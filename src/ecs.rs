@@ -34,9 +34,9 @@ pub fn render_boxes(
 
 	let instance = Instance {
 		transform: translation * rotation,
-		uv_flip: match side {
-			Side::Green => 1.0,
-			Side::Purple => -1.0,
+		uv_x_offset: match side {
+			Side::Green => 0.0,
+			Side::Purple => 0.5,
 		}
 	};
 
@@ -213,8 +213,8 @@ pub fn render_command_paths(
 	#[resource] buffers: &mut InstanceBuffers,
 ) {
 	let uv = match side {
-		Side::Green => Vec2::new(0.25, 0.0),
-		Side::Purple => Vec2::new(0.75, 0.0)
+		Side::Green => Vec2::new(0.5 / 64.0, 0.5),
+		Side::Purple => Vec2::new(1.5 / 64.0, 0.5)
 	};
 
 	let mut prev = position_to_vertex(position.0, uv);

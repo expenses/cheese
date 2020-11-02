@@ -32,10 +32,11 @@ pub struct Renderer {
 	imgui_renderer: imgui_wgpu::Renderer,
 
 	surface_model: Model,
-	rat_box_model: Model,
+	mouse_box_model: Model,
 	selection_indicator_model: Model,
 	surface_texture: wgpu::BindGroup,
-	colours_texture: wgpu::BindGroup,	
+	box_colours_texture: wgpu::BindGroup,
+	colours_texture: wgpu::BindGroup,
 }
 
 impl Renderer {
@@ -165,7 +166,7 @@ impl Renderer {
 		// Load models
 
 		let surface_model = Model::load(include_bytes!("../models/surface.obj"), &device)?;
-		let rat_box_model = Model::load(include_bytes!("../models/rat_box.obj"), &device)?;
+		let mouse_box_model = Model::load(include_bytes!("../models/mouse_box.obj"), &device)?;
 		let selection_indicator_model =
 			Model::load(include_bytes!("../models/selection_indicator.obj"), &device)?;
 
@@ -177,6 +178,11 @@ impl Renderer {
 
 		let surface_texture = load_texture(
 			include_bytes!("../textures/surface.png"), &texture_bind_group_layout,
+			&device, &mut init_encoder,
+		)?;
+
+		let box_colours_texture = load_texture(
+			include_bytes!("../textures/box_colours.png"), &texture_bind_group_layout,
 			&device, &mut init_encoder,
 		)?;
 
@@ -234,7 +240,10 @@ impl Renderer {
 
 		let identity_instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 			label: None,
-			contents: bytemuck::bytes_of(&Instance { transform: Mat4::from_scale(1.0), uv_flip: 1.0 }),
+			contents: bytemuck::bytes_of(&Instance {
+				transform: Mat4::identity(),
+				uv_x_offset: 0.0,
+			}),
 			usage: wgpu::BufferUsage::VERTEX,
 		});
 
@@ -259,9 +268,9 @@ impl Renderer {
 				// Imgui
 				imgui_platform, imgui_renderer,
 				// Models
-				surface_model, rat_box_model, selection_indicator_model,
+				surface_model, mouse_box_model, selection_indicator_model,
 				// Textures
-				surface_texture, colours_texture,
+				surface_texture, box_colours_texture, colours_texture,
 			},
 			instance_buffers,
 			ScreenDimensions {
@@ -320,15 +329,15 @@ impl Renderer {
 
 				// Draw mice
 				if let Some((slice, num)) = instance_buffers.mice.get() {
-					render_pass.set_bind_group(1, &self.colours_texture, &[]);
-					render_pass.set_vertex_buffer(0, self.rat_box_model.buffer.slice(..));
+					render_pass.set_bind_group(1, &self.box_colours_texture, &[]);
+					render_pass.set_vertex_buffer(0, self.mouse_box_model.buffer.slice(..));
 					render_pass.set_vertex_buffer(1, slice);
-					render_pass.draw(0 .. self.rat_box_model.num_vertices, 0 .. num);
+					render_pass.draw(0 .. self.mouse_box_model.num_vertices, 0 .. num);
 				}
 
 				// Draw selection indicators
 				if let Some((slice, num)) = instance_buffers.selection_indicators.get() {
-					render_pass.set_bind_group(1, &self.colours_texture, &[]);
+					render_pass.set_bind_group(1, &self.box_colours_texture, &[]);
 					render_pass.set_vertex_buffer(0, self.selection_indicator_model.buffer.slice(..));
 					render_pass.set_vertex_buffer(1, slice);
 					render_pass.draw(0 .. self.selection_indicator_model.num_vertices, 0 .. num);
@@ -529,7 +538,7 @@ pub struct InstanceBuffers {
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy, Debug)]
 pub struct Instance {
-	pub uv_flip: f32,
+	pub uv_x_offset: f32,
 	pub transform: Mat4,
 }
 

@@ -1,6 +1,6 @@
-# Blender v2.90.1 OBJ File: 'rat_box.blend'
+# Blender v2.90.1 OBJ File: 'mouse_box.blend'
 # www.blender.org
-mtllib rat_box.mtl
+mtllib mouse_box.mtl
 o Cube
 v 1.000000 4.000000 -1.000000
 v 1.000000 0.000000 -1.000000

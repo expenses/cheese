@@ -45,7 +45,7 @@ async fn run() -> anyhow::Result<()> {
 	for i in 0 .. 10 {
 		world.push((
 			ecs::Position(Vec2::new(0.0, i as f32 / 100.0)),
-			ecs::Facing(1.0), ecs::Side::Green, ecs::CommandQueue::default()
+			ecs::Facing(1.0), ecs::Side::Purple, ecs::CommandQueue::default()
 		));
 	}
 
