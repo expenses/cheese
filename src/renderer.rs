@@ -89,6 +89,8 @@ impl Renderer {
 		let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
 			mag_filter: wgpu::FilterMode::Nearest,
 			min_filter: wgpu::FilterMode::Nearest,
+			address_mode_u: wgpu::AddressMode::Repeat,
+			address_mode_v: wgpu::AddressMode::Repeat,
 			label: Some("Cheese Sampler"),
 			..Default::default()
 		});
@@ -222,7 +224,7 @@ impl Renderer {
 					wgpu::VertexBufferDescriptor {
 						stride: std::mem::size_of::<Instance>() as u64,
 						step_mode: wgpu::InputStepMode::Instance,
-						attributes: &wgpu::vertex_attr_array![3 => Float4, 4 => Float4, 5 => Float4, 6 => Float4],
+						attributes: &wgpu::vertex_attr_array![3 => Float, 4 => Float4, 5 => Float4, 6 => Float4, 7 => Float4],
 					},
 				],
 			},
@@ -245,20 +247,20 @@ impl Renderer {
 		let depth_texture = create_depth_texture(&device, window_size.width, window_size.height);
 
 		let mut instance_buffers = InstanceBuffers {
-			mice: InstanceBuffer::new(&device, 10, "Cheese mice instance buffer"),
+			mice: InstanceBuffer::new(&device, 1, "Cheese mice instance buffer"),
 		};
 
 		instance_buffers.mice.push(Instance {
-			transform: Mat4::identity()
+			transform: Mat4::identity(), uv_flip: 1.0
 		});
 
 		instance_buffers.mice.push(Instance {
-			transform: Mat4::from_translation(Vec3::new(5.0, 0.0, 5.0))
+			transform: Mat4::from_translation(Vec3::new(5.0, 0.0, 5.0)), uv_flip: -1.0
 		});
 
 		let identity_instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 			label: None,
-			contents: bytemuck::bytes_of(&Instance { transform: Mat4::identity() }),
+			contents: bytemuck::bytes_of(&Instance { transform: Mat4::from_scale(2.0), uv_flip: 1.0 }),
 			usage: wgpu::BufferUsage::VERTEX,
 		});
 
@@ -440,6 +442,7 @@ pub struct InstanceBuffers {
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy, Debug)]
 pub struct Instance {
+	pub uv_flip: f32,
 	pub transform: Mat4,
 }
 
