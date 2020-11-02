@@ -4,9 +4,12 @@ mod ecs;
 mod resources;
 
 use winit::{
-	event::{ElementState, Event, KeyboardInput, WindowEvent, VirtualKeyCode, MouseScrollDelta, MouseButton},
+	event::{
+		ElementState, Event, KeyboardInput, WindowEvent, DeviceEvent,	
+		VirtualKeyCode, MouseScrollDelta, MouseButton
+	},
 	event_loop::{ControlFlow, EventLoop},
-	dpi::PhysicalPosition,
+	dpi::LogicalPosition,
 };
 use ultraviolet::{Vec2, Vec3};
 use legion::*;
@@ -22,7 +25,10 @@ async fn run() -> anyhow::Result<()> {
 
 	let event_loop = EventLoop::new();
 
-	let (mut renderer, instance_buffers, screen_dimensions) = renderer::Renderer::new(&event_loop).await?;
+	let mut imgui = imgui::Context::create();
+	imgui.set_ini_filename(None);
+
+	let (mut renderer, instance_buffers, screen_dimensions) = renderer::Renderer::new(&event_loop, &mut imgui).await?;
 
 	let mut world = World::default();
 	let mut resources = Resources::default();
@@ -56,10 +62,9 @@ async fn run() -> anyhow::Result<()> {
 		.add_system(ecs::render_boxes_system())
 		.build();
 
-
 	event_loop.run(move |event, _, control_flow| {
 		match event {
-			Event::WindowEvent { event, .. } => {
+			Event::WindowEvent { ref event, .. } => {
 				match event {
 					WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
 					WindowEvent::Resized(size) => {
@@ -67,27 +72,22 @@ async fn run() -> anyhow::Result<()> {
 						let mut screen_dimensions = resources.get_mut::<ScreenDimensions>().unwrap();
 						*screen_dimensions = ScreenDimensions { width: size.width as u32, height: size.height as u32 };
 					},
-					WindowEvent::KeyboardInput { input: KeyboardInput { state, virtual_keycode: Some(code), .. }, ..} => {
-						let pressed = state == ElementState::Pressed;
+					/*WindowEvent::KeyboardInput { input: KeyboardInput { state, virtual_keycode: Some(code), .. }, ..} => {
+						// Disabled due to a bug where a right keypress gets inserted at the start.
+						
+						let pressed = *state == ElementState::Pressed;
 
 						let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
 						let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
 
-						match code {
-							VirtualKeyCode::Up    => camera_controls.up = pressed,
-							VirtualKeyCode::Down  => camera_controls.down = pressed,
-							VirtualKeyCode::Left  => camera_controls.left = pressed,
-							VirtualKeyCode::Right => camera_controls.right = pressed,
-							VirtualKeyCode::LShift => rts_controls.shift = pressed,
-							_ => {}
-						}
-					},
+						handle_key(code, pressed, &mut camera_controls, &mut rts_controls);
+					},*/
 					WindowEvent::MouseWheel { delta, .. } => {
 						let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
 
 						camera_controls.zoom_delta += match delta {
 							MouseScrollDelta::LineDelta(_, y) => y * 100.0,
-							MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => y as f32
+							MouseScrollDelta::PixelDelta(LogicalPosition { y, .. }) => *y as f32
 						};
 					},
 					WindowEvent::CursorMoved { position, .. } => {
@@ -95,7 +95,7 @@ async fn run() -> anyhow::Result<()> {
 						mouse_state.position = Vec2::new(position.x as f32, position.y as f32);
 					},
 					WindowEvent::MouseInput { state, button, .. } => {
-						let pressed = state == ElementState::Pressed;
+						let pressed = *state == ElementState::Pressed;
 
 						let mut mouse_state = resources.get_mut::<MouseState>().unwrap();
 						if pressed {
@@ -109,6 +109,19 @@ async fn run() -> anyhow::Result<()> {
 					_ => {}
 				}
 			},
+			Event::DeviceEvent { ref event, .. } => {
+				match event {
+					DeviceEvent::Key(KeyboardInput { state, virtual_keycode: Some(code), .. }) => {
+						let pressed = *state == ElementState::Pressed;
+
+						let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
+						let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
+
+						handle_key(code, pressed, &mut camera_controls, &mut rts_controls);
+					},
+					_ => {}
+				}
+			},
 			Event::MainEventsCleared => {
 				schedule.execute(&mut world, &mut resources);
 
@@ -117,9 +130,32 @@ async fn run() -> anyhow::Result<()> {
 			Event::RedrawRequested(_) => {
 				let mut instance_buffers = resources.get_mut::<InstanceBuffers>().unwrap();
 				let camera = resources.get::<Camera>().unwrap();
-				renderer.render(camera.to_matrix(), &mut instance_buffers)
+
+				renderer.prepare_imgui(&mut imgui);
+				let mut ui = imgui.frame();
+				ecs::render_ui(&mut ui, &world);
+
+				renderer.render(camera.to_matrix(), &mut instance_buffers, ui)
 			},
 			_ => {}
 		}
+
+		renderer.copy_event_to_imgui(&event, &mut imgui);
 	});
+}
+
+fn handle_key(
+	code: &VirtualKeyCode, pressed: bool,
+	camera_controls: &mut CameraControls, rts_controls: &mut RtsControls,
+) {
+	log::debug!("{:?} pressed: {}", code, pressed);
+
+	match code {
+		VirtualKeyCode::Up    => camera_controls.up = pressed,
+		VirtualKeyCode::Down  => camera_controls.down = pressed,
+		VirtualKeyCode::Left  => camera_controls.left = pressed,
+		VirtualKeyCode::Right => camera_controls.right = pressed,
+		VirtualKeyCode::LShift => rts_controls.shift = pressed,
+		_ => {}
+	}
 }

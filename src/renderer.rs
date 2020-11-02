@@ -26,15 +26,18 @@ pub struct Renderer {
 	view_buffer: wgpu::Buffer,
 	main_bind_group: wgpu::BindGroup,
 
+	imgui_platform: imgui_winit_support::WinitPlatform,
+	imgui_renderer: imgui_wgpu::Renderer,
+
 	surface_model: Model,
 	rat_box_model: Model,
 	selection_indicator_model: Model,
 	surface_texture: wgpu::BindGroup,
-	colours_texture: wgpu::BindGroup,
+	colours_texture: wgpu::BindGroup,	
 }
 
 impl Renderer {
-	pub async fn new(event_loop: &EventLoop<()>) -> anyhow::Result<(Self, InstanceBuffers, ScreenDimensions)> {
+	pub async fn new(event_loop: &EventLoop<()>, imgui: &mut imgui::Context) -> anyhow::Result<(Self, InstanceBuffers, ScreenDimensions)> {
 		let window = Window::new(event_loop)?;
 
 		let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
@@ -268,10 +271,25 @@ impl Renderer {
 			usage: wgpu::BufferUsage::VERTEX,
 		});
 
+		let mut imgui_platform = imgui_winit_support::WinitPlatform::init(imgui);
+		imgui_platform.attach_window(
+			imgui.io_mut(),
+			&window,
+			imgui_winit_support::HiDpiMode::Default,
+		);
+
+		let imgui_renderer = imgui_wgpu::RendererConfig::new()
+			.set_texture_format(DISPLAY_FORMAT)
+			.set_depth_format(DEPTH_FORMAT)
+			.set_sample_count(1)
+			.build(imgui, &device, &queue);
+
 		Ok((
 			Self {
 				swap_chain, window, device, pipeline, queue, main_bind_group, perspective_buffer,
 				view_buffer, swap_chain_desc, depth_texture, identity_instance_buffer, surface,
+				// Imgui
+				imgui_platform, imgui_renderer,
 				// Models
 				surface_model, rat_box_model, selection_indicator_model,
 				// Textures
@@ -298,7 +316,7 @@ impl Renderer {
 		);
 	}
 
-	pub fn render(&mut self, view: Mat4, instance_buffers: &mut InstanceBuffers) {
+	pub fn render(&mut self, view: Mat4, instance_buffers: &mut InstanceBuffers, ui: imgui::Ui) {
 		self.queue.write_buffer(&self.view_buffer, 0, bytemuck::bytes_of(&view));
 
 		instance_buffers.mice.upload(&self.device, &self.queue);
@@ -353,10 +371,26 @@ impl Renderer {
 				render_pass.set_vertex_buffer(0, self.surface_model.buffer.slice(..));
 				render_pass.set_vertex_buffer(1, self.identity_instance_buffer.slice(..));
 				render_pass.draw(0 .. self.surface_model.num_vertices, 0 .. 1);
+
+				// Draw UI
+
+				self.imgui_renderer
+					.render(ui.render(), &self.queue, &self.device, &mut render_pass)
+					.expect("Rendering failed");
 			}
 
 			self.queue.submit(Some(encoder.finish()));
 		}
+	}
+
+	pub fn prepare_imgui(&mut self, imgui: &mut imgui::Context) {
+		self.imgui_platform
+			.prepare_frame(imgui.io_mut(), &self.window)
+			.expect("Failed to prepare frame");
+	}
+
+	pub fn copy_event_to_imgui(&mut self, event: &winit::event::Event<()>, imgui: &mut imgui::Context) {
+		self.imgui_platform.handle_event(imgui.io_mut(), &self.window, event);
 	}
 
 	pub fn request_redraw(&self) {

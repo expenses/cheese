@@ -12,7 +12,7 @@ pub struct CameraControls {
 
 #[derive(Default)]
 pub struct RtsControls {
-    pub shift: bool,
+	pub shift: bool,
 }
 
 pub struct Camera {
@@ -30,12 +30,12 @@ impl Camera {
 	}
 
 	pub fn cast_ray(&self, mouse_position: Vec2, screen_dimensions: &ScreenDimensions) -> Vec2 {
-        let &ScreenDimensions { width, height } = screen_dimensions;
+		let &ScreenDimensions { width, height } = screen_dimensions;
 
-        let x = (mouse_position.x / width as f32 * 2.0) - 1.0;
-        let y = 1.0 - (mouse_position.y / height as f32 * 2.0);
+		let x = (mouse_position.x / width as f32 * 2.0) - 1.0;
+		let y = 1.0 - (mouse_position.y / height as f32 * 2.0);
 
-        let clip = Vec4::new(x, y, -1.0, 1.0);
+		let clip = Vec4::new(x, y, -1.0, 1.0);
 
 		let eye = crate::renderer::create_perspective_mat4(width, height).inversed() * clip;
 		let eye = Vec4::new(eye.x, eye.y, -1.0, 0.0);
@@ -52,8 +52,8 @@ impl Camera {
 			&ray
 		).unwrap();
 
-        let contact = self.position + direction * toi;
-        Vec2::new(contact.x, contact.z)
+		let contact = self.position + direction * toi;
+		Vec2::new(contact.x, contact.z)
 	}
 }
 
@@ -64,7 +64,7 @@ pub struct ScreenDimensions {
 
 #[derive(Default, Debug)]
 pub struct MouseState {
-    pub position: Vec2,
-    pub left_clicked: bool,
-    pub right_clicked: bool,
+	pub position: Vec2,
+	pub left_clicked: bool,
+	pub right_clicked: bool,
 }
