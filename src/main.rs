@@ -13,6 +13,8 @@ fn main() -> anyhow::Result<()> {
 }
 
 async fn run() -> anyhow::Result<()> {
+	env_logger::init();
+
 	let event_loop = EventLoop::new();
 
 	let (mut renderer, mut instance_buffers) = renderer::Renderer::new(&event_loop).await?;

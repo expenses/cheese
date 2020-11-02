@@ -406,7 +406,7 @@ impl InstanceBuffer {
 			self.len = self.waiting.len();
 		} else {
 			self.capacity *= 2;
-			//log::debug!("Resizing '{}' to {} instances", self.label, self.capacity);
+			log::debug!("Resizing '{}' to {} instances", self.label, self.capacity);
 			self.buffer = device.create_buffer(&wgpu::BufferDescriptor {
 				label: Some(self.label),
 				size: (self.capacity * std::mem::size_of::<Instance>()) as u64,
