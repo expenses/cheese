@@ -2,8 +2,9 @@ mod renderer;
 mod assets;
 
 use winit::{
-	event::{ElementState, Event, KeyboardInput, WindowEvent, VirtualKeyCode},
+	event::{ElementState, Event, KeyboardInput, WindowEvent, VirtualKeyCode, MouseScrollDelta},
 	event_loop::{ControlFlow, EventLoop},
+	dpi::PhysicalPosition,
 };
 use ultraviolet::{Vec3, Mat4};
 
@@ -41,12 +42,18 @@ async fn run() -> anyhow::Result<()> {
 							VirtualKeyCode::Right => camera_controls.right = pressed,
 							_ => {}
 						}
+					},
+					WindowEvent::MouseWheel { delta, .. } => {
+						camera_controls.zoom_delta += match delta {
+							MouseScrollDelta::LineDelta(_, y) => y * 100.0,
+							MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => y as f32
+						};
 					}
 					_ => {}
 				}
 			},
 			Event::MainEventsCleared => {
-				let speed = 0.1;
+				let speed = 0.5;
 
 				let right = Vec3::new(speed, 0.0, 0.0);
 				let forwards = Vec3::new(0.0, 0.0, -speed);
@@ -71,6 +78,9 @@ async fn run() -> anyhow::Result<()> {
 					camera.looking_at -= forwards;
 				}
 
+				camera.position += (camera.looking_at - camera.position).normalized() * camera_controls.zoom_delta * 0.01;
+				camera_controls.zoom_delta = 0.0;
+
 				renderer.request_redraw()
 			},
 			Event::RedrawRequested(_) => renderer.render(camera.to_matrix(), &mut instance_buffers),
@@ -85,6 +95,7 @@ struct CameraControls {
 	down: bool,
 	left: bool,
 	right: bool,
+	zoom_delta: f32,
 }
 
 struct Camera {
