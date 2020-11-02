@@ -43,15 +43,15 @@ async fn run() -> anyhow::Result<()> {
 	resources.insert(RtsControls::default());
 
 	world.push((
-		ecs::Position(Vec2::new(0.0, 1.0)), ecs::Facing(1.0), ecs::Side::Green,
+		ecs::Position(Vec2::new(0.0, 1.0)), ecs::Facing(1.0), ecs::Side::Green, ecs::CommandQueue::default(),
 	));
 
 	world.push((
-		ecs::Position(Vec2::new(1.0, -1.0)), ecs::Facing(-1.0), ecs::Side::Purple
+		ecs::Position(Vec2::new(1.0, -1.0)), ecs::Facing(-1.0), ecs::Side::Purple, ecs::CommandQueue::default(),
 	));
 
 	world.push((
-		ecs::Position(Vec2::new(5.0, -1.0)), ecs::Facing(-1.0), ecs::Side::Purple
+		ecs::Position(Vec2::new(5.0, -1.0)), ecs::Facing(-1.0), ecs::Side::Purple, ecs::CommandQueue::default(),
 	));
 
 	let mut schedule = Schedule::builder()

@@ -261,8 +261,9 @@ impl Renderer {
 		let depth_texture = create_depth_texture(&device, window_size.width, window_size.height);
 
 		let instance_buffers = InstanceBuffers {
-			mice: InstanceBuffer::new(&device, 1, "Cheese mice instance buffer"),
-			selection_indicators: InstanceBuffer::new(&device, 1, "Cheese selection indicators buffer"),
+			mice: GpuBuffer::new(&device, 1, "Cheese mice instance buffer"),
+			selection_indicators: GpuBuffer::new(&device, 1, "Cheese selection indicators buffer"),
+			command_paths: GpuBuffer::new(&device, 1, "Cheese command paths buffer"),
 		};
 
 		let identity_instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -419,21 +420,21 @@ fn create_depth_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu:
 	}).create_view(&wgpu::TextureViewDescriptor::default())
 }
 
-pub struct InstanceBuffer {
+pub struct GpuBuffer<T> {
 	buffer: wgpu::Buffer,
 	capacity: usize,
 	len: usize,
 	label: &'static str,
-	waiting: Vec<Instance>,
+	waiting: Vec<T>,
 }
 
-impl InstanceBuffer {
+impl<T: bytemuck::Pod> GpuBuffer<T> {
 	fn new(device: &wgpu::Device, base_capacity: usize, label: &'static str) -> Self {
 		Self {
 			capacity: base_capacity,
 			buffer: device.create_buffer(&wgpu::BufferDescriptor {
 				label: Some(label),
-				size: (base_capacity * std::mem::size_of::<Instance>()) as u64,
+				size: (base_capacity * std::mem::size_of::<T>()) as u64,
 				usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
 				mapped_at_creation: false,
 			}),
@@ -443,8 +444,8 @@ impl InstanceBuffer {
 		}
 	}
 
-	pub fn push(&mut self, instance: Instance) {
-		self.waiting.push(instance)
+	pub fn push(&mut self, item: T) {
+		self.waiting.push(item)
 	}
 
 	fn upload(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
@@ -460,10 +461,10 @@ impl InstanceBuffer {
 			self.len = self.waiting.len();
 		} else {
 			self.capacity = (self.capacity * 2).max(self.waiting.len());
-			log::debug!("Resizing '{}' to {} instances", self.label, self.capacity);
+			log::debug!("Resizing '{}' to {} items", self.label, self.capacity);
 			self.buffer = device.create_buffer(&wgpu::BufferDescriptor {
 				label: Some(self.label),
-				size: (self.capacity * std::mem::size_of::<Instance>()) as u64,
+				size: (self.capacity * std::mem::size_of::<T>()) as u64,
 				usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
 				mapped_at_creation: true,
 			});
@@ -477,7 +478,7 @@ impl InstanceBuffer {
 
 	fn get(&self) -> Option<(wgpu::BufferSlice, u32)> {
 		if self.len > 0 {
-			let byte_len = (self.len * std::mem::size_of::<Instance>()) as u64;
+			let byte_len = (self.len * std::mem::size_of::<T>()) as u64;
 
 			return Some((
 				self.buffer.slice(..byte_len), self.len as u32,
@@ -489,8 +490,9 @@ impl InstanceBuffer {
 }
 
 pub struct InstanceBuffers {
-	pub mice: InstanceBuffer,
-	pub selection_indicators: InstanceBuffer,
+	pub mice: GpuBuffer<Instance>,
+	pub selection_indicators: GpuBuffer<Instance>,
+	pub command_paths: GpuBuffer<Vertex>,
 }
 
 

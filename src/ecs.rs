@@ -4,6 +4,7 @@ use crate::resources::{Camera, CameraControls, MouseState, ScreenDimensions, Rts
 use legion::*;
 use legion::world::SubWorld;
 use legion::systems::CommandBuffer;
+use std::collections::VecDeque;
 
 pub struct Position(pub Vec2);
 pub struct Facing(pub f32);
@@ -12,7 +13,14 @@ pub enum Side {
 	Purple,
 }
 pub struct Selected;
-pub struct MoveTo(Vec2);
+
+#[derive(Clone)]
+pub enum Command {
+	MoveTo(Vec2),
+}
+
+#[derive(Default)]
+pub struct CommandQueue(VecDeque<Command>);
 
 #[legion::system(for_each)]
 pub fn render_boxes(
@@ -113,11 +121,13 @@ pub fn handle_left_click(
 #[legion::system]
 #[read_component(Entity)]
 #[read_component(Selected)]
+#[write_component(CommandQueue)]
 pub fn handle_right_click(
 	#[resource] camera: &Camera,
 	#[resource] mouse_state: &mut MouseState,
 	#[resource] screen_dimensions: &ScreenDimensions,
-	world: &SubWorld, commands: &mut CommandBuffer,
+	#[resource] rts_controls: &RtsControls,
+	world: &mut SubWorld,
 ) {
 	if !mouse_state.right_clicked {
 		return;
@@ -125,9 +135,13 @@ pub fn handle_right_click(
 
 	let position = camera.cast_ray(mouse_state.position, screen_dimensions);
 
-	<Entity>::query().filter(component::<Selected>())
-		.for_each(world, |entity| {
-			commands.add_component(*entity, MoveTo(position));
+	<&mut CommandQueue>::query().filter(component::<Selected>())
+		.for_each_mut(world, |commands| {
+			if !rts_controls.shift_held {
+				commands.0.clear();
+			}
+
+			commands.0.push_back(Command::MoveTo(position));
 		});
 
 	mouse_state.right_clicked = false;
@@ -135,38 +149,40 @@ pub fn handle_right_click(
 
 #[legion::system(for_each)]
 pub fn move_units(
-	entity: &Entity,
 	position: &mut Position,
-	move_to: &MoveTo,
-	commands: &mut CommandBuffer,
+	commands: &mut CommandQueue,
 ) {
 	let speed = 0.1_f32;
 
-	let direction = move_to.0 - position.0;
+	match commands.0.front().clone() {
+		Some(Command::MoveTo(target)) => {
+			let direction = *target - position.0;
 
-	if direction.mag_sq() <= speed.powi(2) {
-		position.0 = move_to.0;
-		commands.remove_component::<MoveTo>(*entity);
-	} else {
-		position.0 += direction.normalized() * speed;
+			if direction.mag_sq() <= speed.powi(2) {
+				position.0 = *target;
+				commands.0.pop_front();
+			} else {
+				position.0 += direction.normalized() * speed;
+			}
+		},
+		None => {}
 	}
 }
 
 #[legion::system]
 #[read_component(Entity)]
 #[read_component(Selected)]
+#[write_component(CommandQueue)]
 pub fn handle_rts_commands(
 	#[resource] rts_controls: &mut RtsControls,
-	world: &SubWorld, commands: &mut CommandBuffer,
+	world: &mut SubWorld,
 ) {
 	if !rts_controls.s_pressed {
 		return;
 	}
 
-	<Entity>::query().filter(component::<Selected>())
-		.for_each(world, |entity| {
-			commands.remove_component::<MoveTo>(*entity);
-		});
+	<&mut CommandQueue>::query().filter(component::<Selected>())
+		.for_each_mut(world, |commands| commands.0.clear());
 
 	rts_controls.s_pressed = false;
 }
