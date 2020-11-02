@@ -1,12 +1,15 @@
 mod renderer;
 mod assets;
+mod ecs;
 
 use winit::{
 	event::{ElementState, Event, KeyboardInput, WindowEvent, VirtualKeyCode, MouseScrollDelta},
 	event_loop::{ControlFlow, EventLoop},
 	dpi::PhysicalPosition,
 };
-use ultraviolet::{Vec3, Mat4};
+use ultraviolet::{Vec2, Vec3, Mat4};
+use legion::*;
+use crate::renderer::InstanceBuffers;
 
 fn main() -> anyhow::Result<()> {
 	futures::executor::block_on(run())
@@ -18,6 +21,27 @@ async fn run() -> anyhow::Result<()> {
 	let event_loop = EventLoop::new();
 
 	let (mut renderer, mut instance_buffers) = renderer::Renderer::new(&event_loop).await?;
+
+	let mut world = World::default();
+	let mut resources = Resources::default();
+	resources.insert(instance_buffers);
+
+	world.push((
+		ecs::Position(Vec2::new(-1.0, 1.0)), ecs::Facing(1.0), ecs::Side::Green
+	));
+
+	world.push((
+		ecs::Position(Vec2::new(1.0, -1.0)), ecs::Facing(-1.0), ecs::Side::Purple
+	));
+
+	world.push((
+		ecs::Position(Vec2::new(5.0, -1.0)), ecs::Facing(-1.0), ecs::Side::Purple
+	));
+
+	let mut schedule = Schedule::builder()
+		.add_system(ecs::render_boxes_system())
+		.build();
+
 
 	let mut camera = Camera {
 		position: Vec3::new(0.0, 20.0, 10.0),
@@ -83,9 +107,14 @@ async fn run() -> anyhow::Result<()> {
 				camera.position += (camera.looking_at - camera.position).normalized() * camera_controls.zoom_delta * 0.01;
 				camera_controls.zoom_delta = 0.0;
 
+				schedule.execute(&mut world, &mut resources);
+
 				renderer.request_redraw()
 			},
-			Event::RedrawRequested(_) => renderer.render(camera.to_matrix(), &mut instance_buffers),
+			Event::RedrawRequested(_) => {
+				let mut instance_buffers = resources.get_mut::<InstanceBuffers>().unwrap();
+				renderer.render(camera.to_matrix(), &mut instance_buffers)
+			},
 			_ => {}
 		}
 	});

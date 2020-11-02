@@ -250,14 +250,6 @@ impl Renderer {
 			mice: InstanceBuffer::new(&device, 1, "Cheese mice instance buffer"),
 		};
 
-		instance_buffers.mice.push(Instance {
-			transform: Mat4::identity(), uv_flip: 1.0
-		});
-
-		instance_buffers.mice.push(Instance {
-			transform: Mat4::from_translation(Vec3::new(5.0, 0.0, 5.0)), uv_flip: -1.0
-		});
-
 		let identity_instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 			label: None,
 			contents: bytemuck::bytes_of(&Instance { transform: Mat4::from_scale(2.0), uv_flip: 1.0 }),
@@ -389,7 +381,7 @@ impl InstanceBuffer {
 		}
 	}
 
-	fn push(&mut self, instance: Instance) {
+	pub fn push(&mut self, instance: Instance) {
 		self.waiting.push(instance)
 	}
 
@@ -405,7 +397,7 @@ impl InstanceBuffer {
 			queue.write_buffer(&self.buffer, 0, bytes);
 			self.len = self.waiting.len();
 		} else {
-			self.capacity *= 2;
+			self.capacity = (self.capacity * 2).max(self.waiting.len());
 			log::debug!("Resizing '{}' to {} instances", self.label, self.capacity);
 			self.buffer = device.create_buffer(&wgpu::BufferDescriptor {
 				label: Some(self.label),
@@ -418,7 +410,7 @@ impl InstanceBuffer {
 			self.len = self.waiting.len();
 		}
 
-		//self.waiting.clear();
+		self.waiting.clear();
 	}
 
 	fn get(&self) -> Option<(wgpu::BufferSlice, u32)> {

@@ -12,6 +12,7 @@ bytemuck = { version = "1.4.1", features = ["derive"] }
 env_logger = "0.8.1"
 futures = "0.3.7"
 image = "0.23.11"
+legion = "0.3.1"
 log = "0.4.11"
 obj = "0.10.1"
 ultraviolet = { version = "0.7.5", features = ["bytemuck"] }
