@@ -49,7 +49,9 @@ async fn run() -> anyhow::Result<()> {
 
 	let mut schedule = Schedule::builder()
 		.add_system(ecs::control_camera_system())
-		.add_system(ecs::handle_mouse_click_system())
+		.add_system(ecs::handle_left_click_system())
+		.add_system(ecs::handle_right_click_system())
+		.add_system(ecs::move_units_system())
 		.add_system(ecs::render_boxes_system())
 		.build();
 
@@ -89,12 +91,16 @@ async fn run() -> anyhow::Result<()> {
 						let mut mouse_state = resources.get_mut::<MouseState>().unwrap();
 						mouse_state.position = Vec2::new(position.x as f32, position.y as f32);
 					},
-					WindowEvent::MouseInput { state, button: MouseButton::Left, .. } => {
+					WindowEvent::MouseInput { state, button, .. } => {
 						let pressed = state == ElementState::Pressed;
 
 						let mut mouse_state = resources.get_mut::<MouseState>().unwrap();
 						if pressed {
-							mouse_state.clicked = true;
+							match button {
+								MouseButton::Left => mouse_state.left_clicked = true,
+								MouseButton::Right => mouse_state.right_clicked = true,
+								_ => {}
+							}
 						}
 					}
 					_ => {}

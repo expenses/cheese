@@ -60,5 +60,6 @@ pub struct ScreenDimensions {
 #[derive(Default, Debug)]
 pub struct MouseState {
     pub position: Vec2,
-    pub clicked: bool,
+    pub left_clicked: bool,
+    pub right_clicked: bool,
 }

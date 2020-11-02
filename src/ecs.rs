@@ -12,6 +12,7 @@ pub enum Side {
     Purple,
 }
 pub struct Selected;
+pub struct MoveTo(Vec2);
 
 #[legion::system(for_each)]
 pub fn render_boxes(
@@ -71,22 +72,19 @@ pub fn control_camera(
 
 #[legion::system]
 #[read_component(Entity)]
+#[read_component(Selected)]
 #[read_component(Position)]
-pub fn handle_mouse_click(
+pub fn handle_left_click(
     #[resource] camera: &Camera,
     #[resource] mouse_state: &mut MouseState,
     #[resource] screen_dimensions: &ScreenDimensions,
     world: &SubWorld, commands: &mut CommandBuffer,
 ) {
-    if !mouse_state.clicked {
+    if !mouse_state.left_clicked {
         return;
     }
 
     let position = camera.cast_ray(mouse_state.position, screen_dimensions);
-
-    <Entity>::query().for_each(world, |entity| {
-        commands.remove_component::<Selected>(*entity)
-    });
 
     let entity = <(Entity, &Position)>::query().iter(world)
         .filter(|(_, pos)| (position - pos.0).mag_sq() < 4.0)
@@ -94,8 +92,54 @@ pub fn handle_mouse_click(
         .next();
 
     if let Some((entity, _)) = entity {
+        <Entity>::query().filter(component::<Selected>()).for_each(world, |entity| {
+            commands.remove_component::<Selected>(*entity)
+        });
+
         commands.add_component(*entity, Selected);
     }
 
-    mouse_state.clicked = false;
+    mouse_state.left_clicked = false;
+}
+
+#[legion::system]
+#[read_component(Entity)]
+#[read_component(Selected)]
+pub fn handle_right_click(
+    #[resource] camera: &Camera,
+    #[resource] mouse_state: &mut MouseState,
+    #[resource] screen_dimensions: &ScreenDimensions,
+    world: &SubWorld, commands: &mut CommandBuffer,
+) {
+    if !mouse_state.right_clicked {
+        return;
+    }
+
+    let position = camera.cast_ray(mouse_state.position, screen_dimensions);
+
+    <Entity>::query().filter(component::<Selected>())
+        .for_each(world, |entity| {
+            commands.add_component(*entity, MoveTo(position));
+        });
+
+    mouse_state.right_clicked = false;
+}
+
+#[legion::system(for_each)]
+pub fn move_units(
+    entity: &Entity,
+    position: &mut Position,
+    move_to: &MoveTo,
+    commands: &mut CommandBuffer,
+) {
+    let speed = 0.1_f32;
+
+    let direction = move_to.0 - position.0;
+
+    if direction.mag_sq() <= speed.powi(2) {
+        position.0 = move_to.0;
+        commands.remove_component::<MoveTo>(*entity);
+    } else {
+        position.0 += direction.normalized() * speed;
+    }
 }
