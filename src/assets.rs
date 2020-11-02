@@ -3,15 +3,11 @@ use crate::renderer::{Vertex, TEXTURE_FORMAT};
 
 pub struct Model {
 	pub buffer: wgpu::Buffer,
-	pub bind_group: wgpu::BindGroup,
 	pub num_vertices: u32,
 }
 
 impl Model {
-	pub fn load(
-		obj_bytes: &[u8], image_bytes: &[u8], bind_group_layout: &wgpu::BindGroupLayout,
-		device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder
-	) -> anyhow::Result<Self> {
+	pub fn load(obj_bytes: &[u8], device: &wgpu::Device) -> anyhow::Result<Self> {
 		let mut reader = std::io::BufReader::new(obj_bytes);
 		let obj::ObjData { texture, normal, position, objects, .. } = obj::ObjData::load_buf(&mut reader)?;
 
@@ -39,19 +35,17 @@ impl Model {
 			usage: wgpu::BufferUsage::VERTEX
 		});
 
-		let texture_bind_group = load_texture(image_bytes, bind_group_layout, device, encoder);
-
 		Ok(Self {
-			buffer, bind_group: texture_bind_group, num_vertices: vertices.len() as u32,
+			buffer, num_vertices: vertices.len() as u32,
 		})
 	}
 }
 
-fn load_texture(
+pub fn load_texture(
 	bytes: &[u8], bind_group_layout: &wgpu::BindGroupLayout,
 	device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder,
-) -> wgpu::BindGroup {
-	let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png).unwrap()
+) -> anyhow::Result<wgpu::BindGroup> {
+	let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png)?
 		.into_rgba();
 
 	let temp_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -95,7 +89,7 @@ fn load_texture(
 
 	let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-	device.create_bind_group(&wgpu::BindGroupDescriptor {
+	Ok(device.create_bind_group(&wgpu::BindGroupDescriptor {
 		label: None,
 		layout: bind_group_layout,
 		entries: &[
@@ -104,5 +98,5 @@ fn load_texture(
 				resource: wgpu::BindingResource::TextureView(&view),
 			},
 		],
-	})
+	}))
 }

@@ -4,7 +4,7 @@ use winit::{
 };
 use wgpu::util::DeviceExt;
 use ultraviolet::{Vec2, Vec3, Mat4};
-use crate::assets::Model;
+use crate::assets::{Model, load_texture};
 
 const DISPLAY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -27,6 +27,9 @@ pub struct Renderer {
 
 	surface_model: Model,
 	rat_box_model: Model,
+	selection_indicator_model: Model,
+	surface_texture: wgpu::BindGroup,
+	colours_texture: wgpu::BindGroup,
 }
 
 impl Renderer {
@@ -155,18 +158,25 @@ impl Renderer {
 
 		// Load models
 
+		let surface_model = Model::load(include_bytes!("../models/surface.obj"), &device)?;
+		let rat_box_model = Model::load(include_bytes!("../models/rat_box.obj"), &device)?;
+		let selection_indicator_model =
+			Model::load(include_bytes!("../models/selection_indicator.obj"), &device)?;
+
+		// Load textures
+
 		let mut init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
 			label: Some("Cheese init_encoder")
 		});
 
-		let surface_model = Model::load(
-			include_bytes!("../models/surface.obj"), include_bytes!("../textures/surface.png"),
-			&texture_bind_group_layout, &device, &mut init_encoder,
+		let surface_texture = load_texture(
+			include_bytes!("../textures/surface.png"), &texture_bind_group_layout,
+			&device, &mut init_encoder,
 		)?;
 
-		let rat_box_model = Model::load(
-			include_bytes!("../models/rat_box.obj"), include_bytes!("../textures/colours.png"),
-			&texture_bind_group_layout, &device, &mut init_encoder,
+		let colours_texture = load_texture(
+			include_bytes!("../textures/colours.png"), &texture_bind_group_layout,
+			&device, &mut init_encoder,
 		)?;
 
 		queue.submit(Some(init_encoder.finish()));
@@ -246,8 +256,9 @@ impl Renderer {
 		let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
 		let depth_texture = create_depth_texture(&device, window_size.width, window_size.height);
 
-		let mut instance_buffers = InstanceBuffers {
+		let instance_buffers = InstanceBuffers {
 			mice: InstanceBuffer::new(&device, 1, "Cheese mice instance buffer"),
+			selection_indicators: InstanceBuffer::new(&device, 1, "Cheese selection indicators buffer"),
 		};
 
 		let identity_instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -259,8 +270,11 @@ impl Renderer {
 		Ok((
 			Self {
 				swap_chain, window, device, pipeline, queue, main_bind_group, perspective_buffer,
-				view_buffer, surface, surface_model, swap_chain_desc, rat_box_model, depth_texture,
-				identity_instance_buffer,
+				view_buffer, swap_chain_desc, depth_texture, identity_instance_buffer, surface,
+				// Models
+				surface_model, rat_box_model, selection_indicator_model,
+				// Textures
+				surface_texture, colours_texture,
 			},
 			instance_buffers
 		))
@@ -283,6 +297,7 @@ impl Renderer {
 		self.queue.write_buffer(&self.view_buffer, 0, bytemuck::bytes_of(&view));
 
 		instance_buffers.mice.upload(&self.device, &self.queue);
+		instance_buffers.selection_indicators.upload(&self.device, &self.queue);
 
 		if let Ok(frame) = self.swap_chain.get_current_frame() {
 			let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -314,14 +329,22 @@ impl Renderer {
 
 				// Draw mice
 				if let Some((slice, num)) = instance_buffers.mice.get() {
-					render_pass.set_bind_group(1, &self.rat_box_model.bind_group, &[]);
+					render_pass.set_bind_group(1, &self.colours_texture, &[]);
 					render_pass.set_vertex_buffer(0, self.rat_box_model.buffer.slice(..));
 					render_pass.set_vertex_buffer(1, slice);
 					render_pass.draw(0 .. self.rat_box_model.num_vertices, 0 .. num);
 				}
 
+				// Draw selection indicators
+				if let Some((slice, num)) = instance_buffers.selection_indicators.get() {
+					render_pass.set_bind_group(1, &self.colours_texture, &[]);
+					render_pass.set_vertex_buffer(0, self.selection_indicator_model.buffer.slice(..));
+					render_pass.set_vertex_buffer(1, slice);
+					render_pass.draw(0 .. self.selection_indicator_model.num_vertices, 0 .. num);
+				}
+
 				// Draw surface
-				render_pass.set_bind_group(1, &self.surface_model.bind_group, &[]);
+				render_pass.set_bind_group(1, &self.surface_texture, &[]);
 				render_pass.set_vertex_buffer(0, self.surface_model.buffer.slice(..));
 				render_pass.set_vertex_buffer(1, self.identity_instance_buffer.slice(..));
 				render_pass.draw(0 .. self.surface_model.num_vertices, 0 .. 1);
@@ -428,6 +451,7 @@ impl InstanceBuffer {
 
 pub struct InstanceBuffers {
 	pub mice: InstanceBuffer,
+	pub selection_indicators: InstanceBuffer,
 }
 
 

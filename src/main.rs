@@ -20,14 +20,14 @@ async fn run() -> anyhow::Result<()> {
 
 	let event_loop = EventLoop::new();
 
-	let (mut renderer, mut instance_buffers) = renderer::Renderer::new(&event_loop).await?;
+	let (mut renderer, instance_buffers) = renderer::Renderer::new(&event_loop).await?;
 
 	let mut world = World::default();
 	let mut resources = Resources::default();
 	resources.insert(instance_buffers);
 
 	world.push((
-		ecs::Position(Vec2::new(-1.0, 1.0)), ecs::Facing(1.0), ecs::Side::Green
+		ecs::Position(Vec2::new(-1.0, 1.0)), ecs::Facing(1.0), ecs::Side::Green, ecs::Selected,
 	));
 
 	world.push((
@@ -35,7 +35,7 @@ async fn run() -> anyhow::Result<()> {
 	));
 
 	world.push((
-		ecs::Position(Vec2::new(5.0, -1.0)), ecs::Facing(-1.0), ecs::Side::Purple
+		ecs::Position(Vec2::new(5.0, -1.0)), ecs::Facing(-1.0), ecs::Side::Purple, ecs::Selected
 	));
 
 	let mut schedule = Schedule::builder()
