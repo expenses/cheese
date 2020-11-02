@@ -42,26 +42,24 @@ async fn run() -> anyhow::Result<()> {
 	resources.insert(MouseState::default());
 	resources.insert(RtsControls::default());
 
-	world.push((
-		ecs::Position(Vec2::new(0.0, 1.0)), ecs::Facing(1.0), ecs::Side::Green, ecs::CommandQueue::default(),
-	));
-
-	world.push((
-		ecs::Position(Vec2::new(1.0, -1.0)), ecs::Facing(-1.0), ecs::Side::Purple, ecs::CommandQueue::default(),
-	));
-
-	world.push((
-		ecs::Position(Vec2::new(5.0, -1.0)), ecs::Facing(-1.0), ecs::Side::Purple, ecs::CommandQueue::default(),
-	));
+	for i in 0 .. 10 {
+		world.push((
+			ecs::Position(Vec2::new(0.0, i as f32 / 100.0)),
+			ecs::Facing(1.0), ecs::Side::Green, ecs::CommandQueue::default()
+		));
+	}
 
 	let mut schedule = Schedule::builder()
 		.add_system(ecs::control_camera_system())
 		.add_system(ecs::handle_left_click_system())
 		.add_system(ecs::handle_right_click_system())
 		.add_system(ecs::handle_rts_commands_system())
+		.add_system(ecs::avoidance_system())
 		.flush()
 		.add_system(ecs::move_units_system())
+		.add_system(ecs::apply_steering_system())
 		.add_system(ecs::render_boxes_system())
+		.add_system(ecs::render_command_paths_system())
 		.build();
 
 	event_loop.run(move |event, _, control_flow| {

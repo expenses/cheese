@@ -1,5 +1,5 @@
 use ultraviolet::{Vec2, Vec3, Mat4};
-use crate::renderer::{Instance, InstanceBuffers};
+use crate::renderer::{Instance, InstanceBuffers, Vertex};
 use crate::resources::{Camera, CameraControls, MouseState, ScreenDimensions, RtsControls};
 use legion::*;
 use legion::world::SubWorld;
@@ -21,6 +21,8 @@ pub enum Command {
 
 #[derive(Default)]
 pub struct CommandQueue(VecDeque<Command>);
+
+pub struct Avoidance(pub Vec2);
 
 #[legion::system(for_each)]
 pub fn render_boxes(
@@ -200,4 +202,84 @@ pub fn render_ui(ui: &mut imgui::Ui, world: &World) {
 				ui.text(im_str!("{:?}: {:?}", entity, position.0))
 			});
 		});
+}
+
+#[legion::system(for_each)]
+#[filter(component::<Selected>())]
+pub fn render_command_paths(
+	queue: &CommandQueue,
+	position: &Position,
+	side: &Side,
+	#[resource] buffers: &mut InstanceBuffers,
+) {
+	let uv = match side {
+		Side::Green => Vec2::new(0.25, 0.0),
+		Side::Purple => Vec2::new(0.75, 0.0)
+	};
+
+	let mut prev = position_to_vertex(position.0, uv);
+
+	for command in queue.0.iter() {
+		let position = match command {
+			Command::MoveTo(position) => *position
+		};
+
+		let vertex = position_to_vertex(position, uv);
+
+		buffers.command_paths.push(prev);
+		buffers.command_paths.push(vertex);
+
+		prev = vertex;
+	}
+}
+
+fn position_to_vertex(pos: Vec2, uv: Vec2) -> Vertex {
+	Vertex {
+		position: Vec3::new(pos.x, 0.1, pos.y),
+		normal: Vec3::new(0.0, 0.0, 0.0),
+		uv
+	}
+}
+
+#[legion::system]
+#[read_component(Position)]
+pub fn avoidance(
+	world: &SubWorld,
+	command_buffer: &mut CommandBuffer,
+) {
+	let desired_seperation = 2.0_f32;
+
+	<(Entity, &Position)>::query().for_each(world, |(entity, position)| {
+
+		let mut avoidance_direction = Vec2::new(0.0, 0.0);
+		let mut count = 0;
+
+		for other_position in <&Position>::query().iter(world) {
+			let away_vector = position.0 - other_position.0;
+			let distance_sq = away_vector.mag_sq();
+			
+			if distance_sq > 0.0 && distance_sq < desired_seperation.powi(2) {
+				let distance = distance_sq.sqrt();
+
+				avoidance_direction += away_vector.normalized() / distance;
+				count += 1;
+			}
+		}
+
+		if count > 0 {
+			avoidance_direction /= count as f32;
+			command_buffer.add_component(*entity, Avoidance(avoidance_direction));
+		}
+	})
+}
+
+#[legion::system(for_each)]
+pub fn apply_steering(
+	entity: &Entity,
+	position: &mut Position,
+	avoidance: &Avoidance,
+	command_buffer: &mut CommandBuffer,
+) {
+	position.0 += avoidance.0 * 0.1;
+	command_buffer.remove_component::<Avoidance>(*entity);
 }

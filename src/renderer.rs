@@ -15,12 +15,14 @@ pub struct Renderer {
 	swap_chain: wgpu::SwapChain,
 	window: Window,
 	device: wgpu::Device,
-	pipeline: wgpu::RenderPipeline,
 	queue: wgpu::Queue,
 	surface: wgpu::Surface,
 	swap_chain_desc: wgpu::SwapChainDescriptor,
 	depth_texture: wgpu::TextureView,
 	identity_instance_buffer: wgpu::Buffer,
+
+	model_pipeline: wgpu::RenderPipeline,
+	line_pipeline: wgpu::RenderPipeline,
 
 	perspective_buffer: wgpu::Buffer,
 	view_buffer: wgpu::Buffer,
@@ -199,53 +201,17 @@ impl Renderer {
 		let fs = wgpu::include_spirv!("../shaders/shader.frag.spv");
 		let fs_module = device.create_shader_module(fs);
 
-		let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-			label: Some("Cheese render pipeline"),
-			layout: Some(&pipeline_layout),
-			vertex_stage: wgpu::ProgrammableStageDescriptor {
-				module: &vs_module,
-				entry_point: "main",
-			},
-			fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-				module: &fs_module,
-				entry_point: "main",
-			}),
-			rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-				cull_mode: wgpu::CullMode::Back,
-				..Default::default()
-			}),
-			primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-			color_states: &[wgpu::ColorStateDescriptor {
-				format: DISPLAY_FORMAT,
-				color_blend: wgpu::BlendDescriptor::REPLACE,
-				alpha_blend: wgpu::BlendDescriptor::REPLACE,
-				write_mask: wgpu::ColorWrite::ALL,
-			}],
-			depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
-				format: DEPTH_FORMAT,
-				depth_write_enabled: true,
-				depth_compare: wgpu::CompareFunction::Less,
-				stencil: wgpu::StencilStateDescriptor::default(),
-			}),
-			vertex_state: wgpu::VertexStateDescriptor {
-				index_format: wgpu::IndexFormat::Uint16,
-				vertex_buffers: &[
-					wgpu::VertexBufferDescriptor {
-						stride: std::mem::size_of::<Vertex>() as u64,
-						step_mode: wgpu::InputStepMode::Vertex,
-						attributes: &wgpu::vertex_attr_array![0 => Float3, 1 => Float3, 2 => Float2],
-					},
-					wgpu::VertexBufferDescriptor {
-						stride: std::mem::size_of::<Instance>() as u64,
-						step_mode: wgpu::InputStepMode::Instance,
-						attributes: &wgpu::vertex_attr_array![3 => Float, 4 => Float4, 5 => Float4, 6 => Float4, 7 => Float4],
-					},
-				],
-			},
-			sample_count: 1,
-			sample_mask: !0,
-			alpha_to_coverage_enabled: false,
-		});
+		let model_pipeline = create_render_pipeline(
+			&device, &pipeline_layout, "Cheese model pipeline",
+			wgpu::PrimitiveTopology::TriangleList,
+			&vs_module, &fs_module,
+		);
+
+		let line_pipeline = create_render_pipeline(
+			&device, &pipeline_layout, "Cheese line pipeline",
+			wgpu::PrimitiveTopology::LineList,
+			&vs_module, &fs_module,
+		);
 
 		// Create the swap chain.
 
@@ -261,14 +227,14 @@ impl Renderer {
 		let depth_texture = create_depth_texture(&device, window_size.width, window_size.height);
 
 		let instance_buffers = InstanceBuffers {
-			mice: GpuBuffer::new(&device, 1, "Cheese mice instance buffer"),
-			selection_indicators: GpuBuffer::new(&device, 1, "Cheese selection indicators buffer"),
-			command_paths: GpuBuffer::new(&device, 1, "Cheese command paths buffer"),
+			mice: GpuBuffer::new(&device, 50, "Cheese mice instance buffer"),
+			selection_indicators: GpuBuffer::new(&device, 50, "Cheese selection indicators buffer"),
+			command_paths: GpuBuffer::new(&device, 50, "Cheese command paths buffer"),
 		};
 
 		let identity_instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 			label: None,
-			contents: bytemuck::bytes_of(&Instance { transform: Mat4::from_scale(2.0), uv_flip: 1.0 }),
+			contents: bytemuck::bytes_of(&Instance { transform: Mat4::from_scale(1.0), uv_flip: 1.0 }),
 			usage: wgpu::BufferUsage::VERTEX,
 		});
 
@@ -287,8 +253,9 @@ impl Renderer {
 
 		Ok((
 			Self {
-				swap_chain, window, device, pipeline, queue, main_bind_group, perspective_buffer,
+				swap_chain, window, device, queue, main_bind_group, perspective_buffer,
 				view_buffer, swap_chain_desc, depth_texture, identity_instance_buffer, surface,
+				model_pipeline, line_pipeline,
 				// Imgui
 				imgui_platform, imgui_renderer,
 				// Models
@@ -310,7 +277,6 @@ impl Renderer {
 		self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_desc);
 		self.depth_texture = create_depth_texture(&self.device, width, height);
 
-
 		self.queue.write_buffer(
 			&self.perspective_buffer, 0,
 			bytemuck::bytes_of(&create_perspective_mat4(width, height))
@@ -322,6 +288,7 @@ impl Renderer {
 
 		instance_buffers.mice.upload(&self.device, &self.queue);
 		instance_buffers.selection_indicators.upload(&self.device, &self.queue);
+		instance_buffers.command_paths.upload(&self.device, &self.queue);
 
 		if let Ok(frame) = self.swap_chain.get_current_frame() {
 			let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -348,7 +315,7 @@ impl Renderer {
 					}),
 				});
 				
-				render_pass.set_pipeline(&self.pipeline);
+				render_pass.set_pipeline(&self.model_pipeline);
 				render_pass.set_bind_group(0, &self.main_bind_group, &[]);
 
 				// Draw mice
@@ -372,6 +339,15 @@ impl Renderer {
 				render_pass.set_vertex_buffer(0, self.surface_model.buffer.slice(..));
 				render_pass.set_vertex_buffer(1, self.identity_instance_buffer.slice(..));
 				render_pass.draw(0 .. self.surface_model.num_vertices, 0 .. 1);
+
+				// Draw Command paths
+				if let Some((slice, num)) = instance_buffers.command_paths.get() {
+					render_pass.set_pipeline(&self.line_pipeline);
+					render_pass.set_bind_group(1, &self.colours_texture, &[]);
+					render_pass.set_vertex_buffer(0, slice);
+					render_pass.set_vertex_buffer(1, self.identity_instance_buffer.slice(..));
+					render_pass.draw(0 .. num, 0 .. 1);
+				}
 
 				// Draw UI
 
@@ -487,6 +463,60 @@ impl<T: bytemuck::Pod> GpuBuffer<T> {
 			None
 		}
 	}
+}
+
+fn create_render_pipeline(
+	device: &wgpu::Device, layout: &wgpu::PipelineLayout, label: &str,
+	primitives: wgpu::PrimitiveTopology,
+	vs_module: &wgpu::ShaderModule, fs_module: &wgpu::ShaderModule,
+) -> wgpu::RenderPipeline {
+	device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+		label: Some(label),
+		layout: Some(layout),
+		vertex_stage: wgpu::ProgrammableStageDescriptor {
+			module: vs_module,
+			entry_point: "main",
+		},
+		fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+			module: fs_module,
+			entry_point: "main",
+		}),
+		rasterization_state: Some(wgpu::RasterizationStateDescriptor {
+			cull_mode: wgpu::CullMode::Back,
+			..Default::default()
+		}),
+		primitive_topology: primitives,
+		color_states: &[wgpu::ColorStateDescriptor {
+			format: DISPLAY_FORMAT,
+			color_blend: wgpu::BlendDescriptor::REPLACE,
+			alpha_blend: wgpu::BlendDescriptor::REPLACE,
+			write_mask: wgpu::ColorWrite::ALL,
+		}],
+		depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
+			format: DEPTH_FORMAT,
+			depth_write_enabled: true,
+			depth_compare: wgpu::CompareFunction::Less,
+			stencil: wgpu::StencilStateDescriptor::default(),
+		}),
+		vertex_state: wgpu::VertexStateDescriptor {
+			index_format: wgpu::IndexFormat::Uint16,
+			vertex_buffers: &[
+				wgpu::VertexBufferDescriptor {
+					stride: std::mem::size_of::<Vertex>() as u64,
+					step_mode: wgpu::InputStepMode::Vertex,
+					attributes: &wgpu::vertex_attr_array![0 => Float3, 1 => Float3, 2 => Float2],
+				},
+				wgpu::VertexBufferDescriptor {
+					stride: std::mem::size_of::<Instance>() as u64,
+					step_mode: wgpu::InputStepMode::Instance,
+					attributes: &wgpu::vertex_attr_array![3 => Float, 4 => Float4, 5 => Float4, 6 => Float4, 7 => Float4],
+				},
+			],
+		},
+		sample_count: 1,
+		sample_mask: !0,
+		alpha_to_coverage_enabled: false,
+	})
 }
 
 pub struct InstanceBuffers {
