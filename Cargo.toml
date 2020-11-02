@@ -1,0 +1,17 @@
+[package]
+name = "moonshot"
+version = "0.1.0"
+authors = ["Ashley Ruglys <ashley.ruglys@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.33"
+bytemuck = { version = "1.4.1", features = ["derive"] }
+futures = "0.3.7"
+image = "0.23.11"
+obj = "0.10.1"
+ultraviolet = { version = "0.7.5", features = ["bytemuck"] }
+wgpu = "0.6.0"
+winit = "0.23.0"
