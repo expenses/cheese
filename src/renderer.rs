@@ -5,6 +5,7 @@ use winit::{
 use wgpu::util::DeviceExt;
 use ultraviolet::{Vec2, Vec3, Mat4};
 use crate::assets::{Model, load_texture};
+use crate::resources::ScreenDimensions;
 
 const DISPLAY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -33,7 +34,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-	pub async fn new(event_loop: &EventLoop<()>) -> anyhow::Result<(Self, InstanceBuffers)> {
+	pub async fn new(event_loop: &EventLoop<()>) -> anyhow::Result<(Self, InstanceBuffers, ScreenDimensions)> {
 		let window = Window::new(event_loop)?;
 
 		let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
@@ -276,7 +277,11 @@ impl Renderer {
 				// Textures
 				surface_texture, colours_texture,
 			},
-			instance_buffers
+			instance_buffers,
+			ScreenDimensions {
+				width: window_size.width,
+				height: window_size.height,
+			}
 		))
 	}
 
@@ -359,7 +364,7 @@ impl Renderer {
 	}
 }
 
-fn create_perspective_mat4(window_width: u32, window_height: u32) -> Mat4 {
+pub fn create_perspective_mat4(window_width: u32, window_height: u32) -> Mat4 {
 	ultraviolet::projection::perspective_wgpu_dx(
 		45.0,
 		window_width as f32 / window_height as f32,

@@ -14,6 +14,7 @@ futures = "0.3.7"
 image = { version = "0.23.11", default-features = false, features = ["png"] }
 legion = "0.3.1"
 log = "0.4.11"
+ncollide3d = "0.26.1"
 obj = "0.10.1"
 ultraviolet = { version = "0.7.5", features = ["bytemuck"] }
 wgpu = "0.6.0"
