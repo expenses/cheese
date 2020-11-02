@@ -59,6 +59,7 @@ async fn run() -> anyhow::Result<()> {
 		.add_system(ecs::move_units_system())
 		.add_system(ecs::apply_steering_system())
 		.add_system(ecs::render_boxes_system())
+		.add_system(ecs::draw_lines_system())
 		.add_system(ecs::render_command_paths_system())
 		.build();
 

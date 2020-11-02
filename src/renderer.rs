@@ -7,6 +7,8 @@ use ultraviolet::{Vec2, Vec3, Mat4};
 use crate::assets::{Model, load_texture};
 use crate::resources::ScreenDimensions;
 
+mod lines;
+
 const DISPLAY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -30,6 +32,8 @@ pub struct Renderer {
 
 	imgui_platform: imgui_winit_support::WinitPlatform,
 	imgui_renderer: imgui_wgpu::Renderer,
+
+	line_renderer: lines::Renderer,
 
 	surface_model: Model,
 	mouse_box_model: Model,
@@ -232,12 +236,6 @@ impl Renderer {
 		let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
 		let depth_texture = create_depth_texture(&device, window_size.width, window_size.height);
 
-		let instance_buffers = InstanceBuffers {
-			mice: GpuBuffer::new(&device, 50, "Cheese mice instance buffer"),
-			selection_indicators: GpuBuffer::new(&device, 50, "Cheese selection indicators buffer"),
-			command_paths: GpuBuffer::new(&device, 50, "Cheese command paths buffer"),
-		};
-
 		let identity_instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 			label: None,
 			contents: bytemuck::bytes_of(&Instance {
@@ -260,11 +258,22 @@ impl Renderer {
 			.set_sample_count(1)
 			.build(imgui, &device, &queue);
 
+		let (line_renderer, line_buffers) =
+			lines::Renderer::new(&device, window_size.width, window_size.height);
+
+		let instance_buffers = InstanceBuffers {
+			mice: GpuBuffer::new(&device, 50, "Cheese mice instance buffer", wgpu::BufferUsage::VERTEX),
+			selection_indicators: GpuBuffer::new(&device, 50, "Cheese selection indicators buffer", wgpu::BufferUsage::VERTEX),
+			command_paths: GpuBuffer::new(&device, 50, "Cheese command paths buffer", wgpu::BufferUsage::VERTEX),
+			line_buffers,
+		};
+
 		Ok((
 			Self {
 				swap_chain, window, device, queue, main_bind_group, perspective_buffer,
 				view_buffer, swap_chain_desc, depth_texture, identity_instance_buffer, surface,
 				model_pipeline, line_pipeline,
+				line_renderer,
 				// Imgui
 				imgui_platform, imgui_renderer,
 				// Models
@@ -285,6 +294,7 @@ impl Renderer {
 		self.swap_chain_desc.height = height;
 		self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_desc);
 		self.depth_texture = create_depth_texture(&self.device, width, height);
+		self.line_renderer.resize(&self.queue, width, height);
 
 		self.queue.write_buffer(
 			&self.perspective_buffer, 0,
@@ -360,6 +370,11 @@ impl Renderer {
 
 				// Draw UI
 
+				self.line_renderer.render(
+					&mut render_pass, &mut instance_buffers.line_buffers,
+					&self.device, &self.queue,
+				);
+
 				self.imgui_renderer
 					.render(ui.render(), &self.queue, &self.device, &mut render_pass)
 					.expect("Rendering failed");
@@ -411,21 +426,23 @@ pub struct GpuBuffer<T> {
 	len: usize,
 	label: &'static str,
 	waiting: Vec<T>,
+	usage: wgpu::BufferUsage,
 }
 
 impl<T: bytemuck::Pod> GpuBuffer<T> {
-	fn new(device: &wgpu::Device, base_capacity: usize, label: &'static str) -> Self {
+	fn new(device: &wgpu::Device, base_capacity: usize, label: &'static str, usage: wgpu::BufferUsage) -> Self {
 		Self {
 			capacity: base_capacity,
 			buffer: device.create_buffer(&wgpu::BufferDescriptor {
 				label: Some(label),
 				size: (base_capacity * std::mem::size_of::<T>()) as u64,
-				usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
+				usage: usage | wgpu::BufferUsage::COPY_DST,
 				mapped_at_creation: false,
 			}),
 			len: 0,
 			label,
 			waiting: Vec::with_capacity(base_capacity),
+			usage,
 		}
 	}
 
@@ -450,7 +467,7 @@ impl<T: bytemuck::Pod> GpuBuffer<T> {
 			self.buffer = device.create_buffer(&wgpu::BufferDescriptor {
 				label: Some(self.label),
 				size: (self.capacity * std::mem::size_of::<T>()) as u64,
-				usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
+				usage: self.usage | wgpu::BufferUsage::COPY_DST,
 				mapped_at_creation: true,
 			});
 			self.buffer.slice(..bytes.len() as u64).get_mapped_range_mut().copy_from_slice(bytes);
@@ -532,6 +549,7 @@ pub struct InstanceBuffers {
 	pub mice: GpuBuffer<Instance>,
 	pub selection_indicators: GpuBuffer<Instance>,
 	pub command_paths: GpuBuffer<Vertex>,
+	pub line_buffers: lines::LineBuffers,
 }
 
 

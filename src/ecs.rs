@@ -283,3 +283,10 @@ pub fn apply_steering(
 	position.0 += avoidance.0 * 0.1;
 	command_buffer.remove_component::<Avoidance>(*entity);
 }
+
+#[legion::system]
+pub fn draw_lines(
+	#[resource] buffers: &mut InstanceBuffers,
+) {
+	buffers.line_buffers.draw_rect(Vec2::new(100.0, 100.0), Vec2::new(200.0, 200.0));
+}
