@@ -1,6 +1,6 @@
 use ultraviolet::{Vec2, Vec3, Mat4};
 use crate::renderer::{Instance, InstanceBuffers};
-use crate::resources::{Camera, CameraControls, MouseState, ScreenDimensions};
+use crate::resources::{Camera, CameraControls, MouseState, ScreenDimensions, RtsControls};
 use legion::*;
 use legion::world::SubWorld;
 use legion::systems::CommandBuffer;
@@ -78,6 +78,7 @@ pub fn handle_left_click(
     #[resource] camera: &Camera,
     #[resource] mouse_state: &mut MouseState,
     #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] rts_controls: &RtsControls,
     world: &SubWorld, commands: &mut CommandBuffer,
 ) {
     if !mouse_state.left_clicked {
@@ -86,17 +87,24 @@ pub fn handle_left_click(
 
     let position = camera.cast_ray(mouse_state.position, screen_dimensions);
 
-    let entity = <(Entity, &Position)>::query().iter(world)
-        .filter(|(_, pos)| (position - pos.0).mag_sq() < 4.0)
+    let entity = <(Entity, &Position, Option<&Selected>)>::query().iter(world)
+        .filter(|(_, pos, _)| (position - pos.0).mag_sq() < 4.0)
         //.min_by_key(|(_, pos)| (position - pos.0).mag_sq());
-        .next();
+        .next()
+        .map(|(entity, _, selected)| (entity, selected.is_some()));
 
-    if let Some((entity, _)) = entity {
-        <Entity>::query().filter(component::<Selected>()).for_each(world, |entity| {
-            commands.remove_component::<Selected>(*entity)
-        });
+    if let Some((entity, is_selected)) = entity {
+        if !rts_controls.shift {
+            <Entity>::query().filter(component::<Selected>()).for_each(world, |entity| {
+                commands.remove_component::<Selected>(*entity)
+            });
+        }
 
-        commands.add_component(*entity, Selected);
+        if rts_controls.shift && is_selected {
+            commands.remove_component::<Selected>(*entity);
+        } else {
+            commands.add_component(*entity, Selected);
+        }
     }
 
     mouse_state.left_clicked = false;

@@ -10,6 +10,11 @@ pub struct CameraControls {
 	pub zoom_delta: f32,
 }
 
+#[derive(Default)]
+pub struct RtsControls {
+    pub shift: bool,
+}
+
 pub struct Camera {
 	pub position: Vec3,
 	pub looking_at: Vec3,

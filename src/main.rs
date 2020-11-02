@@ -11,7 +11,7 @@ use winit::{
 use ultraviolet::{Vec2, Vec3};
 use legion::*;
 use crate::renderer::InstanceBuffers;
-use crate::resources::{Camera, CameraControls, ScreenDimensions, MouseState};
+use crate::resources::{Camera, CameraControls, ScreenDimensions, MouseState, RtsControls};
 
 fn main() -> anyhow::Result<()> {
 	futures::executor::block_on(run())
@@ -34,6 +34,7 @@ async fn run() -> anyhow::Result<()> {
 		looking_at: Vec3::new(0.0, 0.0, 0.0),
 	});
 	resources.insert(MouseState::default());
+	resources.insert(RtsControls::default());
 
 	world.push((
 		ecs::Position(Vec2::new(0.0, 1.0)), ecs::Facing(1.0), ecs::Side::Green,
@@ -70,12 +71,14 @@ async fn run() -> anyhow::Result<()> {
 						let pressed = state == ElementState::Pressed;
 
 						let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
+						let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
 
 						match code {
 							VirtualKeyCode::Up    => camera_controls.up = pressed,
 							VirtualKeyCode::Down  => camera_controls.down = pressed,
 							VirtualKeyCode::Left  => camera_controls.left = pressed,
 							VirtualKeyCode::Right => camera_controls.right = pressed,
+							VirtualKeyCode::LShift => rts_controls.shift = pressed,
 							_ => {}
 						}
 					},
