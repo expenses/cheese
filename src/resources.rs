@@ -12,7 +12,8 @@ pub struct CameraControls {
 
 #[derive(Default)]
 pub struct RtsControls {
-	pub shift: bool,
+	pub shift_held: bool,
+	pub s_pressed: bool,
 }
 
 pub struct Camera {

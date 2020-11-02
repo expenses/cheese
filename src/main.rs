@@ -58,6 +58,8 @@ async fn run() -> anyhow::Result<()> {
 		.add_system(ecs::control_camera_system())
 		.add_system(ecs::handle_left_click_system())
 		.add_system(ecs::handle_right_click_system())
+		.add_system(ecs::handle_rts_commands_system())
+		.flush()
 		.add_system(ecs::move_units_system())
 		.add_system(ecs::render_boxes_system())
 		.build();
@@ -155,7 +157,8 @@ fn handle_key(
 		VirtualKeyCode::Down  => camera_controls.down = pressed,
 		VirtualKeyCode::Left  => camera_controls.left = pressed,
 		VirtualKeyCode::Right => camera_controls.right = pressed,
-		VirtualKeyCode::LShift => rts_controls.shift = pressed,
+		VirtualKeyCode::LShift => rts_controls.shift_held = pressed,
+		VirtualKeyCode::S if pressed => rts_controls.s_pressed = true,
 		_ => {}
 	}
 }

@@ -94,13 +94,13 @@ pub fn handle_left_click(
 		.map(|(entity, _, selected)| (entity, selected.is_some()));
 
 	if let Some((entity, is_selected)) = entity {
-		if !rts_controls.shift {
+		if !rts_controls.shift_held {
 			<Entity>::query().filter(component::<Selected>()).for_each(world, |entity| {
 				commands.remove_component::<Selected>(*entity)
 			});
 		}
 
-		if rts_controls.shift && is_selected {
+		if rts_controls.shift_held && is_selected {
 			commands.remove_component::<Selected>(*entity);
 		} else {
 			commands.add_component(*entity, Selected);
@@ -150,6 +150,25 @@ pub fn move_units(
 	} else {
 		position.0 += direction.normalized() * speed;
 	}
+}
+
+#[legion::system]
+#[read_component(Entity)]
+#[read_component(Selected)]
+pub fn handle_rts_commands(
+	#[resource] rts_controls: &mut RtsControls,
+	world: &SubWorld, commands: &mut CommandBuffer,
+) {
+	if !rts_controls.s_pressed {
+		return;
+	}
+
+	<Entity>::query().filter(component::<Selected>())
+		.for_each(world, |entity| {
+			commands.remove_component::<MoveTo>(*entity);
+		});
+
+	rts_controls.s_pressed = false;
 }
 
 pub fn render_ui(ui: &mut imgui::Ui, world: &World) {
