@@ -76,6 +76,7 @@ pub fn render_command_paths(
     for command in queue.0.iter() {
         let position = match command {
             Command::MoveTo(position) => *position,
+            Command::AttackMove(position) => *position,
             Command::Attack(target) => {
                 <&Position>::query()
                     .get(world, *target)

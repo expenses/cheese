@@ -67,7 +67,7 @@ async fn run() -> anyhow::Result<()> {
         ecs::Avoids,
         ecs::Avoidable,
         ecs::Selectable,
-        ecs::Health(5000),
+        ecs::Health(500),
     ));
 
     let mut schedule = Schedule::builder()
@@ -79,6 +79,7 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::handle_drag_selection_system())
         .add_system(ecs::set_move_to_system())
         .add_system(ecs::avoidance_system())
+        .add_system(ecs::add_attack_commands_system())
         .flush()
         .add_system(ecs::move_units_system())
         .add_system(ecs::apply_steering_system())

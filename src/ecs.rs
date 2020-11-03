@@ -29,6 +29,7 @@ pub struct Selectable;
 pub enum Command {
     MoveTo(Vec2),
     Attack(Entity),
+    AttackMove(Vec2),
 }
 
 #[derive(Default)]
@@ -92,5 +93,35 @@ pub fn firing(entity: &Entity, command_queue: &CommandQueue, world: &mut SubWorl
 pub fn kill_dead(entity: &Entity, health: &Health, buffer: &mut CommandBuffer) {
     if health.0 == 0 {
         buffer.remove(*entity);
+    }
+}
+
+#[legion::system(for_each)]
+#[filter(component::<Position>() & component::<Side>())]
+#[read_component(Entity)]
+#[read_component(Position)]
+#[read_component(Side)]
+pub fn add_attack_commands(
+    entity: &Entity,
+    commands: &mut CommandQueue,
+    world: &SubWorld,
+) {
+    let (position, side) = <(&Position, &Side)>::query()
+        .get(world, *entity)
+        .expect("We've applied a filter to this system for Position and Side");
+
+    if matches!(commands.0.front().cloned(), None | Some(Command::AttackMove(_))) {
+        let target = <(Entity, &Position, &Side)>::query()
+            .iter(world)
+            .filter(|(.., entity_side)| *entity_side != side)
+            .filter(|(_, entity_position, _)| {
+                (position.0 - entity_position.0).mag_sq() <= FIRING_RANGE.powi(2)
+            })
+            .next()
+            .map(|(entity, ..)| entity);
+
+        if let Some(target) = target {
+            commands.0.push_front(Command::Attack(*target))
+        }
     }
 }
