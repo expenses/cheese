@@ -1,12 +1,20 @@
 #version 450
 
 layout(location = 0) in vec2 position;
+layout(location = 1) in vec2 uv;
+layout(location = 2) in int textured;
+
+layout(location = 0) out vec2 out_uv;
+layout(location = 1) out int out_textured;
 
 layout(set = 0, binding = 0) uniform Uniforms {
     vec2 screen_dimensions;
 };
 
 void main() {
+    out_uv = uv;
+    out_textured = textured;
+
     vec2 adjusted_position = vec2(
         (position.x / screen_dimensions.x * 2.0) - 1.0,
         1.0 - (position.y / screen_dimensions.y * 2.0)

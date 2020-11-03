@@ -6,21 +6,34 @@ pub struct Renderer {
     uniforms_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
+    hud_texture: wgpu::BindGroup,
+    hud_buffer: wgpu::Buffer,
 }
 
 impl Renderer {
-    pub fn new(device: &wgpu::Device, width: u32, height: u32) -> (Self, LineBuffers) {
+    pub fn new(
+        device: &wgpu::Device, texture_bind_group_layout: &wgpu::BindGroupLayout,
+        sampler: &wgpu::Sampler, width: u32, height: u32, hud_texture: wgpu::BindGroup,
+    ) -> (Self, LineBuffers) {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Cheese line bind group layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStage::VERTEX,
-                ty: wgpu::BindingType::UniformBuffer {
-                    dynamic: false,
-                    min_binding_size: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX,
+                    ty: wgpu::BindingType::UniformBuffer {
+                        dynamic: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler { comparison: false },
+                    count: None,
+                },
+            ],
         });
 
         let uniforms_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -32,15 +45,21 @@ impl Renderer {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Cheese line bind group"),
             layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer(uniforms_buffer.slice(..)),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(uniforms_buffer.slice(..)),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(sampler),
+                },
+            ],
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Cheese line pipeline layout"),
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[&bind_group_layout, texture_bind_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -65,8 +84,16 @@ impl Renderer {
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
             color_states: &[wgpu::ColorStateDescriptor {
                 format: DISPLAY_FORMAT,
-                color_blend: wgpu::BlendDescriptor::REPLACE,
-                alpha_blend: wgpu::BlendDescriptor::REPLACE,
+                color_blend: wgpu::BlendDescriptor {
+                    src_factor: wgpu::BlendFactor::SrcAlpha,
+                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                    operation: wgpu::BlendOperation::Add,
+                },
+                alpha_blend: wgpu::BlendDescriptor {
+                    src_factor: wgpu::BlendFactor::SrcAlpha,
+                    dst_factor: wgpu::BlendFactor::DstAlpha,
+                    operation: wgpu::BlendOperation::Max,
+                },
                 write_mask: wgpu::ColorWrite::ALL,
             }],
             depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
@@ -80,7 +107,7 @@ impl Renderer {
                 vertex_buffers: &[wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<Vertex>() as u64,
                     step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float2],
+                    attributes: &wgpu::vertex_attr_array![0 => Float2, 1 => Float2, 2 => Int],
                 }],
             },
             sample_count: 1,
@@ -88,11 +115,19 @@ impl Renderer {
             alpha_to_coverage_enabled: false,
         });
 
+        let hud_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Cheese line hud buffer"),
+            contents: bytemuck::cast_slice(&generate_hud_vertices(width, height)),
+            usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
+        });
+
         (
             Self {
                 uniforms_buffer,
                 bind_group,
                 pipeline,
+                hud_texture,
+                hud_buffer,
             },
             LineBuffers {
                 vertices: GpuBuffer::new(
@@ -118,6 +153,11 @@ impl Renderer {
             0,
             bytemuck::bytes_of(&Uniforms::new(width, height)),
         );
+        queue.write_buffer(
+            &self.hud_buffer,
+            0,
+            bytemuck::cast_slice(&generate_hud_vertices(width, height))
+        );
     }
 
     pub fn render<'a>(
@@ -130,13 +170,18 @@ impl Renderer {
         line_buffers.vertices.upload(device, queue);
         line_buffers.indices.upload(device, queue);
 
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
+
         if let Some((vertices, indices, num_indices)) = line_buffers.get() {
-            render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_bind_group(0, &self.bind_group, &[]);
             render_pass.set_vertex_buffer(0, vertices);
             render_pass.set_index_buffer(indices);
             render_pass.draw_indexed(0..num_indices, 0, 0..1);
         }
+
+        render_pass.set_bind_group(1, &self.hud_texture, &[]);
+        render_pass.set_vertex_buffer(0, self.hud_buffer.slice(..));
+        render_pass.draw(0 .. 6, 0 .. 1);
     }
 }
 
@@ -152,6 +197,8 @@ impl StrokeVertexConstructor<Vertex> for Constructor {
     fn new_vertex(&mut self, point: Point, _: StrokeAttributes) -> Vertex {
         Vertex {
             position: Vec2::new(point.x, point.y),
+            uv: Vec2::new(0.0, 0.0),
+            textured: false as i32,
         }
     }
 }
@@ -210,4 +257,31 @@ impl Uniforms {
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
 struct Vertex {
     position: Vec2,
+    uv: Vec2,
+    textured: i32,
+}
+
+fn generate_hud_vertices(screen_width: u32, screen_height: u32) -> [Vertex; 6] {
+    let vertex = |x, y, u, v| {
+        Vertex {
+            position: Vec2::new(x as f32, y as f32),
+            uv: Vec2::new(u as f32, v as f32),
+            textured: true as i32
+        }
+    };
+
+    let screen_height = screen_height as f32;
+    // The hud is a 64px x 8px image
+    let hud_height = screen_width as f32 / 8.0;
+    let hud_top = screen_height - hud_height;
+
+    let top_left = vertex(0, hud_top, 0, 0);
+    let top_right = vertex(screen_width, hud_top, 1, 0);
+    let bottom_left = vertex(0, screen_height, 0, 1);
+    let bottom_right = vertex(screen_width, screen_height, 1, 1);
+
+    [
+        top_left, top_right, bottom_left,
+        top_right, bottom_left, bottom_right
+    ]
 }

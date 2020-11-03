@@ -207,6 +207,13 @@ impl Renderer {
             &mut init_encoder,
         )?;
 
+        let hud_texture = load_texture(
+            include_bytes!("../textures/hud.png"),
+            &texture_bind_group_layout,
+            &device,
+            &mut init_encoder,
+        )?;
+
         queue.submit(Some(init_encoder.finish()));
 
         // Create the shaders and pipeline
@@ -277,8 +284,10 @@ impl Renderer {
             .set_sample_count(1)
             .build(imgui, &device, &queue);
 
-        let (line_renderer, line_buffers) =
-            lines::Renderer::new(&device, window_size.width, window_size.height);
+        let (line_renderer, line_buffers) = lines::Renderer::new(
+            &device, &texture_bind_group_layout, &sampler,
+            window_size.width, window_size.height, hud_texture,
+        );
 
         let instance_buffers = InstanceBuffers {
             mice: GpuBuffer::new(
