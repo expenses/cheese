@@ -48,7 +48,7 @@ async fn run() -> anyhow::Result<()> {
 
     for i in 0..10 {
         world.push((
-            ecs::Position(Vec2::new(0.0, i as f32 / 100.0)),
+            ecs::Position(Vec2::new(-10.0, i as f32 / 100.0)),
             ecs::Facing(1.0),
             ecs::Side::Purple,
             ecs::CommandQueue::default(),
@@ -56,11 +56,12 @@ async fn run() -> anyhow::Result<()> {
             ecs::Avoidable,
             ecs::Selectable,
             ecs::Health(50),
+            ecs::FiringCooldown(0),
         ));
     }
 
     world.push((
-        ecs::Position(Vec2::new(5.0, 0.0)),
+        ecs::Position(Vec2::new(10.0, 0.0)),
         ecs::Facing(1.0),
         ecs::Side::Green,
         ecs::CommandQueue::default(),
@@ -68,6 +69,7 @@ async fn run() -> anyhow::Result<()> {
         ecs::Avoidable,
         ecs::Selectable,
         ecs::Health(500),
+        ecs::FiringCooldown(0),
     ));
 
     let mut schedule = Schedule::builder()
@@ -78,13 +80,17 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::handle_stop_command_system())
         .add_system(ecs::handle_drag_selection_system())
         .add_system(ecs::set_move_to_system())
+        .add_system(ecs::set_move_to_for_bullets_system())
         .add_system(ecs::avoidance_system())
         .add_system(ecs::add_attack_commands_system())
+        .add_system(ecs::reduce_cooldowns_system())
         .flush()
         .add_system(ecs::move_units_system())
         .add_system(ecs::apply_steering_system())
         .add_system(ecs::firing_system())
         .add_system(ecs::kill_dead_system())
+        .add_system(ecs::apply_bullets_system())
+        .add_system(ecs::render_bullets_system())
         .add_system(ecs::render_boxes_system())
         .add_system(ecs::render_drag_box_system())
         .add_system(ecs::render_command_paths_system())

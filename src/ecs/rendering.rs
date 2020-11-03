@@ -112,3 +112,19 @@ pub fn render_drag_box(
         buffers.line_buffers.draw_rect(top_left, bottom_right);
     }
 }
+
+#[legion::system(for_each)]
+#[filter(component::<Bullet>())]
+pub fn render_bullets(
+    position: &Position,
+    facing: &Facing,
+    #[resource] buffers: &mut InstanceBuffers,
+) {
+    let translation = Mat4::from_translation(Vec3::new(position.0.x, 1.0, position.0.y));
+    let rotation = Mat4::from_rotation_y(facing.0);
+
+    buffers.bullets.push(Instance {
+        transform: translation * rotation,
+        uv_x_offset: 0.0,
+    });
+}

@@ -15,7 +15,7 @@ image = { version = "0.23.11", default-features = false, features = ["png"] }
 imgui = "0.5.0"
 imgui-wgpu = "0.11.0"
 imgui-winit-support = "0.5.0"
-legion = "0.3.1"
+legion = { version = "0.3.1", features = ["extended-tuple-impls"] }
 log = "0.4.11"
 lyon_tessellation = "0.16.2"
 ncollide3d = "0.26.1"

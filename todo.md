@@ -1,5 +1,4 @@
 - Better selection visibility
-- Bullet rendering and travelling
 - Mouse modeling, texturing rigging and animating
 - Add animation system to renderer
 - Fill out HUD

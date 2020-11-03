@@ -1,7 +1,5 @@
 use super::*;
 
-pub struct MoveTo(Vec2);
-
 #[legion::system(for_each)]
 #[filter(component::<Position>())]
 #[read_component(Position)]
@@ -33,6 +31,8 @@ pub fn set_move_to(
                 let distance_to_go = mag - (FIRING_RANGE - fudge_factor);
                 let target = position.0 + vector.normalized() * distance_to_go;
                 buffer.add_component(*entity, MoveTo(target));
+            } else {
+                buffer.remove_component::<MoveTo>(*entity);
             }
         }
         None => buffer.remove_component::<MoveTo>(*entity),
@@ -44,20 +44,23 @@ pub fn move_units(
     position: &mut Position,
     facing: &mut Facing,
     move_to: &MoveTo,
-    commands: &mut CommandQueue,
+    // `None` if we're moving a bullet
+    commands: Option<&mut CommandQueue>,
 ) {
     let direction = move_to.0 - position.0;
     facing.0 = direction.y.atan2(direction.x);
 
     if direction.mag_sq() <= MOVE_SPEED.powi(2) {
         position.0 = move_to.0;
-        if commands
-            .0
-            .front()
-            .map(|command| matches!(command, Command::MoveTo(_)))
-            .unwrap_or(false)
-        {
-            commands.0.pop_front();
+        if let Some(commands) = commands {
+            if commands
+                .0
+                .front()
+                .map(|command| matches!(command, Command::MoveTo(_)))
+                .unwrap_or(false)
+            {
+                commands.0.pop_front();
+            }
         }
     } else {
         position.0 += direction.normalized() * MOVE_SPEED;
@@ -110,4 +113,17 @@ pub fn apply_steering(
 ) {
     position.0 += avoidance.0 * 0.1;
     command_buffer.remove_component::<Avoidance>(*entity);
+}
+
+#[legion::system(for_each)]
+#[read_component(Position)]
+pub fn set_move_to_for_bullets(
+    entity: &Entity,
+    bullet: &Bullet,
+    world: &SubWorld,
+    buffer: &mut CommandBuffer,
+) {
+    if let Ok(target_position) = <&Position>::query().get(world, bullet.target) {
+        buffer.add_component(*entity, MoveTo(target_position.0));
+    }
 }
