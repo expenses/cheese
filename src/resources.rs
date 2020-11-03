@@ -1,5 +1,5 @@
-use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
 use crate::ecs;
+use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
 
 #[derive(Default)]
 pub struct CameraControls {

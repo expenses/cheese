@@ -4,7 +4,9 @@ mod renderer;
 mod resources;
 
 use crate::renderer::InstanceBuffers;
-use crate::resources::{Camera, CameraControls, MouseState, RtsControls, ScreenDimensions, PlayerSide};
+use crate::resources::{
+    Camera, CameraControls, MouseState, PlayerSide, RtsControls, ScreenDimensions,
+};
 use legion::*;
 use ultraviolet::{Vec2, Vec3};
 use winit::{
