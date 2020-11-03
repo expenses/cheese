@@ -67,7 +67,7 @@ async fn run() -> anyhow::Result<()> {
         ecs::Avoids,
         ecs::Avoidable,
         ecs::Selectable,
-        ecs::Health(50),
+        ecs::Health(5000),
     ));
 
     let mut schedule = Schedule::builder()

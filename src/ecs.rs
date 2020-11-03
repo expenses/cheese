@@ -87,7 +87,6 @@ pub fn firing(
         
         if (position - target_position.0).mag_sq() <= FIRING_RANGE.powi(2) {
             target_health.0 = target_health.0.saturating_sub(1);
-            println!("{}", target_health.0);
         }
     }
 }

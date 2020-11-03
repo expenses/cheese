@@ -29,7 +29,7 @@ pub fn render_boxes(
 pub fn render_ui(ui: &mut imgui::Ui, world: &World) {
     use imgui::im_str;
 
-    let mut selected = <(Entity, &Position)>::query().filter(component::<Selected>());
+    let mut selected = <(Entity, &Position, &Health)>::query().filter(component::<Selected>());
 
     let window = imgui::Window::new(im_str!("Selected"));
     window
@@ -37,7 +37,9 @@ pub fn render_ui(ui: &mut imgui::Ui, world: &World) {
         .build(&ui, || {
             selected
                 .iter(world)
-                .for_each(|(entity, position)| ui.text(im_str!("{:?}: {:?}", entity, position.0)));
+                .for_each(|(entity, position, health)| {
+                    ui.text(im_str!("{:?}: {:?}, Health: {}", entity, position.0, health.0))
+                });
         });
 }
 

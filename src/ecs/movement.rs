@@ -16,6 +16,9 @@ pub fn set_move_to(
     let position = <&Position>::query().get(world, *entity)
         .expect("We've applied a filter to this system for Position");
 
+    // Units try to get this much closer to enemies than their firing range.
+    let fudge_factor = 0.05;
+
     match commands.0.front().cloned() {
         Some(Command::MoveTo(target)) => buffer.add_component(*entity, MoveTo(target)),
         Some(Command::Attack(target)) => {
@@ -23,9 +26,9 @@ pub fn set_move_to(
                 .get(world, target)
                 .expect("We've cancelled attack commands on dead entities");
             let vector = target_pos.0 - position.0;
-            if vector.mag_sq() > FIRING_RANGE.powi(2) {
+            if vector.mag_sq() > (FIRING_RANGE - fudge_factor).powi(2) {
                 let mag = vector.mag();
-                let distance_to_go = mag - FIRING_RANGE;
+                let distance_to_go = mag - (FIRING_RANGE - fudge_factor);
                 let target = position.0 + vector.normalized() * distance_to_go;
                 buffer.add_component(*entity, MoveTo(target));
             }
