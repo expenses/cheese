@@ -55,6 +55,7 @@ async fn run() -> anyhow::Result<()> {
             ecs::Avoids,
             ecs::Avoidable,
             ecs::Selectable,
+            ecs::Health(50),
         ));
     }
 
@@ -66,6 +67,7 @@ async fn run() -> anyhow::Result<()> {
         ecs::Avoids,
         ecs::Avoidable,
         ecs::Selectable,
+        ecs::Health(50),
     ));
 
     let mut schedule = Schedule::builder()
@@ -80,6 +82,8 @@ async fn run() -> anyhow::Result<()> {
         .flush()
         .add_system(ecs::move_units_system())
         .add_system(ecs::apply_steering_system())
+        .add_system(ecs::firing_system())
+        .add_system(ecs::kill_dead_system())
         .add_system(ecs::render_boxes_system())
         .add_system(ecs::render_drag_box_system())
         .add_system(ecs::render_command_paths_system())

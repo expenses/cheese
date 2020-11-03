@@ -3,13 +3,19 @@ use super::*;
 pub struct MoveTo(Vec2);
 
 #[legion::system(for_each)]
+#[filter(component::<Position>())]
+#[read_component(Position)]
 pub fn set_move_to(
     entity: &Entity,
-    position: &Position,
     commands: &CommandQueue,
     buffer: &mut CommandBuffer,
     world: &SubWorld,
 ) {
+    // Grrrr.... In a `for_each` system, you can't pass in an `&T` and also have a query accessing
+    // it, so we have to add `filter(component::<T>())` and do this.
+    let position = <&Position>::query().get(world, *entity)
+        .expect("We've applied a filter to this system for Position");
+
     match commands.0.front().cloned() {
         Some(Command::MoveTo(target)) => buffer.add_component(*entity, MoveTo(target)),
         Some(Command::Attack(target)) => {

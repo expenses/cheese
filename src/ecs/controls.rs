@@ -58,7 +58,7 @@ pub fn handle_left_click(
     let entity = <(Entity, &Position, Option<&Selected>, &Side)>::query()
         .filter(component::<Selectable>())
         .iter(world)
-        .filter(|(_, pos, ..)| (position - pos.0).mag_sq() < 4.0)
+        .filter(|(_, pos, ..)| (position - pos.0).mag_sq() < SELECTION_RADIUS.powi(2))
         //.min_by_key(|(_, pos)| (position - pos.0).mag_sq());
         .next()
         .map(|(entity, _, selected, side)| (entity, selected.is_some(), side));
@@ -89,6 +89,8 @@ pub fn handle_left_click(
 }
 
 #[legion::system]
+#[read_component(Entity)]
+#[read_component(Position)]
 #[read_component(Side)]
 #[write_component(CommandQueue)]
 pub fn handle_right_click(
@@ -105,6 +107,18 @@ pub fn handle_right_click(
 
     let position = camera.cast_ray(mouse_state.position, screen_dimensions);
 
+    let enemy_entity_under_cursor = <(Entity, &Position, &Side)>::query()
+        .iter(world)
+        .filter(|(.., side)| **side != player_side.0)
+        .filter(|(_, pos, _)| (position - pos.0).mag_sq() < SELECTION_RADIUS.powi(2))
+        .next()
+        .map(|(entity, ..)| entity);
+
+    let command = match enemy_entity_under_cursor {
+        Some(entity) => Command::Attack(*entity),
+        None => Command::MoveTo(position)
+    };
+
     <(&mut CommandQueue, &Side)>::query()
         .filter(component::<Selected>())
         .iter_mut(world)
@@ -114,7 +128,7 @@ pub fn handle_right_click(
                 commands.0.clear();
             }
 
-            commands.0.push_back(Command::MoveTo(position));
+            commands.0.push_back(command);
         });
 }
 

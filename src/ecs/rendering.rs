@@ -42,15 +42,19 @@ pub fn render_ui(ui: &mut imgui::Ui, world: &World) {
 }
 
 #[legion::system(for_each)]
-#[filter(component::<Selected>())]
+#[filter(component::<Selected>() & component::<Position>())]
+#[read_component(Position)]
 pub fn render_command_paths(
     queue: &CommandQueue,
-    position: &Position,
+    entity: &Entity,
     side: &Side,
     #[resource] buffers: &mut InstanceBuffers,
     #[resource] player_side: &PlayerSide,
     world: &SubWorld,
 ) {
+    let position = <&Position>::query().get(world, *entity)
+        .expect("We've applied a filter to this system for Position");
+
     if *side != player_side.0 {
         // Can't be leaking infomation about what enemy units are doing!
         return;
