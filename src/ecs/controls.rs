@@ -116,7 +116,7 @@ pub fn handle_right_click(
 
     let command = match enemy_entity_under_cursor {
         Some(entity) => Command::Attack(*entity),
-        None => Command::MoveTo(position)
+        None => Command::MoveTo(position),
     };
 
     <(&mut CommandQueue, &Side)>::query()

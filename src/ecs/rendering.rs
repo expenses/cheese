@@ -35,11 +35,14 @@ pub fn render_ui(ui: &mut imgui::Ui, world: &World) {
     window
         .size([300.0, 100.0], imgui::Condition::FirstUseEver)
         .build(&ui, || {
-            selected
-                .iter(world)
-                .for_each(|(entity, position, health)| {
-                    ui.text(im_str!("{:?}: {:?}, Health: {}", entity, position.0, health.0))
-                });
+            selected.iter(world).for_each(|(entity, position, health)| {
+                ui.text(im_str!(
+                    "{:?}: {:?}, Health: {}",
+                    entity,
+                    position.0,
+                    health.0
+                ))
+            });
         });
 }
 
@@ -54,7 +57,8 @@ pub fn render_command_paths(
     #[resource] player_side: &PlayerSide,
     world: &SubWorld,
 ) {
-    let position = <&Position>::query().get(world, *entity)
+    let position = <&Position>::query()
+        .get(world, *entity)
         .expect("We've applied a filter to this system for Position");
 
     if *side != player_side.0 {

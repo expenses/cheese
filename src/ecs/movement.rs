@@ -13,7 +13,8 @@ pub fn set_move_to(
 ) {
     // Grrrr.... In a `for_each` system, you can't pass in an `&T` and also have a query accessing
     // it, so we have to add `filter(component::<T>())` and do this.
-    let position = <&Position>::query().get(world, *entity)
+    let position = <&Position>::query()
+        .get(world, *entity)
         .expect("We've applied a filter to this system for Position");
 
     // Units try to get this much closer to enemies than their firing range.
@@ -38,8 +39,14 @@ pub fn set_move_to(
 }
 
 #[legion::system(for_each)]
-pub fn move_units(position: &mut Position, move_to: &MoveTo, commands: &mut CommandQueue) {
+pub fn move_units(
+    position: &mut Position,
+    facing: &mut Facing,
+    move_to: &MoveTo,
+    commands: &mut CommandQueue,
+) {
     let direction = move_to.0 - position.0;
+    facing.0 = direction.y.atan2(direction.x);
 
     if direction.mag_sq() <= MOVE_SPEED.powi(2) {
         position.0 = move_to.0;
