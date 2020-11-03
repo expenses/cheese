@@ -1,4 +1,5 @@
 use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
+use crate::ecs;
 
 #[derive(Default)]
 pub struct CameraControls {
@@ -138,3 +139,5 @@ impl MouseButtonState {
         }
     }
 }
+
+pub struct PlayerSide(pub ecs::Side);

@@ -1,5 +1,5 @@
 use crate::renderer::{Instance, InstanceBuffers, Vertex};
-use crate::resources::{Camera, CameraControls, MouseState, RtsControls, ScreenDimensions};
+use crate::resources::{Camera, CameraControls, MouseState, RtsControls, ScreenDimensions, PlayerSide};
 use legion::systems::CommandBuffer;
 use legion::world::SubWorld;
 use legion::*;
@@ -8,6 +8,7 @@ use ultraviolet::{Mat4, Vec2, Vec3};
 
 pub struct Position(pub Vec2);
 pub struct Facing(pub f32);
+#[derive(PartialEq)]
 pub enum Side {
     Green,
     Purple,
@@ -96,11 +97,13 @@ pub fn control_camera(
 #[read_component(Entity)]
 #[read_component(Selected)]
 #[read_component(Position)]
+#[read_component(Side)]
 pub fn handle_left_click(
     #[resource] camera: &Camera,
     #[resource] mouse_state: &MouseState,
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] rts_controls: &RtsControls,
+    #[resource] player_side: &PlayerSide,
     world: &SubWorld,
     commands: &mut CommandBuffer,
 ) {
@@ -110,36 +113,48 @@ pub fn handle_left_click(
 
     let position = camera.cast_ray(mouse_state.position, screen_dimensions);
 
-    let entity = <(Entity, &Position, Option<&Selected>)>::query()
+    let entity = <(Entity, &Position, Option<&Selected>, &Side)>::query()
         .filter(component::<Selectable>())
         .iter(world)
-        .filter(|(_, pos, _)| (position - pos.0).mag_sq() < 4.0)
+        .filter(|(_, pos, ..)| (position - pos.0).mag_sq() < 4.0)
         //.min_by_key(|(_, pos)| (position - pos.0).mag_sq());
         .next()
-        .map(|(entity, _, selected)| (entity, selected.is_some()));
+        .map(|(entity, _, selected, side)| (entity, selected.is_some(), side));
 
-    if let Some((entity, is_selected)) = entity {
+    if let Some((entity, is_selected, side)) = entity {
         if !rts_controls.shift_held {
             deselect_all(world, commands);
         }
 
         if rts_controls.shift_held && is_selected {
             commands.remove_component::<Selected>(*entity);
-        } else {
+        } else if !rts_controls.shift_held {
             commands.add_component(*entity, Selected);
+        // If we're holding shift but haven't selected the unit, we need to check if we can add it
+        // the current selection, because having a selection of a bunch of enemy units or a mixture
+        // doesn't really make sense.
+        } else {
+            let only_player_units_selected = <&Side>::query()
+            .filter(component::<Selected>())
+            .iter(world)
+            .all(|side| *side == player_side.0);
+
+            if only_player_units_selected && *side == player_side.0 {
+                commands.add_component(*entity, Selected);
+            }
         }
     }
 }
 
 #[legion::system]
-#[read_component(Entity)]
-#[read_component(Selected)]
+#[read_component(Side)]
 #[write_component(CommandQueue)]
 pub fn handle_right_click(
     #[resource] camera: &Camera,
     #[resource] mouse_state: &MouseState,
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] rts_controls: &RtsControls,
+    #[resource] player_side: &PlayerSide,
     world: &mut SubWorld,
 ) {
     if !mouse_state.right_state.was_clicked() {
@@ -148,9 +163,11 @@ pub fn handle_right_click(
 
     let position = camera.cast_ray(mouse_state.position, screen_dimensions);
 
-    <&mut CommandQueue>::query()
+    <(&mut CommandQueue, &Side)>::query()
         .filter(component::<Selected>())
-        .for_each_mut(world, |commands| {
+        .iter_mut(world)
+        .filter(|(_, side)| **side == player_side.0)
+        .for_each(|(commands, _)| {
             if !rts_controls.shift_held {
                 commands.0.clear();
             }
@@ -180,20 +197,18 @@ pub fn set_move_to(
                 buffer.add_component(*entity, MoveTo(target));
             }
         }
-        None => {}
+        None => buffer.remove_component::<MoveTo>(*entity)
     }
 }
 
 #[legion::system(for_each)]
 pub fn move_units(
-    entity: &Entity, position: &mut Position, move_to: &MoveTo, commands: &mut CommandQueue,
-    buffer: &mut CommandBuffer
+    position: &mut Position, move_to: &MoveTo, commands: &mut CommandQueue,
 ) {
     let direction = move_to.0 - position.0;
 
     if direction.mag_sq() <= MOVE_SPEED.powi(2) {
         position.0 = move_to.0;
-        buffer.remove_component::<MoveTo>(*entity);
         if commands.0.front().map(|command| matches!(command, Command::MoveTo(_))).unwrap_or(false) {
             commands.0.pop_front();
         }
@@ -219,17 +234,24 @@ pub fn stop_attacks_on_dead_entities(
 }
 
 #[legion::system]
-#[read_component(Entity)]
-#[read_component(Selected)]
+#[read_component(Side)]
 #[write_component(CommandQueue)]
-pub fn handle_rts_commands(#[resource] rts_controls: &mut RtsControls, world: &mut SubWorld) {
+pub fn handle_stop_command(
+    #[resource] rts_controls: &mut RtsControls,
+    #[resource] player_side: &PlayerSide,
+    world: &mut SubWorld
+) {
     if !rts_controls.s_pressed {
         return;
     }
 
-    <&mut CommandQueue>::query()
+    <(&mut CommandQueue, &Side)>::query()
         .filter(component::<Selected>())
-        .for_each_mut(world, |commands| commands.0.clear());
+        .iter_mut(world)
+        .filter(|(_, side)| **side == player_side.0)
+        .for_each(|(commands, _)| {
+            commands.0.clear();
+        });
 
     rts_controls.s_pressed = false;
 }
@@ -256,8 +278,14 @@ pub fn render_command_paths(
     position: &Position,
     side: &Side,
     #[resource] buffers: &mut InstanceBuffers,
+    #[resource] player_side: &PlayerSide,
     world: &SubWorld,
 ) {
+    if *side != player_side.0 {
+        // Can't be leaking infomation about what enemy units are doing!
+        return;
+    }
+
     let uv = match side {
         Side::Green => Vec2::new(0.5 / 64.0, 0.5),
         Side::Purple => Vec2::new(1.5 / 64.0, 0.5),
@@ -348,12 +376,14 @@ pub fn render_drag_box(
 
 #[legion::system]
 #[read_component(Entity)]
+#[read_component(Side)]
 #[read_component(Position)]
 pub fn handle_drag_selection(
     #[resource] mouse_state: &MouseState,
     #[resource] camera: &Camera,
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] rts_controls: &RtsControls,
+    #[resource] player_side: &PlayerSide,
     command_buffer: &mut CommandBuffer,
     world: &SubWorld,
 ) {
@@ -365,19 +395,22 @@ pub fn handle_drag_selection(
             deselect_all(world, command_buffer);
         }
 
-        <(Entity, &Position)>::query().filter(component::<Selectable>()).for_each(world, |(entity, position)| {
-            if point_is_in_select_box(
-                camera,
-                screen_dimensions,
-                position.0,
-                left,
-                right,
-                top,
-                bottom,
-            ) {
-                command_buffer.add_component(*entity, Selected);
-            }
-        })
+        <(Entity, &Position, &Side)>::query().filter(component::<Selectable>())
+            .iter(world)
+            .filter(|(.., side)| **side == player_side.0)
+            .for_each(|(entity, position, _)| {
+                if point_is_in_select_box(
+                    camera,
+                    screen_dimensions,
+                    position.0,
+                    left,
+                    right,
+                    top,
+                    bottom,
+                ) {
+                    command_buffer.add_component(*entity, Selected);
+                }
+            })
     }
 }
 
