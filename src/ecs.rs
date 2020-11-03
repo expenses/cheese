@@ -13,16 +13,23 @@ pub enum Side {
     Purple,
 }
 pub struct Selected;
+pub struct Selectable;
 
 #[derive(Clone)]
 pub enum Command {
     MoveTo(Vec2),
+    Attack(Entity),
 }
 
 #[derive(Default)]
 pub struct CommandQueue(VecDeque<Command>);
 
-pub struct Avoidance(pub Vec2);
+pub struct Health(u16);
+
+pub struct Bullet;
+
+const FIRING_RANGE: f32 = 5.0;
+const MOVE_SPEED: f32 = 0.1;
 
 #[legion::system(for_each)]
 pub fn render_boxes(
@@ -104,6 +111,7 @@ pub fn handle_left_click(
     let position = camera.cast_ray(mouse_state.position, screen_dimensions);
 
     let entity = <(Entity, &Position, Option<&Selected>)>::query()
+        .filter(component::<Selectable>())
         .iter(world)
         .filter(|(_, pos, _)| (position - pos.0).mag_sq() < 4.0)
         //.min_by_key(|(_, pos)| (position - pos.0).mag_sq());
@@ -151,22 +159,62 @@ pub fn handle_right_click(
         });
 }
 
+pub struct MoveTo(Vec2);
+
 #[legion::system(for_each)]
-pub fn move_units(position: &mut Position, commands: &mut CommandQueue) {
-    let speed = 0.1_f32;
-
-    match commands.0.front() {
+pub fn set_move_to(
+    entity: &Entity, position: &Position, commands: &CommandQueue, buffer: &mut CommandBuffer, world: &SubWorld,
+) {
+    match commands.0.front().cloned() {
         Some(Command::MoveTo(target)) => {
-            let direction = *target - position.0;
-
-            if direction.mag_sq() <= speed.powi(2) {
-                position.0 = *target;
-                commands.0.pop_front();
-            } else {
-                position.0 += direction.normalized() * speed;
+            buffer.add_component(*entity, MoveTo(target))
+        },
+        Some(Command::Attack(target)) => {
+            let target_pos = <&Position>::query().get(world, target)
+                .expect("We've cancelled attack commands on dead entities");
+            let vector = target_pos.0 - position.0;
+            if vector.mag_sq() > FIRING_RANGE.powi(2) {
+                let mag = vector.mag();
+                let distance_to_go = mag - FIRING_RANGE;
+                let target = position.0 + vector.normalized() * distance_to_go;
+                buffer.add_component(*entity, MoveTo(target));
             }
         }
         None => {}
+    }
+}
+
+#[legion::system(for_each)]
+pub fn move_units(
+    entity: &Entity, position: &mut Position, move_to: &MoveTo, commands: &mut CommandQueue,
+    buffer: &mut CommandBuffer
+) {
+    let direction = move_to.0 - position.0;
+
+    if direction.mag_sq() <= MOVE_SPEED.powi(2) {
+        position.0 = move_to.0;
+        buffer.remove_component::<MoveTo>(*entity);
+        if commands.0.front().map(|command| matches!(command, Command::MoveTo(_))).unwrap_or(false) {
+            commands.0.pop_front();
+        }
+    } else {
+        position.0 += direction.normalized() * MOVE_SPEED;
+    }
+}
+
+#[legion::system(for_each)]
+pub fn stop_attacks_on_dead_entities(
+    commands: &mut CommandQueue,
+    world: &SubWorld,
+) {
+    while commands.0.front().map(|command| {
+        if let Command::Attack(entity) = command {
+            world.entry_ref(*entity).is_err()
+        } else {
+            false
+        }
+    }).unwrap_or(false) {
+        commands.0.pop_front();
     }
 }
 
@@ -208,6 +256,7 @@ pub fn render_command_paths(
     position: &Position,
     side: &Side,
     #[resource] buffers: &mut InstanceBuffers,
+    world: &SubWorld,
 ) {
     let uv = match side {
         Side::Green => Vec2::new(0.5 / 64.0, 0.5),
@@ -219,6 +268,11 @@ pub fn render_command_paths(
     for command in queue.0.iter() {
         let position = match command {
             Command::MoveTo(position) => *position,
+            Command::Attack(target) => {
+                <&Position>::query().get(world, *target)
+                    .expect("We've cancelled attack commands on dead entities")
+                    .0
+            }
         };
 
         let vertex = position_to_vertex(position, uv);
@@ -238,16 +292,20 @@ fn position_to_vertex(pos: Vec2, uv: Vec2) -> Vertex {
     }
 }
 
+pub struct Avoidance(pub Vec2);
+pub struct Avoids;
+pub struct Avoidable;
+
 #[legion::system]
 #[read_component(Position)]
 pub fn avoidance(world: &SubWorld, command_buffer: &mut CommandBuffer) {
     let desired_seperation = 2.0_f32;
 
-    <(Entity, &Position)>::query().for_each(world, |(entity, position)| {
+    <(Entity, &Position)>::query().filter(component::<Avoids>()).for_each(world, |(entity, position)| {
         let mut avoidance_direction = Vec2::new(0.0, 0.0);
         let mut count = 0;
 
-        for other_position in <&Position>::query().iter(world) {
+        for other_position in <&Position>::query().filter(component::<Avoidable>()).iter(world) {
             let away_vector = position.0 - other_position.0;
             let distance_sq = away_vector.mag_sq();
 
@@ -307,7 +365,7 @@ pub fn handle_drag_selection(
             deselect_all(world, command_buffer);
         }
 
-        <(Entity, &Position)>::query().for_each(world, |(entity, position)| {
+        <(Entity, &Position)>::query().filter(component::<Selectable>()).for_each(world, |(entity, position)| {
             if point_is_in_select_box(
                 camera,
                 screen_dimensions,

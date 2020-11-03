@@ -49,15 +49,20 @@ async fn run() -> anyhow::Result<()> {
             ecs::Facing(1.0),
             ecs::Side::Purple,
             ecs::CommandQueue::default(),
+            ecs::Avoids,
+            ecs::Avoidable,
+            ecs::Selectable,
         ));
     }
 
     let mut schedule = Schedule::builder()
+        .add_system(ecs::stop_attacks_on_dead_entities_system())
         .add_system(ecs::control_camera_system())
         .add_system(ecs::handle_left_click_system())
         .add_system(ecs::handle_right_click_system())
         .add_system(ecs::handle_rts_commands_system())
         .add_system(ecs::handle_drag_selection_system())
+        .add_system(ecs::set_move_to_system())
         .add_system(ecs::avoidance_system())
         .flush()
         .add_system(ecs::move_units_system())
