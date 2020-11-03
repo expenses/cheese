@@ -35,6 +35,8 @@ pub struct Renderer {
     surface_model: Model,
     mouse_box_model: Model,
     selection_indicator_model: Model,
+    bullet_model: Model,
+
     surface_texture: wgpu::BindGroup,
     box_colours_texture: wgpu::BindGroup,
     colours_texture: wgpu::BindGroup,
@@ -176,6 +178,7 @@ impl Renderer {
         let mouse_box_model = Model::load(include_bytes!("../models/mouse_box.obj"), &device)?;
         let selection_indicator_model =
             Model::load(include_bytes!("../models/selection_indicator.obj"), &device)?;
+        let bullet_model = Model::load(include_bytes!("../models/bullet.obj"), &device)?;
 
         // Load textures
 
@@ -290,6 +293,12 @@ impl Renderer {
                 "Cheese selection indicators buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
+            bullets: GpuBuffer::new(
+                &device,
+                50,
+                "Cheese bullet buffer",
+                wgpu::BufferUsage::VERTEX,
+            ),
             command_paths: GpuBuffer::new(
                 &device,
                 50,
@@ -322,6 +331,7 @@ impl Renderer {
                 surface_model,
                 mouse_box_model,
                 selection_indicator_model,
+                bullet_model,
                 // Textures
                 surface_texture,
                 box_colours_texture,
@@ -362,6 +372,7 @@ impl Renderer {
         instance_buffers
             .command_paths
             .upload(&self.device, &self.queue);
+        instance_buffers.bullets.upload(&self.device, &self.queue);
 
         if let Ok(frame) = self.swap_chain.get_current_frame() {
             let mut encoder = self
@@ -399,6 +410,14 @@ impl Renderer {
 
                 render_pass.set_pipeline(&self.model_pipeline);
                 render_pass.set_bind_group(0, &self.main_bind_group, &[]);
+
+                // Draw bullets
+                if let Some((slice, num)) = instance_buffers.bullets.get() {
+                    render_pass.set_bind_group(1, &self.colours_texture, &[]);
+                    render_pass.set_vertex_buffer(0, self.bullet_model.buffer.slice(..));
+                    render_pass.set_vertex_buffer(1, slice);
+                    render_pass.draw(0..self.bullet_model.num_vertices, 0..num);
+                }
 
                 // Draw mice
                 if let Some((slice, num)) = instance_buffers.mice.get() {
@@ -635,6 +654,7 @@ pub struct InstanceBuffers {
     pub mice: GpuBuffer<Instance>,
     pub selection_indicators: GpuBuffer<Instance>,
     pub command_paths: GpuBuffer<Vertex>,
+    pub bullets: GpuBuffer<Instance>,
     pub line_buffers: lines::LineBuffers,
 }
 
