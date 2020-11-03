@@ -55,7 +55,7 @@ impl Renderer {
 		let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
 			power_preference: wgpu::PowerPreference::default(),
 			compatible_surface: Some(&surface),
-		}).await.ok_or(anyhow::anyhow!("request_adapter failed"))?;
+		}).await.ok_or_else(|| anyhow::anyhow!("request_adapter failed"))?;
 
 		let (device, queue) = adapter.request_device(
 			&wgpu::DeviceDescriptor {

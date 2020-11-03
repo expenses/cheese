@@ -66,6 +66,69 @@ pub struct ScreenDimensions {
 #[derive(Default, Debug)]
 pub struct MouseState {
 	pub position: Vec2,
-	pub left_clicked: bool,
-	pub right_clicked: bool,
+	pub left_state: MouseButtonState,
+	pub right_state: MouseButtonState,
+}
+
+#[derive(Debug, Clone)]
+pub enum MouseButtonState {
+    Dragging(Vec2),
+    Dragged(Vec2),
+    Up,
+    Clicked,
+    Down(u8, Vec2)
+}
+
+impl Default for MouseButtonState {
+	fn default() -> Self {
+		Self::Up
+	}
+}
+
+impl MouseButtonState {
+    pub fn update(&mut self, mouse: Vec2) {
+        match *self {
+            Self::Clicked => *self = Self::Up,
+			Self::Down(frames, start)
+				if frames > 10 || (mouse.x - start.x).abs() > 10.0 || (mouse.y - start.y).abs() > 10.0 =>
+			{
+				*self = Self::Dragging(start)
+			},
+            Self::Down(ref mut frames, _) => *frames += 1,
+			Self::Dragged(_) => *self = Self::Up,
+			Self::Up | Self::Dragging(_) => {}
+        }
+    }
+
+    pub fn handle(&mut self, mouse: Vec2, pressed: bool) {
+        if pressed {
+            self.handle_down(mouse);
+        } else {
+            self.handle_up();
+        }
+    }
+
+    fn handle_down(&mut self, mouse: Vec2) {
+        *self = Self::Down(0, mouse)
+    }
+
+    fn handle_up(&mut self) {
+        match *self {
+            Self::Down(_, _) => *self = Self::Clicked,
+            Self::Dragging(start) => *self = Self::Dragged(start),
+            _ => *self = Self::Up
+        }
+	}
+	
+	pub fn was_clicked(&self) -> bool {
+		matches!(self, Self::Clicked)
+	}
+
+	pub fn is_being_dragged(&self) -> Option<Vec2> {
+		if let Self::Dragging(start) = self {
+			Some(*start)
+		} else {
+			None
+		}
+	}
 }

@@ -59,8 +59,9 @@ async fn run() -> anyhow::Result<()> {
 		.add_system(ecs::move_units_system())
 		.add_system(ecs::apply_steering_system())
 		.add_system(ecs::render_boxes_system())
-		.add_system(ecs::draw_lines_system())
+		.add_system(ecs::render_drag_box_system())
 		.add_system(ecs::render_command_paths_system())
+		.add_system(ecs::update_mouse_buttons_system())
 		.build();
 
 	event_loop.run(move |event, _, control_flow| {
@@ -99,12 +100,11 @@ async fn run() -> anyhow::Result<()> {
 						let pressed = *state == ElementState::Pressed;
 
 						let mut mouse_state = resources.get_mut::<MouseState>().unwrap();
-						if pressed {
-							match button {
-								MouseButton::Left => mouse_state.left_clicked = true,
-								MouseButton::Right => mouse_state.right_clicked = true,
-								_ => {}
-							}
+						let position = mouse_state.position;
+						match button {
+							MouseButton::Left => mouse_state.left_state.handle(position, pressed),
+							MouseButton::Right => mouse_state.right_state.handle(position, pressed),
+							_ => {}
 						}
 					}
 					_ => {}

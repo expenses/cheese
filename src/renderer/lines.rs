@@ -152,11 +152,14 @@ pub struct LineBuffers {
 }
 
 impl LineBuffers {
-	pub fn draw_rect(&mut self, top_left: Vec2, bottom_right: Vec2) {
-		let dimensions = bottom_right - top_left;
+	pub fn draw_rect(&mut self, a: Vec2, b: Vec2) {
+		let left = a.x.min(b.x);
+		let right = a.x.max(b.x);
+		let top = a.y.min(b.y);
+		let bottom = a.y.max(b.y);
 
 		stroke_rectangle(
-			&rect(top_left.x, top_left.y, dimensions.x, dimensions.y),
+			&rect(left, top, right - left, bottom - top),
 			&StrokeOptions::default(),
 			&mut BuffersBuilder::new(&mut self.lyon_buffers, Constructor)
 		).unwrap();

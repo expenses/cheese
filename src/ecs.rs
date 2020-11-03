@@ -86,12 +86,12 @@ pub fn control_camera(
 #[read_component(Position)]
 pub fn handle_left_click(
 	#[resource] camera: &Camera,
-	#[resource] mouse_state: &mut MouseState,
+	#[resource] mouse_state: &MouseState,
 	#[resource] screen_dimensions: &ScreenDimensions,
 	#[resource] rts_controls: &RtsControls,
 	world: &SubWorld, commands: &mut CommandBuffer,
 ) {
-	if !mouse_state.left_clicked {
+	if !mouse_state.left_state.was_clicked() {
 		return;
 	}
 
@@ -116,8 +116,6 @@ pub fn handle_left_click(
 			commands.add_component(*entity, Selected);
 		}
 	}
-
-	mouse_state.left_clicked = false;
 }
 
 #[legion::system]
@@ -126,12 +124,12 @@ pub fn handle_left_click(
 #[write_component(CommandQueue)]
 pub fn handle_right_click(
 	#[resource] camera: &Camera,
-	#[resource] mouse_state: &mut MouseState,
+	#[resource] mouse_state: &MouseState,
 	#[resource] screen_dimensions: &ScreenDimensions,
 	#[resource] rts_controls: &RtsControls,
 	world: &mut SubWorld,
 ) {
-	if !mouse_state.right_clicked {
+	if !mouse_state.right_state.was_clicked() {
 		return;
 	}
 
@@ -145,8 +143,6 @@ pub fn handle_right_click(
 
 			commands.0.push_back(Command::MoveTo(position));
 		});
-
-	mouse_state.right_clicked = false;
 }
 
 #[legion::system(for_each)]
@@ -156,7 +152,7 @@ pub fn move_units(
 ) {
 	let speed = 0.1_f32;
 
-	match commands.0.front().clone() {
+	match commands.0.front() {
 		Some(Command::MoveTo(target)) => {
 			let direction = *target - position.0;
 
@@ -285,8 +281,21 @@ pub fn apply_steering(
 }
 
 #[legion::system]
-pub fn draw_lines(
+pub fn render_drag_box(
+	#[resource] mouse_state: &MouseState,
 	#[resource] buffers: &mut InstanceBuffers,
 ) {
-	buffers.line_buffers.draw_rect(Vec2::new(100.0, 100.0), Vec2::new(200.0, 200.0));
+	if let Some(start) = mouse_state.left_state.is_being_dragged() {
+		buffers.line_buffers.draw_rect(mouse_state.position, start);
+	}
 }
+
+#[legion::system]
+pub fn update_mouse_buttons(
+	#[resource] mouse_state: &mut MouseState,
+) {
+	let position = mouse_state.position;
+	mouse_state.left_state.update(position);
+	mouse_state.right_state.update(position);
+}
+
