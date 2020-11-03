@@ -57,6 +57,7 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::handle_left_click_system())
         .add_system(ecs::handle_right_click_system())
         .add_system(ecs::handle_rts_commands_system())
+        .add_system(ecs::handle_drag_selection_system())
         .add_system(ecs::avoidance_system())
         .flush()
         .add_system(ecs::move_units_system())

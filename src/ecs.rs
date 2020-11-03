@@ -112,11 +112,7 @@ pub fn handle_left_click(
 
     if let Some((entity, is_selected)) = entity {
         if !rts_controls.shift_held {
-            <Entity>::query()
-                .filter(component::<Selected>())
-                .for_each(world, |entity| {
-                    commands.remove_component::<Selected>(*entity)
-                });
+            deselect_all(world, commands);
         }
 
         if rts_controls.shift_held && is_selected {
@@ -287,7 +283,43 @@ pub fn render_drag_box(
     #[resource] buffers: &mut InstanceBuffers,
 ) {
     if let Some(start) = mouse_state.left_state.is_being_dragged() {
-        buffers.line_buffers.draw_rect(mouse_state.position, start);
+        let (top_left, bottom_right) = sort_points(start, mouse_state.position);
+        buffers.line_buffers.draw_rect(top_left, bottom_right);
+    }
+}
+
+#[legion::system]
+#[read_component(Entity)]
+#[read_component(Position)]
+pub fn handle_drag_selection(
+    #[resource] mouse_state: &MouseState,
+    #[resource] camera: &Camera,
+    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] rts_controls: &RtsControls,
+    command_buffer: &mut CommandBuffer,
+    world: &SubWorld,
+) {
+    if let Some(start) = mouse_state.left_state.was_dragged() {
+        let (top_left, bottom_right) = sort_points(start, mouse_state.position);
+        let (left, right, top, bottom) = (top_left.x, bottom_right.x, top_left.y, bottom_right.y);
+
+        if !rts_controls.shift_held {
+            deselect_all(world, command_buffer);
+        }
+
+        <(Entity, &Position)>::query().for_each(world, |(entity, position)| {
+            if point_is_in_select_box(
+                camera,
+                screen_dimensions,
+                position.0,
+                left,
+                right,
+                top,
+                bottom,
+            ) {
+                command_buffer.add_component(*entity, Selected);
+            }
+        })
     }
 }
 
@@ -296,4 +328,55 @@ pub fn update_mouse_buttons(#[resource] mouse_state: &mut MouseState) {
     let position = mouse_state.position;
     mouse_state.left_state.update(position);
     mouse_state.right_state.update(position);
+}
+
+fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {
+    <Entity>::query()
+        .filter(component::<Selected>())
+        .for_each(world, |entity| {
+            commands.remove_component::<Selected>(*entity)
+        });
+}
+
+fn point_is_in_select_box(
+    camera: &Camera,
+    screen_dimensions: &ScreenDimensions,
+    point: Vec2,
+    left: f32,
+    right: f32,
+    top: f32,
+    bottom: f32,
+) -> bool {
+    let point = vec2_to_ncollide_point(point);
+    let top_left_point =
+        vec2_to_ncollide_point(camera.cast_ray(Vec2::new(left, top), screen_dimensions));
+    let top_right_point =
+        vec2_to_ncollide_point(camera.cast_ray(Vec2::new(right, top), screen_dimensions));
+    let bottom_left_point =
+        vec2_to_ncollide_point(camera.cast_ray(Vec2::new(left, bottom), screen_dimensions));
+    let bottom_right_point =
+        vec2_to_ncollide_point(camera.cast_ray(Vec2::new(right, bottom), screen_dimensions));
+
+    ncollide3d::utils::is_point_in_triangle(
+        &point,
+        &top_left_point,
+        &top_right_point,
+        &bottom_left_point,
+    ) || ncollide3d::utils::is_point_in_triangle(
+        &point,
+        &top_right_point,
+        &bottom_left_point,
+        &bottom_right_point,
+    )
+}
+
+fn vec2_to_ncollide_point(point: Vec2) -> ncollide3d::math::Point<f32> {
+    ncollide3d::math::Point::new(point.x, 0.0, point.y)
+}
+
+fn sort_points(a: Vec2, b: Vec2) -> (Vec2, Vec2) {
+    (
+        Vec2::new(a.x.min(b.x), a.y.min(b.y)),
+        Vec2::new(a.x.max(b.x), a.y.max(b.y)),
+    )
 }

@@ -129,4 +129,12 @@ impl MouseButtonState {
             None
         }
     }
+
+    pub fn was_dragged(&self) -> Option<Vec2> {
+        if let Self::Dragged(start) = self {
+            Some(*start)
+        } else {
+            None
+        }
+    }
 }
