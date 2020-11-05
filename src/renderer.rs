@@ -360,6 +360,10 @@ impl Renderer {
         );
     }
 
+    pub fn set_cursor_icon(&self, cursor_icon: winit::window::CursorIcon) {
+        self.window.set_cursor_icon(cursor_icon);
+    }
+
     pub fn render(&mut self, view: Mat4, instance_buffers: &mut InstanceBuffers) {
         self.queue
             .write_buffer(&self.view_buffer, 0, bytemuck::bytes_of(&view));

@@ -5,8 +5,8 @@ mod resources;
 
 use crate::renderer::InstanceBuffers;
 use crate::resources::{
-    Camera, CameraControls, CommandMode, DeltaTime, MouseState, PlayerSide, RtsControls,
-    ScreenDimensions,
+    Camera, CameraControls, CommandMode, CursorIcon, DeltaTime, MouseState, PlayerSide,
+    RtsControls, ScreenDimensions,
 };
 use legion::*;
 use ultraviolet::{Vec2, Vec3};
@@ -89,6 +89,7 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::render_command_paths_system())
         .add_system(ecs::render_ui_system())
         .add_system(ecs::render_health_bars_system())
+        .add_system(ecs::set_cursor_if_unit_under_system())
         // Cleanup
         .flush()
         .add_system(ecs::update_mouse_buttons_system())
@@ -164,8 +165,12 @@ async fn run() -> anyhow::Result<()> {
                 let elapsed = (now - time).as_secs_f32();
                 time = now;
                 resources.insert(DeltaTime(elapsed));
+                resources.insert(CursorIcon(winit::window::CursorIcon::default()));
 
                 schedule.execute(&mut world, &mut resources);
+
+                let cursor_icon = resources.get::<CursorIcon>().unwrap();
+                renderer.set_cursor_icon(cursor_icon.0);
 
                 renderer.request_redraw()
             }

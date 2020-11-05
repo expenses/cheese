@@ -155,3 +155,4 @@ impl MouseButtonState {
 
 pub struct PlayerSide(pub ecs::Side);
 pub struct DeltaTime(pub f32);
+pub struct CursorIcon(pub winit::window::CursorIcon);

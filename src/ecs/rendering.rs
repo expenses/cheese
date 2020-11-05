@@ -1,5 +1,6 @@
 use super::*;
 use crate::renderer::TorusInstance;
+use crate::resources::CursorIcon;
 use ultraviolet::Vec4;
 
 const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
@@ -237,4 +238,32 @@ pub fn render_bullets(
         transform: translation * rotation,
         uv_x_offset: 0.0,
     });
+}
+
+#[legion::system]
+#[read_component(Position)]
+#[read_component(Radius)]
+pub fn set_cursor_if_unit_under(
+    #[resource] camera: &Camera,
+    #[resource] mouse_state: &MouseState,
+    #[resource] screen_position: &ScreenDimensions,
+    #[resource] cursor_icon: &mut CursorIcon,
+    world: &SubWorld,
+) {
+    if unit_under_cursor(camera, mouse_state, screen_position, world) {
+        cursor_icon.0 = winit::window::CursorIcon::Hand;
+    }
+}
+
+fn unit_under_cursor(
+    camera: &Camera,
+    mouse_state: &MouseState,
+    screen_dimensions: &ScreenDimensions,
+    world: &SubWorld,
+) -> bool {
+    let position = camera.cast_ray(mouse_state.position, screen_dimensions);
+
+    <(&Position, &Radius)>::query()
+        .iter(world)
+        .any(|(pos, radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
 }
