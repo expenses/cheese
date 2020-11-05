@@ -44,6 +44,35 @@ pub fn render_selections(
     });
 }
 
+#[legion::system]
+#[read_component(Position)]
+#[read_component(Radius)]
+#[read_component(Side)]
+pub fn render_under_select_box(
+    #[resource] mouse_state: &MouseState,
+    #[resource] camera: &Camera,
+    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] player_side: &PlayerSide,
+    #[resource] buffers: &mut InstanceBuffers,
+    world: &SubWorld,
+) {
+    if let Some(start) = mouse_state.left_state.is_being_dragged() {
+        let select_box = SelectBox::new(camera, screen_dimensions, start, mouse_state.position);
+
+        <(&Position, &Radius, &Side)>::query()
+            .filter(component::<Selectable>() & !component::<Selected>())
+            .iter(world)
+            .filter(|(.., side)| **side == player_side.0)
+            .filter(|(position, ..)| select_box.contains(position.0))
+            .for_each(|(position, radius, _)| {
+                buffers.toruses.push(TorusInstance {
+                    center: Vec3::new(position.0.x, 0.0, position.0.y),
+                    colour: Vec3::new(1.0, 1.0, 1.0),
+                    radius: radius.0,
+                })
+            });
+    }
+}
 
 #[legion::system(for_each)]
 #[filter(component::<Selected>())]

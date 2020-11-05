@@ -93,13 +93,16 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::firing_system())
         .add_system(ecs::kill_dead_system())
         .add_system(ecs::apply_bullets_system())
+        // Rendering
         .add_system(ecs::render_bullets_system())
         .add_system(ecs::render_boxes_system())
         .add_system(ecs::render_selections_system())
         .add_system(ecs::render_firing_ranges_system())
+        .add_system(ecs::render_under_select_box_system())
         .add_system(ecs::render_drag_box_system())
         .add_system(ecs::render_command_paths_system())
         .add_system(ecs::render_ui_system())
+        // Cleanup
         .add_system(ecs::update_mouse_buttons_system())
         .build();
 

@@ -171,8 +171,7 @@ pub fn handle_drag_selection(
     world: &SubWorld,
 ) {
     if let Some(start) = mouse_state.left_state.was_dragged() {
-        let (top_left, bottom_right) = sort_points(start, mouse_state.position);
-        let (left, right, top, bottom) = (top_left.x, bottom_right.x, top_left.y, bottom_right.y);
+        let select_box = SelectBox::new(camera, screen_dimensions, start, mouse_state.position);
 
         if !rts_controls.shift_held {
             deselect_all(world, command_buffer);
@@ -183,15 +182,7 @@ pub fn handle_drag_selection(
             .iter(world)
             .filter(|(.., side)| **side == player_side.0)
             .for_each(|(entity, position, _)| {
-                if point_is_in_select_box(
-                    camera,
-                    screen_dimensions,
-                    position.0,
-                    left,
-                    right,
-                    top,
-                    bottom,
-                ) {
+                if select_box.contains(position.0) {
                     command_buffer.add_component(*entity, Selected);
                 }
             })
@@ -211,40 +202,4 @@ fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {
         .for_each(world, |entity| {
             commands.remove_component::<Selected>(*entity)
         });
-}
-
-fn point_is_in_select_box(
-    camera: &Camera,
-    screen_dimensions: &ScreenDimensions,
-    point: Vec2,
-    left: f32,
-    right: f32,
-    top: f32,
-    bottom: f32,
-) -> bool {
-    let point = vec2_to_ncollide_point(point);
-    let top_left_point =
-        vec2_to_ncollide_point(camera.cast_ray(Vec2::new(left, top), screen_dimensions));
-    let top_right_point =
-        vec2_to_ncollide_point(camera.cast_ray(Vec2::new(right, top), screen_dimensions));
-    let bottom_left_point =
-        vec2_to_ncollide_point(camera.cast_ray(Vec2::new(left, bottom), screen_dimensions));
-    let bottom_right_point =
-        vec2_to_ncollide_point(camera.cast_ray(Vec2::new(right, bottom), screen_dimensions));
-
-    ncollide3d::utils::is_point_in_triangle(
-        &point,
-        &top_left_point,
-        &top_right_point,
-        &bottom_left_point,
-    ) || ncollide3d::utils::is_point_in_triangle(
-        &point,
-        &top_right_point,
-        &bottom_left_point,
-        &bottom_right_point,
-    )
-}
-
-fn vec2_to_ncollide_point(point: Vec2) -> ncollide3d::math::Point<f32> {
-    ncollide3d::math::Point::new(point.x, 0.0, point.y)
 }
