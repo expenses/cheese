@@ -92,8 +92,9 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::move_units_system())
         .add_system(ecs::apply_steering_system())
         .add_system(ecs::firing_system())
-        .add_system(ecs::kill_dead_system())
         .add_system(ecs::apply_bullets_system())
+        .flush()
+        .add_system(ecs::handle_damaged_system())
         // Rendering
         .add_system(ecs::render_bullets_system())
         .add_system(ecs::render_boxes_system())
@@ -105,7 +106,6 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::render_ui_system())
         // Cleanup
         .flush()
-        .add_system(ecs::handle_damaged_system())
         .add_system(ecs::update_mouse_buttons_system())
         .build();
 

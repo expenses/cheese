@@ -59,21 +59,19 @@ pub fn firing(
 }
 
 #[legion::system(for_each)]
-#[write_component(Health)]
+// Need this so that entry_ref works instead of erroring for a non-obvious reason.
+#[read_component(Entity)]
 pub fn apply_bullets(
     entity: &Entity,
     bullet: &Bullet,
     position: &Position,
     move_to: &MoveTo,
-    world: &mut SubWorld,
+    world: &SubWorld,
     buffer: &mut CommandBuffer,
 ) {
     if position.0 == move_to.0 {
-        if let Ok(health) = <&mut Health>::query().get_mut(world, bullet.target) {
-            health.0 = health.0.saturating_sub(1);
-            if health.0 > 0 {
-                buffer.add_component(bullet.target, DamagedThisTick(bullet.source));
-            }
+        if world.entry_ref(bullet.target).is_ok() {
+            buffer.add_component(bullet.target, DamagedThisTick(bullet.source));
         }
         buffer.remove(*entity);
     }
@@ -83,22 +81,23 @@ pub fn apply_bullets(
 pub fn handle_damaged(
     entity: &Entity,
     damaged: &DamagedThisTick,
+    health: &mut Health,
     commands: &mut CommandQueue,
     buffer: &mut CommandBuffer,
 ) {
+    health.0 = health.0.saturating_sub(1);
+
+    if health.0 == 0 {
+        buffer.remove(*entity);
+        return;
+    }
+
     // If the unit is idle and got attacked, go attack back!
     if commands.0.is_empty() {
         commands.0.push_front(Command::Attack(damaged.0));
     }
 
     buffer.remove_component::<DamagedThisTick>(*entity);
-}
-
-#[legion::system(for_each)]
-pub fn kill_dead(entity: &Entity, health: &Health, buffer: &mut CommandBuffer) {
-    if health.0 == 0 {
-        buffer.remove(*entity);
-    }
 }
 
 #[legion::system(for_each)]
