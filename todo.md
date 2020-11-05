@@ -1,5 +1,4 @@
 - Add health bars (important)
-- Better selection visibility (medium)
 - Mouse modeling, texturing rigging and animating (important, can save for later)
 - Add animation system to renderer (medium)
 - Fill out HUD (medium)

@@ -30,9 +30,6 @@ pub struct Renderer {
     view_buffer: wgpu::Buffer,
     main_bind_group: wgpu::BindGroup,
 
-    imgui_platform: imgui_winit_support::WinitPlatform,
-    imgui_renderer: imgui_wgpu::Renderer,
-
     line_renderer: lines::Renderer,
     torus_renderer: torus::Renderer,
 
@@ -48,7 +45,6 @@ pub struct Renderer {
 impl Renderer {
     pub async fn new(
         event_loop: &EventLoop<()>,
-        imgui: &mut imgui::Context,
     ) -> anyhow::Result<(Self, InstanceBuffers, ScreenDimensions)> {
         let window = Window::new(event_loop)?;
 
@@ -272,25 +268,23 @@ impl Renderer {
                 usage: wgpu::BufferUsage::VERTEX,
             });
 
-        let mut imgui_platform = imgui_winit_support::WinitPlatform::init(imgui);
-        imgui_platform.attach_window(
-            imgui.io_mut(),
-            &window,
-            imgui_winit_support::HiDpiMode::Default,
-        );
-
-        let imgui_renderer = imgui_wgpu::RendererConfig::new()
-            .set_texture_format(DISPLAY_FORMAT)
-            .set_depth_format(DEPTH_FORMAT)
-            .set_sample_count(1)
-            .build(imgui, &device, &queue);
-
         let (line_renderer, line_buffers) = lines::Renderer::new(
-            &device, &texture_bind_group_layout, &sampler,
-            window_size.width, window_size.height, hud_texture,
+            &device,
+            &texture_bind_group_layout,
+            &sampler,
+            window_size.width,
+            window_size.height,
+            hud_texture,
         );
 
         let torus_renderer = torus::Renderer::new(&device, &pipeline_layout)?;
+
+        let font = wgpu_glyph::ab_glyph::FontRef::try_from_slice(include_bytes!(
+            "../fonts/Roboto_Mono/RobotoMono-Bold.ttf"
+        ))?;
+
+        let glyph_brush =
+            wgpu_glyph::GlyphBrushBuilder::using_font(font).build(&device, DISPLAY_FORMAT);
 
         let instance_buffers = InstanceBuffers {
             mice: GpuBuffer::new(
@@ -311,10 +305,9 @@ impl Renderer {
                 "Cheese command paths buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
-            toruses: GpuBuffer::new(
-                &device, 1, "Cheese torus buffer", wgpu::BufferUsage::VERTEX,
-            ),
+            toruses: GpuBuffer::new(&device, 1, "Cheese torus buffer", wgpu::BufferUsage::VERTEX),
             line_buffers,
+            glyph_brush,
         };
 
         Ok((
@@ -334,9 +327,6 @@ impl Renderer {
                 line_pipeline,
                 line_renderer,
                 torus_renderer,
-                // Imgui
-                imgui_platform,
-                imgui_renderer,
                 // Models
                 surface_model,
                 mouse_box_model,
@@ -370,7 +360,7 @@ impl Renderer {
         );
     }
 
-    pub fn render(&mut self, view: Mat4, instance_buffers: &mut InstanceBuffers, ui: imgui::Ui) {
+    pub fn render(&mut self, view: Mat4, instance_buffers: &mut InstanceBuffers) {
         self.queue
             .write_buffer(&self.view_buffer, 0, bytemuck::bytes_of(&view));
 
@@ -449,8 +439,11 @@ impl Renderer {
                 }
 
                 self.torus_renderer.render(
-                    &mut render_pass, &mut instance_buffers.toruses,
-                    &self.main_bind_group, &self.device, &self.queue,
+                    &mut render_pass,
+                    &mut instance_buffers.toruses,
+                    &self.main_bind_group,
+                    &self.device,
+                    &self.queue,
                 );
 
                 // Draw UI
@@ -461,29 +454,30 @@ impl Renderer {
                     &self.device,
                     &self.queue,
                 );
-
-                self.imgui_renderer
-                    .render(ui.render(), &self.queue, &self.device, &mut render_pass)
-                    .expect("Rendering failed");
             }
 
+            let size = self.window.inner_size();
+            let mut staging_belt = wgpu::util::StagingBelt::new(10);
+
+            instance_buffers
+                .glyph_brush
+                .draw_queued(
+                    &self.device,
+                    &mut staging_belt,
+                    &mut encoder,
+                    &frame.output.view,
+                    size.width,
+                    size.height,
+                )
+                .unwrap();
+
+            staging_belt.finish();
+
             self.queue.submit(Some(encoder.finish()));
+
+            // Do I need to do this?
+            // staging_belt.recall();
         }
-    }
-
-    pub fn prepare_imgui(&mut self, imgui: &mut imgui::Context) {
-        self.imgui_platform
-            .prepare_frame(imgui.io_mut(), &self.window)
-            .expect("Failed to prepare frame");
-    }
-
-    pub fn copy_event_to_imgui(
-        &mut self,
-        event: &winit::event::Event<()>,
-        imgui: &mut imgui::Context,
-    ) {
-        self.imgui_platform
-            .handle_event(imgui.io_mut(), &self.window, event);
     }
 
     pub fn request_redraw(&self) {
@@ -656,8 +650,19 @@ pub struct InstanceBuffers {
     pub mice: GpuBuffer<Instance>,
     pub command_paths: GpuBuffer<Vertex>,
     pub bullets: GpuBuffer<Instance>,
-    pub line_buffers: lines::LineBuffers,
     pub toruses: GpuBuffer<TorusInstance>,
+    pub line_buffers: lines::LineBuffers,
+    glyph_brush: wgpu_glyph::GlyphBrush<(), wgpu_glyph::ab_glyph::FontRef<'static>>,
+}
+
+impl InstanceBuffers {
+    pub fn render_text(&mut self, screen_position: (f32, f32), text: &str) {
+        self.glyph_brush.queue(
+            wgpu_glyph::Section::new()
+                .with_screen_position(screen_position)
+                .add_text(wgpu_glyph::Text::new(text).with_color([1.0; 4])),
+        );
+    }
 }
 
 #[repr(C)]

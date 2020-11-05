@@ -27,11 +27,8 @@ async fn run() -> anyhow::Result<()> {
 
     let event_loop = EventLoop::new();
 
-    let mut imgui = imgui::Context::create();
-    imgui.set_ini_filename(None);
-
     let (mut renderer, instance_buffers, screen_dimensions) =
-        renderer::Renderer::new(&event_loop, &mut imgui).await?;
+        renderer::Renderer::new(&event_loop).await?;
 
     let mut world = World::default();
     let mut resources = Resources::default();
@@ -94,6 +91,7 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::render_boxes_system())
         .add_system(ecs::render_drag_box_system())
         .add_system(ecs::render_command_paths_system())
+        .add_system(ecs::render_ui_system())
         .add_system(ecs::update_mouse_buttons_system())
         .build();
 
@@ -170,17 +168,10 @@ async fn run() -> anyhow::Result<()> {
             Event::RedrawRequested(_) => {
                 let mut instance_buffers = resources.get_mut::<InstanceBuffers>().unwrap();
                 let camera = resources.get::<Camera>().unwrap();
-
-                renderer.prepare_imgui(&mut imgui);
-                let mut ui = imgui.frame();
-                ecs::render_ui(&mut ui, &world);
-
-                renderer.render(camera.to_matrix(), &mut instance_buffers, ui)
+                renderer.render(camera.to_matrix(), &mut instance_buffers)
             }
             _ => {}
         }
-
-        renderer.copy_event_to_imgui(&event, &mut imgui);
     });
 }
 

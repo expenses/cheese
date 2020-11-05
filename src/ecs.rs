@@ -8,14 +8,14 @@ use legion::*;
 use std::collections::VecDeque;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
+mod combat;
 mod controls;
 mod movement;
 mod rendering;
-mod combat;
+pub use combat::*;
 pub use controls::*;
 pub use movement::*;
 pub use rendering::*;
-pub use combat::*;
 
 #[derive(Debug)]
 pub struct Position(pub Vec2);
@@ -41,7 +41,9 @@ pub struct CommandQueue(VecDeque<Command>);
 pub struct Health(pub u16);
 
 #[derive(Debug)]
-pub struct Bullet { target: Entity }
+pub struct Bullet {
+    target: Entity,
+}
 
 #[derive(Debug)]
 pub struct MoveTo(pub Vec2);

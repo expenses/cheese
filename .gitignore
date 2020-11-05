@@ -1,6 +1,7 @@
 *.blend1
 *.mtl
 *.code-workspace
+fonts
 target
 # Wrong place!
 blender/*.obj

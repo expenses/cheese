@@ -12,8 +12,12 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new(
-        device: &wgpu::Device, texture_bind_group_layout: &wgpu::BindGroupLayout,
-        sampler: &wgpu::Sampler, width: u32, height: u32, hud_texture: wgpu::BindGroup,
+        device: &wgpu::Device,
+        texture_bind_group_layout: &wgpu::BindGroupLayout,
+        sampler: &wgpu::Sampler,
+        width: u32,
+        height: u32,
+        hud_texture: wgpu::BindGroup,
     ) -> (Self, LineBuffers) {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Cheese line bind group layout"),
@@ -156,7 +160,7 @@ impl Renderer {
         queue.write_buffer(
             &self.hud_buffer,
             0,
-            bytemuck::cast_slice(&generate_hud_vertices(width, height))
+            bytemuck::cast_slice(&generate_hud_vertices(width, height)),
         );
     }
 
@@ -181,7 +185,7 @@ impl Renderer {
 
         render_pass.set_bind_group(1, &self.hud_texture, &[]);
         render_pass.set_vertex_buffer(0, self.hud_buffer.slice(..));
-        render_pass.draw(0 .. 6, 0 .. 1);
+        render_pass.draw(0..6, 0..1);
     }
 }
 
@@ -262,12 +266,10 @@ struct Vertex {
 }
 
 fn generate_hud_vertices(screen_width: u32, screen_height: u32) -> [Vertex; 6] {
-    let vertex = |x, y, u, v| {
-        Vertex {
-            position: Vec2::new(x as f32, y as f32),
-            uv: Vec2::new(u as f32, v as f32),
-            textured: true as i32
-        }
+    let vertex = |x, y, u, v| Vertex {
+        position: Vec2::new(x as f32, y as f32),
+        uv: Vec2::new(u as f32, v as f32),
+        textured: true as i32,
     };
 
     let screen_height = screen_height as f32;
@@ -281,7 +283,11 @@ fn generate_hud_vertices(screen_width: u32, screen_height: u32) -> [Vertex; 6] {
     let bottom_right = vertex(screen_width, screen_height, 1, 1);
 
     [
-        top_left, top_right, bottom_left,
-        top_right, bottom_left, bottom_right
+        top_left,
+        top_right,
+        bottom_left,
+        top_right,
+        bottom_left,
+        bottom_right,
     ]
 }

@@ -38,24 +38,19 @@ pub fn render_boxes(
     }
 }
 
-pub fn render_ui(ui: &mut imgui::Ui, world: &World) {
-    use imgui::im_str;
+#[legion::system]
+#[read_component(Entity)]
+#[read_component(Health)]
+pub fn render_ui(#[resource] buffers: &mut InstanceBuffers, world: &SubWorld) {
+    let text: String = <(Entity, &Health)>::query()
+        .filter(component::<Selected>())
+        .iter(world)
+        .map(|(entity, health)| {
+            format!("{:?}: Health: {}\n", entity, health.0)
+        })
+        .collect();
 
-    let mut selected = <(Entity, &Position, &Health)>::query().filter(component::<Selected>());
-
-    let window = imgui::Window::new(im_str!("Selected"));
-    window
-        .size([300.0, 100.0], imgui::Condition::FirstUseEver)
-        .build(&ui, || {
-            selected.iter(world).for_each(|(entity, position, health)| {
-                ui.text(im_str!(
-                    "{:?}: {:?}, Health: {}",
-                    entity,
-                    position.0,
-                    health.0
-                ))
-            });
-        });
+    buffers.render_text((10.0, 10.0), &text);
 }
 
 #[legion::system(for_each)]

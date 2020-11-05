@@ -1,4 +1,4 @@
-use super::{DISPLAY_FORMAT, DEPTH_FORMAT, Vertex, GpuBuffer};
+use super::{GpuBuffer, Vertex, DEPTH_FORMAT, DISPLAY_FORMAT};
 use crate::assets::Model;
 use ultraviolet::Vec3;
 
@@ -13,7 +13,10 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(device: &wgpu::Device, pipeline_layout: &wgpu::PipelineLayout) -> anyhow::Result<Self> {
+    pub fn new(
+        device: &wgpu::Device,
+        pipeline_layout: &wgpu::PipelineLayout,
+    ) -> anyhow::Result<Self> {
         let torus_model = Model::load(include_bytes!("../../models/torus.obj"), &device)?;
 
         let vs = wgpu::include_spirv!("../../shaders/torus.vert.spv");
@@ -95,7 +98,6 @@ impl Renderer {
         }
     }
 }
-
 
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]

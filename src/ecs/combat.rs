@@ -22,11 +22,14 @@ pub fn stop_attacks_on_dead_entities(commands: &mut CommandQueue, world: &SubWor
 #[filter(component::<Position>())]
 #[read_component(Position)]
 pub fn firing(
-    entity: &Entity, command_queue: &CommandQueue, world: &SubWorld, buffer: &mut CommandBuffer,
+    entity: &Entity,
+    command_queue: &CommandQueue,
+    world: &SubWorld,
+    buffer: &mut CommandBuffer,
     cooldown: &mut FiringCooldown,
 ) {
     if cooldown.0 != 0 {
-        return
+        return;
     }
 
     let position = <&Position>::query()
@@ -40,7 +43,9 @@ pub fn firing(
 
         if (position.0 - target_position.0).mag_sq() <= FIRING_RANGE.powi(2) {
             buffer.push((
-                Position(position.0), Bullet { target: *target }, Facing(0.0),
+                Position(position.0),
+                Bullet { target: *target },
+                Facing(0.0),
                 MoveTo(target_position.0),
             ));
             cooldown.0 = 10;
@@ -78,11 +83,7 @@ pub fn kill_dead(entity: &Entity, health: &Health, buffer: &mut CommandBuffer) {
 #[read_component(Entity)]
 #[read_component(Position)]
 #[read_component(Side)]
-pub fn add_attack_commands(
-    entity: &Entity,
-    commands: &mut CommandQueue,
-    world: &SubWorld,
-) {
+pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: &SubWorld) {
     let (position, side) = <(&Position, &Side)>::query()
         .get(world, *entity)
         .expect("We've applied a filter to this system for Position and Side");
@@ -104,8 +105,6 @@ pub fn add_attack_commands(
 }
 
 #[legion::system(for_each)]
-pub fn reduce_cooldowns(
-    cooldown: &mut FiringCooldown,
-) {
+pub fn reduce_cooldowns(cooldown: &mut FiringCooldown) {
     cooldown.0 = cooldown.0.saturating_sub(1);
 }
