@@ -1,5 +1,5 @@
 use super::{GpuBuffer, DEPTH_FORMAT, DISPLAY_FORMAT};
-use ultraviolet::Vec2;
+use ultraviolet::{Vec2, Vec3};
 use wgpu::util::DeviceExt;
 
 pub struct Renderer {
@@ -111,7 +111,7 @@ impl Renderer {
                 vertex_buffers: &[wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<Vertex>() as u64,
                     step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float2, 1 => Float2, 2 => Int],
+                    attributes: &wgpu::vertex_attr_array![0 => Float2, 1 => Float2, 2 => Float3, 3 => Int],
                 }],
             },
             sample_count: 1,
@@ -171,6 +171,14 @@ impl Renderer {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) {
+        for vertex in line_buffers.lyon_buffers.vertices.drain(..) {
+            line_buffers.vertices.push(vertex);
+        }
+
+        for index in line_buffers.lyon_buffers.indices.drain(..) {
+            line_buffers.indices.push(index);
+        }
+
         line_buffers.vertices.upload(device, queue);
         line_buffers.indices.upload(device, queue);
 
@@ -190,18 +198,33 @@ impl Renderer {
 }
 
 use lyon_tessellation::{
-    basic_shapes::stroke_rectangle,
+    basic_shapes::{fill_rectangle, stroke_rectangle},
     math::{rect, Point},
-    BuffersBuilder, StrokeAttributes, StrokeOptions, StrokeVertexConstructor, VertexBuffers,
+    BasicVertexConstructor, BuffersBuilder, FillOptions, StrokeAttributes, StrokeOptions,
+    StrokeVertexConstructor, VertexBuffers,
 };
 
-struct Constructor;
+struct Constructor {
+    colour: Vec3,
+}
 
 impl StrokeVertexConstructor<Vertex> for Constructor {
     fn new_vertex(&mut self, point: Point, _: StrokeAttributes) -> Vertex {
         Vertex {
             position: Vec2::new(point.x, point.y),
             uv: Vec2::new(0.0, 0.0),
+            colour: self.colour,
+            textured: false as i32,
+        }
+    }
+}
+
+impl BasicVertexConstructor<Vertex> for Constructor {
+    fn new_vertex(&mut self, point: Point) -> Vertex {
+        Vertex {
+            position: Vec2::new(point.x, point.y),
+            uv: Vec2::new(0.0, 0.0),
+            colour: self.colour,
             textured: false as i32,
         }
     }
@@ -214,23 +237,31 @@ pub struct LineBuffers {
 }
 
 impl LineBuffers {
+    pub fn draw_filled_rect(&mut self, center: Vec2, dimensions: Vec2, colour: Vec3) {
+        let top_left = center - dimensions / 2.0;
+
+        fill_rectangle(
+            &rect(top_left.x, top_left.y, dimensions.x, dimensions.y),
+            &FillOptions::default(),
+            &mut BuffersBuilder::new(&mut self.lyon_buffers, Constructor { colour }),
+        )
+        .unwrap();
+    }
+
     pub fn draw_rect(&mut self, top_left: Vec2, bottom_right: Vec2) {
         let dimensions = bottom_right - top_left;
 
         stroke_rectangle(
             &rect(top_left.x, top_left.y, dimensions.x, dimensions.y),
             &StrokeOptions::default(),
-            &mut BuffersBuilder::new(&mut self.lyon_buffers, Constructor),
+            &mut BuffersBuilder::new(
+                &mut self.lyon_buffers,
+                Constructor {
+                    colour: Vec3::new(1.0, 1.0, 1.0),
+                },
+            ),
         )
         .unwrap();
-
-        for vertex in self.lyon_buffers.vertices.drain(..) {
-            self.vertices.push(vertex);
-        }
-
-        for index in self.lyon_buffers.indices.drain(..) {
-            self.indices.push(index);
-        }
     }
 
     fn get(&self) -> Option<(wgpu::BufferSlice, wgpu::BufferSlice, u32)> {
@@ -262,6 +293,7 @@ impl Uniforms {
 struct Vertex {
     position: Vec2,
     uv: Vec2,
+    colour: Vec3,
     textured: i32,
 }
 
@@ -269,6 +301,7 @@ fn generate_hud_vertices(screen_width: u32, screen_height: u32) -> [Vertex; 6] {
     let vertex = |x, y, u, v| Vertex {
         position: Vec2::new(x as f32, y as f32),
         uv: Vec2::new(u as f32, v as f32),
+        colour: Vec3::new(0.0, 0.0, 0.0),
         textured: true as i32,
     };
 

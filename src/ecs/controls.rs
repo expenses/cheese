@@ -61,7 +61,7 @@ pub fn handle_left_click(
     match rts_controls.mode {
         CommandMode::AttackMove => {
             issue_command(position, rts_controls, player_side, world);
-        },
+        }
         CommandMode::Normal => {
             let entity = <(Entity, &Position, Option<&Selected>, &Side, &Radius)>::query()
                 .filter(component::<Selectable>())
@@ -133,7 +133,7 @@ fn issue_command(
     position: Vec2,
     rts_controls: &RtsControls,
     player_side: &PlayerSide,
-    world: &mut SubWorld
+    world: &mut SubWorld,
 ) {
     let enemy_entity_under_cursor = <(Entity, &Position, &Side, &Radius)>::query()
         .iter(world)

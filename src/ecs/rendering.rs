@@ -1,5 +1,6 @@
 use super::*;
 use crate::renderer::TorusInstance;
+use ultraviolet::Vec4;
 
 const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
 const GREEN: Vec3 = Vec3::new(43.0, 140.0, 0.0);
@@ -75,6 +76,46 @@ pub fn render_under_select_box(
 }
 
 #[legion::system(for_each)]
+pub fn render_health_bars(
+    position: &Position,
+    radius: &Radius,
+    health: &Health,
+    unit: &Unit,
+    #[resource] camera: &Camera,
+    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] buffers: &mut InstanceBuffers,
+) {
+    let stats = unit.stats();
+
+    if health.0 != stats.max_health {
+        let floating = Vec3::new(position.0.x, radius.0 * 2.0, position.0.y);
+        let location = screen_location(floating, camera, screen_dimensions);
+
+        let health_percentage = health.0 as f32 / stats.max_health as f32;
+        let length = 60.0 * health_percentage;
+
+        buffers.line_buffers.draw_filled_rect(
+            location,
+            Vec2::new(length, 10.0),
+            Vec3::new(1.0 - health_percentage, health_percentage, 0.0),
+        );
+    }
+}
+
+fn screen_location(position: Vec3, camera: &Camera, screen_dimensions: &ScreenDimensions) -> Vec2 {
+    let &ScreenDimensions { width, height } = screen_dimensions;
+    let view = camera.to_matrix();
+    let perspective = crate::renderer::create_perspective_mat4(width, height);
+    let screen_position = perspective * view * Vec4::new(position.x, position.y, position.z, 1.0);
+    let screen_position = Vec2::new(screen_position.x, screen_position.y) / screen_position.w;
+    wgpu_to_screen(screen_position, width as f32, height as f32)
+}
+
+fn wgpu_to_screen(wgpu: Vec2, width: f32, height: f32) -> Vec2 {
+    Vec2::new((wgpu.x + 1.0) / 2.0 * width, (1.0 - wgpu.y) / 2.0 * height)
+}
+
+#[legion::system(for_each)]
 #[filter(component::<Selected>())]
 pub fn render_firing_ranges(
     position: &Position,
@@ -106,7 +147,8 @@ pub fn render_ui(
 
     let mut query = <(Entity, &Health)>::query().filter(component::<Selected>());
 
-    let unit_info = query.iter(world)
+    let unit_info = query
+        .iter(world)
         .map(|(entity, health)| format!("{:?}: Health: {}\n", entity, health.0));
 
     let text: String = mode.chain(unit_info).collect();

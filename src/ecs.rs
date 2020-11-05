@@ -57,6 +57,63 @@ pub struct MoveTo(pub Vec2);
 
 pub struct FiringCooldown(pub u8);
 
+#[derive(Copy, Clone)]
+pub enum Unit {
+    MouseMarine,
+    Hulk,
+}
+
+impl Unit {
+    fn stats(self) -> UnitStats {
+        match self {
+            Self::MouseMarine => UnitStats {
+                max_health: 50,
+                firing_range: 10.0,
+                move_speed: 6.0,
+                radius: 2.0,
+            },
+            Self::Hulk => UnitStats {
+                max_health: 500,
+                firing_range: 5.0,
+                move_speed: 6.0,
+                radius: 3.0,
+            },
+        }
+    }
+
+    pub fn add_to_world(self, world: &mut World, position: Vec2, facing: Facing, side: Side) {
+        let UnitStats {
+            max_health,
+            move_speed,
+            radius,
+            firing_range,
+        } = self.stats();
+
+        world.push((
+            Position(position),
+            facing,
+            side,
+            self,
+            CommandQueue::default(),
+            Avoids,
+            Avoidable,
+            Selectable,
+            Health(max_health),
+            FiringCooldown(0),
+            FiringRange(firing_range),
+            MoveSpeed(move_speed),
+            Radius(radius),
+        ));
+    }
+}
+
+pub struct UnitStats {
+    pub max_health: u16,
+    pub move_speed: f32,
+    pub radius: f32,
+    pub firing_range: f32,
+}
+
 fn sort_points(a: Vec2, b: Vec2) -> (Vec2, Vec2) {
     (
         Vec2::new(a.x.min(b.x), a.y.min(b.y)),

@@ -2,10 +2,12 @@
 
 layout(location = 0) in vec2 position;
 layout(location = 1) in vec2 uv;
-layout(location = 2) in int textured;
+layout(location = 2) in vec3 colour;
+layout(location = 3) in int textured;
 
 layout(location = 0) out vec2 out_uv;
-layout(location = 1) out int out_textured;
+layout(location = 1) out vec3 out_colour;
+layout(location = 2) out int out_textured;
 
 layout(set = 0, binding = 0) uniform Uniforms {
     vec2 screen_dimensions;
@@ -13,6 +15,7 @@ layout(set = 0, binding = 0) uniform Uniforms {
 
 void main() {
     out_uv = uv;
+    out_colour = colour;
     out_textured = textured;
 
     vec2 adjusted_position = vec2(

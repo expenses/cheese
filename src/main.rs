@@ -5,8 +5,8 @@ mod resources;
 
 use crate::renderer::InstanceBuffers;
 use crate::resources::{
-    Camera, CameraControls, DeltaTime, MouseState, PlayerSide, RtsControls, ScreenDimensions,
-    CommandMode,
+    Camera, CameraControls, CommandMode, DeltaTime, MouseState, PlayerSide, RtsControls,
+    ScreenDimensions,
 };
 use legion::*;
 use ultraviolet::{Vec2, Vec3};
@@ -45,36 +45,20 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(PlayerSide(ecs::Side::Purple));
 
     for i in 0..10 {
-        world.push((
-            ecs::Position(Vec2::new(-10.0, i as f32 / 100.0)),
+        ecs::Unit::MouseMarine.add_to_world(
+            &mut world,
+            Vec2::new(-10.0, i as f32 / 100.0),
             ecs::Facing(1.0),
             ecs::Side::Purple,
-            ecs::CommandQueue::default(),
-            ecs::Avoids,
-            ecs::Avoidable,
-            ecs::Selectable,
-            ecs::Health(50),
-            ecs::FiringCooldown(0),
-            ecs::FiringRange(10.0),
-            ecs::MoveSpeed(6.0),
-            ecs::Radius(2.0),
-        ));
+        );
     }
 
-    world.push((
-        ecs::Position(Vec2::new(10.0, 0.0)),
+    ecs::Unit::Hulk.add_to_world(
+        &mut world,
+        Vec2::new(10.0, 0.0),
         ecs::Facing(1.0),
         ecs::Side::Green,
-        ecs::CommandQueue::default(),
-        ecs::Avoids,
-        ecs::Avoidable,
-        ecs::Selectable,
-        ecs::Health(500),
-        ecs::FiringCooldown(0),
-        ecs::FiringRange(5.0),
-        ecs::MoveSpeed(6.0),
-        ecs::Radius(3.0),
-    ));
+    );
 
     let mut schedule = Schedule::builder()
         .add_system(ecs::stop_attacks_on_dead_entities_system())
@@ -104,6 +88,7 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::render_drag_box_system())
         .add_system(ecs::render_command_paths_system())
         .add_system(ecs::render_ui_system())
+        .add_system(ecs::render_health_bars_system())
         // Cleanup
         .flush()
         .add_system(ecs::update_mouse_buttons_system())

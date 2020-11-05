@@ -33,6 +33,7 @@ void main() {
     // Remove the y coordinate because we don't want to scale on that axis.
     vec3 position_no_y = vec3(position.x, 0.0, position.z);
     // Calculate what the new distance from the center should be.
+    // When the radius is 1 there should be no change.
     float new_length = length(position_no_y) + radius - 1;
     // Rescale the position by the new length and add the y coordinate back.
     vec3 new = normalize(position_no_y) * new_length;
