@@ -186,22 +186,26 @@ pub fn render_command_paths(
 
     for command in queue.0.iter() {
         let position = match command {
-            Command::MoveTo(position) => *position,
-            Command::AttackMove(position) => *position,
-            Command::Attack(target) => {
-                <&Position>::query()
+            Command::MoveTo(position) => Some(*position),
+            Command::AttackMove(position) => Some(*position),
+            Command::Attack { target, explicit: true } => {
+                let position = <&Position>::query()
                     .get(world, *target)
                     .expect("We've cancelled attack commands on dead entities")
-                    .0
-            }
+                    .0;
+                Some(position)
+            },
+            Command::Attack { explicit: false, .. } => None
         };
 
-        let vertex = position_to_vertex(position, uv);
+        if let Some(position) = position {
+            let vertex = position_to_vertex(position, uv);
 
-        buffers.command_paths.push(prev);
-        buffers.command_paths.push(vertex);
+            buffers.command_paths.push(prev);
+            buffers.command_paths.push(vertex);
 
-        prev = vertex;
+            prev = vertex;
+        }
     }
 }
 

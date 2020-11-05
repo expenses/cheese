@@ -23,7 +23,7 @@ pub fn set_move_to(
     match commands.0.front().cloned() {
         Some(Command::MoveTo(target)) => buffer.add_component(*entity, MoveTo(target)),
         Some(Command::AttackMove(target)) => buffer.add_component(*entity, MoveTo(target)),
-        Some(Command::Attack(target)) => {
+        Some(Command::Attack { target, .. }) => {
             let target_pos = <&Position>::query()
                 .get(world, target)
                 .expect("We've cancelled attack commands on dead entities");

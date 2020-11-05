@@ -31,7 +31,12 @@ pub struct Selectable;
 #[derive(Clone, Copy)]
 pub enum Command {
     MoveTo(Vec2),
-    Attack(Entity),
+    Attack {
+        target: Entity,
+        // Was the unit explicitly commanded to attack, or was this caused by attack moving or agro?
+        // todo: attack moves need to give up when an enemy goes out of range.
+        explicit: bool,
+    },
     AttackMove(Vec2),
 }
 

@@ -6,8 +6,8 @@ pub fn stop_attacks_on_dead_entities(commands: &mut CommandQueue, world: &SubWor
         .0
         .front()
         .map(|command| {
-            if let Command::Attack(entity) = command {
-                world.entry_ref(*entity).is_err()
+            if let Command::Attack { target, .. } = command {
+                world.entry_ref(*target).is_err()
             } else {
                 false
             }
@@ -37,7 +37,7 @@ pub fn firing(
         .get(world, *entity)
         .expect("We've applied a filter to this system for Position");
 
-    if let Some(Command::Attack(target)) = command_queue.0.front() {
+    if let Some(Command::Attack { target, .. }) = command_queue.0.front() {
         let target_position = <&Position>::query()
             .get(world, *target)
             .expect("We've cancelled attack commands on dead entities");
@@ -94,7 +94,7 @@ pub fn handle_damaged(
 
     // If the unit is idle and got attacked, go attack back!
     if commands.0.is_empty() {
-        commands.0.push_front(Command::Attack(damaged.0));
+        commands.0.push_front(Command::Attack { target: damaged.0, explicit: false });
     }
 
     buffer.remove_component::<DamagedThisTick>(*entity);
@@ -122,7 +122,7 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
             .map(|(entity, ..)| entity);
 
         if let Some(target) = target {
-            commands.0.push_front(Command::Attack(*target))
+            commands.0.push_front(Command::Attack { target: *target, explicit: false })
         }
     }
 }
