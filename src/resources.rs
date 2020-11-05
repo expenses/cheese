@@ -13,7 +13,20 @@ pub struct CameraControls {
 #[derive(Default)]
 pub struct RtsControls {
     pub shift_held: bool,
-    pub s_pressed: bool,
+    pub stop_pressed: bool,
+    pub mode: CommandMode,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum CommandMode {
+    Normal,
+    AttackMove,
+}
+
+impl Default for CommandMode {
+    fn default() -> Self {
+        Self::Normal
+    }
 }
 
 pub struct Camera {

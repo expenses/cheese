@@ -6,6 +6,7 @@ mod resources;
 use crate::renderer::InstanceBuffers;
 use crate::resources::{
     Camera, CameraControls, DeltaTime, MouseState, PlayerSide, RtsControls, ScreenDimensions,
+    CommandMode,
 };
 use legion::*;
 use ultraviolet::{Vec2, Vec3};
@@ -207,7 +208,9 @@ fn handle_key(
         VirtualKeyCode::Left => camera_controls.left = pressed,
         VirtualKeyCode::Right => camera_controls.right = pressed,
         VirtualKeyCode::LShift => rts_controls.shift_held = pressed,
-        VirtualKeyCode::S if pressed => rts_controls.s_pressed = true,
+        VirtualKeyCode::S if pressed => rts_controls.stop_pressed = true,
+        VirtualKeyCode::A if pressed => rts_controls.mode = CommandMode::AttackMove,
+        //VirtualKeyCode::Escape if pressed => rts_controls.mode = CommandMode::Normal,
         _ => {}
     }
 }

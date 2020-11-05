@@ -97,12 +97,19 @@ pub fn render_firing_ranges(
 #[legion::system]
 #[read_component(Entity)]
 #[read_component(Health)]
-pub fn render_ui(#[resource] buffers: &mut InstanceBuffers, world: &SubWorld) {
-    let text: String = <(Entity, &Health)>::query()
-        .filter(component::<Selected>())
-        .iter(world)
-        .map(|(entity, health)| format!("{:?}: Health: {}\n", entity, health.0))
-        .collect();
+pub fn render_ui(
+    #[resource] rts_controls: &RtsControls,
+    #[resource] buffers: &mut InstanceBuffers,
+    world: &SubWorld,
+) {
+    let mode = Some(format!("Mode: {:?}\n", rts_controls.mode)).into_iter();
+
+    let mut query = <(Entity, &Health)>::query().filter(component::<Selected>());
+
+    let unit_info = query.iter(world)
+        .map(|(entity, health)| format!("{:?}: Health: {}\n", entity, health.0));
+
+    let text: String = mode.chain(unit_info).collect();
 
     buffers.render_text((10.0, 10.0), &text);
 }

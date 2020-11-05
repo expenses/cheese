@@ -1,4 +1,5 @@
 use super::*;
+use crate::resources::CommandMode;
 
 #[legion::system]
 pub fn control_camera(
@@ -41,13 +42,14 @@ pub fn control_camera(
 #[read_component(Position)]
 #[read_component(Side)]
 #[read_component(Radius)]
+#[write_component(CommandQueue)]
 pub fn handle_left_click(
     #[resource] camera: &Camera,
     #[resource] mouse_state: &MouseState,
     #[resource] screen_dimensions: &ScreenDimensions,
-    #[resource] rts_controls: &RtsControls,
+    #[resource] rts_controls: &mut RtsControls,
     #[resource] player_side: &PlayerSide,
-    world: &SubWorld,
+    world: &mut SubWorld,
     commands: &mut CommandBuffer,
 ) {
     if !mouse_state.left_state.was_clicked() {
@@ -56,37 +58,46 @@ pub fn handle_left_click(
 
     let position = camera.cast_ray(mouse_state.position, screen_dimensions);
 
-    let entity = <(Entity, &Position, Option<&Selected>, &Side, &Radius)>::query()
-        .filter(component::<Selectable>())
-        .iter(world)
-        .filter(|(_, pos, .., radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
-        //.min_by_key(|(_, pos)| (position - pos.0).mag_sq());
-        .next()
-        .map(|(entity, _, selected, side, _)| (entity, selected.is_some(), side));
-
-    if let Some((entity, is_selected, side)) = entity {
-        if !rts_controls.shift_held {
-            deselect_all(world, commands);
-        }
-
-        if rts_controls.shift_held && is_selected {
-            commands.remove_component::<Selected>(*entity);
-        } else if !rts_controls.shift_held {
-            commands.add_component(*entity, Selected);
-        // If we're holding shift but haven't selected the unit, we need to check if we can add it
-        // the current selection, because having a selection of a bunch of enemy units or a mixture
-        // doesn't really make sense.
-        } else {
-            let only_player_units_selected = <&Side>::query()
-                .filter(component::<Selected>())
+    match rts_controls.mode {
+        CommandMode::AttackMove => {
+            issue_command(position, rts_controls, player_side, world);
+        },
+        CommandMode::Normal => {
+            let entity = <(Entity, &Position, Option<&Selected>, &Side, &Radius)>::query()
+                .filter(component::<Selectable>())
                 .iter(world)
-                .all(|side| *side == player_side.0);
+                .filter(|(_, pos, .., radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
+                //.min_by_key(|(_, pos)| (position - pos.0).mag_sq());
+                .next()
+                .map(|(entity, _, selected, side, _)| (entity, selected.is_some(), side));
 
-            if only_player_units_selected && *side == player_side.0 {
-                commands.add_component(*entity, Selected);
+            if let Some((entity, is_selected, side)) = entity {
+                if !rts_controls.shift_held {
+                    deselect_all(world, commands);
+                }
+
+                if rts_controls.shift_held && is_selected {
+                    commands.remove_component::<Selected>(*entity);
+                } else if !rts_controls.shift_held {
+                    commands.add_component(*entity, Selected);
+                // If we're holding shift but haven't selected the unit, we need to check if we can add it
+                // the current selection, because having a selection of a bunch of enemy units or a mixture
+                // doesn't really make sense.
+                } else {
+                    let only_player_units_selected = <&Side>::query()
+                        .filter(component::<Selected>())
+                        .iter(world)
+                        .all(|side| *side == player_side.0);
+
+                    if only_player_units_selected && *side == player_side.0 {
+                        commands.add_component(*entity, Selected);
+                    }
+                }
             }
         }
     }
+
+    rts_controls.mode = CommandMode::Normal;
 }
 
 #[legion::system]
@@ -99,7 +110,7 @@ pub fn handle_right_click(
     #[resource] camera: &Camera,
     #[resource] mouse_state: &MouseState,
     #[resource] screen_dimensions: &ScreenDimensions,
-    #[resource] rts_controls: &RtsControls,
+    #[resource] rts_controls: &mut RtsControls,
     #[resource] player_side: &PlayerSide,
     world: &mut SubWorld,
 ) {
@@ -107,8 +118,23 @@ pub fn handle_right_click(
         return;
     }
 
-    let position = camera.cast_ray(mouse_state.position, screen_dimensions);
+    // Copying SC2 here. If you're not in the normal command mode, attack moving, casting a spell,
+    // whatever, then we want right clicks to just cancel that.
+    if rts_controls.mode != CommandMode::Normal {
+        rts_controls.mode = CommandMode::Normal;
+        return;
+    }
 
+    let position = camera.cast_ray(mouse_state.position, screen_dimensions);
+    issue_command(position, rts_controls, player_side, world)
+}
+
+fn issue_command(
+    position: Vec2,
+    rts_controls: &RtsControls,
+    player_side: &PlayerSide,
+    world: &mut SubWorld
+) {
     let enemy_entity_under_cursor = <(Entity, &Position, &Side, &Radius)>::query()
         .iter(world)
         .filter(|(.., side, _)| **side != player_side.0)
@@ -118,7 +144,10 @@ pub fn handle_right_click(
 
     let command = match enemy_entity_under_cursor {
         Some(entity) => Command::Attack(*entity),
-        None => Command::MoveTo(position),
+        None => match rts_controls.mode {
+            CommandMode::Normal => Command::MoveTo(position),
+            CommandMode::AttackMove => Command::AttackMove(position),
+        },
     };
 
     <(&mut CommandQueue, &Side)>::query()
@@ -142,7 +171,7 @@ pub fn handle_stop_command(
     #[resource] player_side: &PlayerSide,
     world: &mut SubWorld,
 ) {
-    if !rts_controls.s_pressed {
+    if !rts_controls.stop_pressed {
         return;
     }
 
@@ -154,7 +183,7 @@ pub fn handle_stop_command(
             commands.0.clear();
         });
 
-    rts_controls.s_pressed = false;
+    rts_controls.stop_pressed = false;
 }
 
 #[legion::system]
