@@ -70,7 +70,7 @@ async fn run() -> anyhow::Result<()> {
         ecs::Selectable,
         ecs::Health(500),
         ecs::FiringCooldown(0),
-        ecs::FiringRange(10.0),
+        ecs::FiringRange(5.0),
         ecs::MoveSpeed(6.0),
         ecs::Radius(3.0),
     ));
@@ -103,6 +103,8 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::render_command_paths_system())
         .add_system(ecs::render_ui_system())
         // Cleanup
+        .flush()
+        .add_system(ecs::handle_damaged_system())
         .add_system(ecs::update_mouse_buttons_system())
         .build();
 

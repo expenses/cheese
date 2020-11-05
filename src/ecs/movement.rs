@@ -117,6 +117,7 @@ pub fn apply_steering(
     avoidance: &Avoidance,
     command_buffer: &mut CommandBuffer,
 ) {
+    // todo: delta time here
     position.0 += avoidance.0 * 0.1;
     command_buffer.remove_component::<Avoidance>(*entity);
 }

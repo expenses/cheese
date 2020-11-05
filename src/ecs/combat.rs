@@ -45,7 +45,10 @@ pub fn firing(
         if (position.0 - target_position.0).mag_sq() <= firing_range.0.powi(2) {
             buffer.push((
                 Position(position.0),
-                Bullet { target: *target },
+                Bullet {
+                    target: *target,
+                    source: *entity,
+                },
                 Facing(0.0),
                 MoveTo(target_position.0),
                 MoveSpeed(10.0),
@@ -68,9 +71,25 @@ pub fn apply_bullets(
     if position.0 == move_to.0 {
         if let Ok(health) = <&mut Health>::query().get_mut(world, bullet.target) {
             health.0 = health.0.saturating_sub(1);
+            buffer.add_component(bullet.target, DamagedThisTick(bullet.source));
         }
         buffer.remove(*entity);
     }
+}
+
+#[legion::system(for_each)]
+pub fn handle_damaged(
+    entity: &Entity,
+    damaged: &DamagedThisTick,
+    commands: &mut CommandQueue,
+    buffer: &mut CommandBuffer,
+) {
+    // If the unit is idle and got attacked, go attack back!
+    if commands.0.is_empty() {
+        commands.0.push_front(Command::Attack(damaged.0));
+    }
+
+    buffer.remove_component::<DamagedThisTick>(*entity);
 }
 
 #[legion::system(for_each)]

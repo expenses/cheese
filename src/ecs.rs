@@ -44,8 +44,11 @@ pub struct FiringRange(pub f32);
 pub struct MoveSpeed(pub f32);
 pub struct Radius(pub f32);
 
+pub struct DamagedThisTick(pub Entity);
+
 #[derive(Debug)]
 pub struct Bullet {
+    source: Entity,
     target: Entity,
 }
 
