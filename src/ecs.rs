@@ -40,6 +40,10 @@ pub struct CommandQueue(VecDeque<Command>);
 
 pub struct Health(pub u16);
 
+pub struct FiringRange(pub f32);
+pub struct MoveSpeed(pub f32);
+pub struct Radius(pub f32);
+
 #[derive(Debug)]
 pub struct Bullet {
     target: Entity,
@@ -49,10 +53,6 @@ pub struct Bullet {
 pub struct MoveTo(pub Vec2);
 
 pub struct FiringCooldown(pub u8);
-
-const FIRING_RANGE: f32 = 10.0;
-const MOVE_SPEED: f32 = 0.1;
-const SELECTION_RADIUS: f32 = 2.0;
 
 fn sort_points(a: Vec2, b: Vec2) -> (Vec2, Vec2) {
     (

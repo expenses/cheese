@@ -27,6 +27,7 @@ pub fn firing(
     world: &SubWorld,
     buffer: &mut CommandBuffer,
     cooldown: &mut FiringCooldown,
+    firing_range: &FiringRange,
 ) {
     if cooldown.0 != 0 {
         return;
@@ -41,12 +42,13 @@ pub fn firing(
             .get(world, *target)
             .expect("We've cancelled attack commands on dead entities");
 
-        if (position.0 - target_position.0).mag_sq() <= FIRING_RANGE.powi(2) {
+        if (position.0 - target_position.0).mag_sq() <= firing_range.0.powi(2) {
             buffer.push((
                 Position(position.0),
                 Bullet { target: *target },
                 Facing(0.0),
                 MoveTo(target_position.0),
+                MoveSpeed(10.0),
             ));
             cooldown.0 = 10;
         }
@@ -79,21 +81,22 @@ pub fn kill_dead(entity: &Entity, health: &Health, buffer: &mut CommandBuffer) {
 }
 
 #[legion::system(for_each)]
-#[filter(component::<Position>() & component::<Side>())]
+#[filter(component::<Position>() & component::<Side>() & component::<FiringRange>())]
 #[read_component(Entity)]
 #[read_component(Position)]
 #[read_component(Side)]
+#[read_component(FiringRange)]
 pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: &SubWorld) {
-    let (position, side) = <(&Position, &Side)>::query()
+    let (position, side, firing_range) = <(&Position, &Side, &FiringRange)>::query()
         .get(world, *entity)
-        .expect("We've applied a filter to this system for Position and Side");
+        .expect("We've applied a filter for these components");
 
     if matches!(commands.0.front().cloned(), None | Some(Command::AttackMove(_))) {
         let target = <(Entity, &Position, &Side)>::query()
             .iter(world)
             .filter(|(.., entity_side)| *entity_side != side)
             .filter(|(_, entity_position, _)| {
-                (position.0 - entity_position.0).mag_sq() <= FIRING_RANGE.powi(2)
+                (position.0 - entity_position.0).mag_sq() <= firing_range.0.powi(2)
             })
             .next()
             .map(|(entity, ..)| entity);

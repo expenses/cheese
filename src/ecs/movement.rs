@@ -1,10 +1,12 @@
 use super::*;
+use crate::resources::DeltaTime;
 
 #[legion::system(for_each)]
 #[filter(component::<Position>())]
 #[read_component(Position)]
 pub fn set_move_to(
     entity: &Entity,
+    firing_range: &FiringRange,
     commands: &CommandQueue,
     buffer: &mut CommandBuffer,
     world: &SubWorld,
@@ -26,9 +28,9 @@ pub fn set_move_to(
                 .get(world, target)
                 .expect("We've cancelled attack commands on dead entities");
             let vector = target_pos.0 - position.0;
-            if vector.mag_sq() > (FIRING_RANGE - fudge_factor).powi(2) {
+            if vector.mag_sq() > (firing_range.0 - fudge_factor).powi(2) {
                 let mag = vector.mag();
-                let distance_to_go = mag - (FIRING_RANGE - fudge_factor);
+                let distance_to_go = mag - (firing_range.0 - fudge_factor);
                 let target = position.0 + vector.normalized() * distance_to_go;
                 buffer.add_component(*entity, MoveTo(target));
             } else {
@@ -44,13 +46,17 @@ pub fn move_units(
     position: &mut Position,
     facing: &mut Facing,
     move_to: &MoveTo,
+    move_speed: &MoveSpeed,
     // `None` if we're moving a bullet
     commands: Option<&mut CommandQueue>,
+    #[resource] delta_time: &DeltaTime,
 ) {
     let direction = move_to.0 - position.0;
     facing.0 = direction.y.atan2(direction.x);
 
-    if direction.mag_sq() <= MOVE_SPEED.powi(2) {
+    let speed = move_speed.0 * delta_time.0;
+
+    if direction.mag_sq() <= speed.powi(2) {
         position.0 = move_to.0;
         if let Some(commands) = commands {
             if commands
@@ -63,7 +69,7 @@ pub fn move_units(
             }
         }
     } else {
-        position.0 += direction.normalized() * MOVE_SPEED;
+        position.0 += direction.normalized() * speed;
     }
 }
 

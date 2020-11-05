@@ -40,6 +40,7 @@ pub fn control_camera(
 #[read_component(Selected)]
 #[read_component(Position)]
 #[read_component(Side)]
+#[read_component(Radius)]
 pub fn handle_left_click(
     #[resource] camera: &Camera,
     #[resource] mouse_state: &MouseState,
@@ -55,13 +56,13 @@ pub fn handle_left_click(
 
     let position = camera.cast_ray(mouse_state.position, screen_dimensions);
 
-    let entity = <(Entity, &Position, Option<&Selected>, &Side)>::query()
+    let entity = <(Entity, &Position, Option<&Selected>, &Side, &Radius)>::query()
         .filter(component::<Selectable>())
         .iter(world)
-        .filter(|(_, pos, ..)| (position - pos.0).mag_sq() < SELECTION_RADIUS.powi(2))
+        .filter(|(_, pos, .., radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
         //.min_by_key(|(_, pos)| (position - pos.0).mag_sq());
         .next()
-        .map(|(entity, _, selected, side)| (entity, selected.is_some(), side));
+        .map(|(entity, _, selected, side, _)| (entity, selected.is_some(), side));
 
     if let Some((entity, is_selected, side)) = entity {
         if !rts_controls.shift_held {
@@ -92,6 +93,7 @@ pub fn handle_left_click(
 #[read_component(Entity)]
 #[read_component(Position)]
 #[read_component(Side)]
+#[read_component(Radius)]
 #[write_component(CommandQueue)]
 pub fn handle_right_click(
     #[resource] camera: &Camera,
@@ -107,10 +109,10 @@ pub fn handle_right_click(
 
     let position = camera.cast_ray(mouse_state.position, screen_dimensions);
 
-    let enemy_entity_under_cursor = <(Entity, &Position, &Side)>::query()
+    let enemy_entity_under_cursor = <(Entity, &Position, &Side, &Radius)>::query()
         .iter(world)
-        .filter(|(.., side)| **side != player_side.0)
-        .filter(|(_, pos, _)| (position - pos.0).mag_sq() < SELECTION_RADIUS.powi(2))
+        .filter(|(.., side, _)| **side != player_side.0)
+        .filter(|(_, pos, _, radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
         .next()
         .map(|(entity, ..)| entity);
 

@@ -141,3 +141,4 @@ impl MouseButtonState {
 }
 
 pub struct PlayerSide(pub ecs::Side);
+pub struct DeltaTime(pub f32);

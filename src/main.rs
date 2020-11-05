@@ -5,7 +5,7 @@ mod resources;
 
 use crate::renderer::InstanceBuffers;
 use crate::resources::{
-    Camera, CameraControls, MouseState, PlayerSide, RtsControls, ScreenDimensions,
+    Camera, CameraControls, DeltaTime, MouseState, PlayerSide, RtsControls, ScreenDimensions,
 };
 use legion::*;
 use ultraviolet::{Vec2, Vec3};
@@ -54,6 +54,9 @@ async fn run() -> anyhow::Result<()> {
             ecs::Selectable,
             ecs::Health(50),
             ecs::FiringCooldown(0),
+            ecs::FiringRange(10.0),
+            ecs::MoveSpeed(6.0),
+            ecs::Radius(2.0),
         ));
     }
 
@@ -67,6 +70,9 @@ async fn run() -> anyhow::Result<()> {
         ecs::Selectable,
         ecs::Health(500),
         ecs::FiringCooldown(0),
+        ecs::FiringRange(10.0),
+        ecs::MoveSpeed(6.0),
+        ecs::Radius(3.0),
     ));
 
     let mut schedule = Schedule::builder()
@@ -95,6 +101,8 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::update_mouse_buttons_system())
         .build();
 
+    let mut time = std::time::Instant::now();
+
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent { ref event, .. } => {
@@ -102,12 +110,10 @@ async fn run() -> anyhow::Result<()> {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                     WindowEvent::Resized(size) => {
                         renderer.resize(size.width as u32, size.height as u32);
-                        let mut screen_dimensions =
-                            resources.get_mut::<ScreenDimensions>().unwrap();
-                        *screen_dimensions = ScreenDimensions {
+                        resources.insert(ScreenDimensions {
                             width: size.width as u32,
                             height: size.height as u32,
-                        };
+                        })
                     }
                     /*WindowEvent::KeyboardInput { input: KeyboardInput { state, virtual_keycode: Some(code), .. }, ..} => {
                         // Disabled due to a bug where a right keypress gets inserted at the start.
@@ -161,6 +167,11 @@ async fn run() -> anyhow::Result<()> {
                 _ => {}
             },
             Event::MainEventsCleared => {
+                let now = std::time::Instant::now();
+                let elapsed = (now - time).as_secs_f32();
+                time = now;
+                resources.insert(DeltaTime(elapsed));
+
                 schedule.execute(&mut world, &mut resources);
 
                 renderer.request_redraw()

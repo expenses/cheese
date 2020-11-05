@@ -10,6 +10,7 @@ pub fn render_boxes(
     position: &Position,
     facing: &Facing,
     side: &Side,
+    radius: &Radius,
     selected: Option<&Selected>,
     #[resource] buffers: &mut InstanceBuffers,
 ) {
@@ -33,7 +34,7 @@ pub fn render_boxes(
                 Side::Green => GREEN / COLOUR_MAX,
                 Side::Purple => PURPLE / COLOUR_MAX,
             },
-            radius: 2.0,
+            radius: radius.0,
         });
     }
 }
@@ -45,9 +46,7 @@ pub fn render_ui(#[resource] buffers: &mut InstanceBuffers, world: &SubWorld) {
     let text: String = <(Entity, &Health)>::query()
         .filter(component::<Selected>())
         .iter(world)
-        .map(|(entity, health)| {
-            format!("{:?}: Health: {}\n", entity, health.0)
-        })
+        .map(|(entity, health)| format!("{:?}: Health: {}\n", entity, health.0))
         .collect();
 
     buffers.render_text((10.0, 10.0), &text);
