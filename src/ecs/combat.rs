@@ -71,7 +71,9 @@ pub fn apply_bullets(
     if position.0 == move_to.0 {
         if let Ok(health) = <&mut Health>::query().get_mut(world, bullet.target) {
             health.0 = health.0.saturating_sub(1);
-            buffer.add_component(bullet.target, DamagedThisTick(bullet.source));
+            if health.0 > 0 {
+                buffer.add_component(bullet.target, DamagedThisTick(bullet.source));
+            }
         }
         buffer.remove(*entity);
     }
