@@ -10,8 +10,6 @@ pub fn render_boxes(
     position: &Position,
     facing: &Facing,
     side: &Side,
-    radius: &Radius,
-    selected: Option<&Selected>,
     #[resource] buffers: &mut InstanceBuffers,
 ) {
     let translation = Mat4::from_translation(Vec3::new(position.0.x, 0.0, position.0.y));
@@ -26,17 +24,45 @@ pub fn render_boxes(
     };
 
     buffers.mice.push(instance);
+}
 
-    if selected.is_some() {
-        buffers.toruses.push(TorusInstance {
-            center: Vec3::new(position.0.x, 0.0, position.0.y),
-            colour: match side {
-                Side::Green => GREEN / COLOUR_MAX,
-                Side::Purple => PURPLE / COLOUR_MAX,
-            },
-            radius: radius.0,
-        });
+#[legion::system(for_each)]
+#[filter(component::<Selected>())]
+pub fn render_selections(
+    position: &Position,
+    side: &Side,
+    radius: &Radius,
+    #[resource] buffers: &mut InstanceBuffers,
+) {
+    buffers.toruses.push(TorusInstance {
+        center: Vec3::new(position.0.x, 0.0, position.0.y),
+        colour: match side {
+            Side::Green => GREEN / COLOUR_MAX,
+            Side::Purple => PURPLE / COLOUR_MAX,
+        },
+        radius: radius.0,
+    });
+}
+
+
+#[legion::system(for_each)]
+#[filter(component::<Selected>())]
+pub fn render_firing_ranges(
+    position: &Position,
+    firing_range: &FiringRange,
+    side: &Side,
+    #[resource] player_side: &PlayerSide,
+    #[resource] buffers: &mut InstanceBuffers,
+) {
+    if *side != player_side.0 {
+        return;
     }
+
+    buffers.toruses.push(TorusInstance {
+        center: Vec3::new(position.0.x, 0.0, position.0.y),
+        colour: Vec3::new(0.5, 0.0, 0.0),
+        radius: firing_range.0,
+    });
 }
 
 #[legion::system]
