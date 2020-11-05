@@ -304,7 +304,7 @@ impl Renderer {
             ),
             bullets: GpuBuffer::new(
                 &device,
-                50,
+                200,
                 "Cheese bullet buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
