@@ -5,6 +5,9 @@ use wgpu::util::DeviceExt;
 use winit::{event_loop::EventLoop, window::Window};
 
 mod lines;
+mod torus;
+
+pub use torus::TorusInstance;
 
 const DISPLAY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -31,10 +34,10 @@ pub struct Renderer {
     imgui_renderer: imgui_wgpu::Renderer,
 
     line_renderer: lines::Renderer,
+    torus_renderer: torus::Renderer,
 
     surface_model: Model,
     mouse_box_model: Model,
-    selection_indicator_model: Model,
     bullet_model: Model,
 
     surface_texture: wgpu::BindGroup,
@@ -176,8 +179,6 @@ impl Renderer {
 
         let surface_model = Model::load(include_bytes!("../models/surface.obj"), &device)?;
         let mouse_box_model = Model::load(include_bytes!("../models/mouse_box.obj"), &device)?;
-        let selection_indicator_model =
-            Model::load(include_bytes!("../models/selection_indicator.obj"), &device)?;
         let bullet_model = Model::load(include_bytes!("../models/bullet.obj"), &device)?;
 
         // Load textures
@@ -289,17 +290,13 @@ impl Renderer {
             window_size.width, window_size.height, hud_texture,
         );
 
+        let torus_renderer = torus::Renderer::new(&device, &pipeline_layout)?;
+
         let instance_buffers = InstanceBuffers {
             mice: GpuBuffer::new(
                 &device,
                 50,
                 "Cheese mice instance buffer",
-                wgpu::BufferUsage::VERTEX,
-            ),
-            selection_indicators: GpuBuffer::new(
-                &device,
-                50,
-                "Cheese selection indicators buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
             bullets: GpuBuffer::new(
@@ -313,6 +310,9 @@ impl Renderer {
                 50,
                 "Cheese command paths buffer",
                 wgpu::BufferUsage::VERTEX,
+            ),
+            toruses: GpuBuffer::new(
+                &device, 1, "Cheese torus buffer", wgpu::BufferUsage::VERTEX,
             ),
             line_buffers,
         };
@@ -333,13 +333,13 @@ impl Renderer {
                 model_pipeline,
                 line_pipeline,
                 line_renderer,
+                torus_renderer,
                 // Imgui
                 imgui_platform,
                 imgui_renderer,
                 // Models
                 surface_model,
                 mouse_box_model,
-                selection_indicator_model,
                 bullet_model,
                 // Textures
                 surface_texture,
@@ -375,9 +375,6 @@ impl Renderer {
             .write_buffer(&self.view_buffer, 0, bytemuck::bytes_of(&view));
 
         instance_buffers.mice.upload(&self.device, &self.queue);
-        instance_buffers
-            .selection_indicators
-            .upload(&self.device, &self.queue);
         instance_buffers
             .command_paths
             .upload(&self.device, &self.queue);
@@ -436,15 +433,6 @@ impl Renderer {
                     render_pass.draw(0..self.mouse_box_model.num_vertices, 0..num);
                 }
 
-                // Draw selection indicators
-                if let Some((slice, num)) = instance_buffers.selection_indicators.get() {
-                    render_pass.set_bind_group(1, &self.box_colours_texture, &[]);
-                    render_pass
-                        .set_vertex_buffer(0, self.selection_indicator_model.buffer.slice(..));
-                    render_pass.set_vertex_buffer(1, slice);
-                    render_pass.draw(0..self.selection_indicator_model.num_vertices, 0..num);
-                }
-
                 // Draw surface
                 render_pass.set_bind_group(1, &self.surface_texture, &[]);
                 render_pass.set_vertex_buffer(0, self.surface_model.buffer.slice(..));
@@ -459,6 +447,11 @@ impl Renderer {
                     render_pass.set_vertex_buffer(1, self.identity_instance_buffer.slice(..));
                     render_pass.draw(0..num, 0..1);
                 }
+
+                self.torus_renderer.render(
+                    &mut render_pass, &mut instance_buffers.toruses,
+                    &self.main_bind_group, &self.device, &self.queue,
+                );
 
                 // Draw UI
 
@@ -661,10 +654,10 @@ fn create_render_pipeline(
 
 pub struct InstanceBuffers {
     pub mice: GpuBuffer<Instance>,
-    pub selection_indicators: GpuBuffer<Instance>,
     pub command_paths: GpuBuffer<Vertex>,
     pub bullets: GpuBuffer<Instance>,
     pub line_buffers: lines::LineBuffers,
+    pub toruses: GpuBuffer<TorusInstance>,
 }
 
 #[repr(C)]

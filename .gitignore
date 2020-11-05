@@ -1,5 +1,6 @@
 *.blend1
 *.mtl
+*.code-workspace
 target
 # Wrong place!
 blender/*.obj
