@@ -17,6 +17,7 @@ log = "0.4.11"
 lyon_tessellation = "0.16.2"
 ncollide3d = "0.26.1"
 obj = "0.10.1"
+rand = "0.7.3"
 ultraviolet = { version = "0.7.5", features = ["bytemuck"] }
 wgpu = "0.6.0"
 wgpu_glyph = "0.10.0"

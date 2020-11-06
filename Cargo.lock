@@ -1247,6 +1247,7 @@ dependencies = [
  "lyon_tessellation",
  "ncollide3d",
  "obj",
+ "rand",
  "ultraviolet",
  "wgpu",
  "wgpu_glyph",

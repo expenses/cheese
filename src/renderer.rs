@@ -16,7 +16,7 @@ const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 pub struct Renderer {
     swap_chain: wgpu::SwapChain,
     window: Window,
-    device: wgpu::Device,
+    pub device: wgpu::Device,
     queue: wgpu::Queue,
     surface: wgpu::Surface,
     swap_chain_desc: wgpu::SwapChainDescriptor,
@@ -36,6 +36,7 @@ pub struct Renderer {
     surface_model: Model,
     mouse_box_model: Model,
     bullet_model: Model,
+    cheese_rock_model: Model,
 
     surface_texture: wgpu::BindGroup,
     box_colours_texture: wgpu::BindGroup,
@@ -176,6 +177,7 @@ impl Renderer {
         let surface_model = Model::load(include_bytes!("../models/surface.obj"), &device)?;
         let mouse_box_model = Model::load(include_bytes!("../models/mouse_box.obj"), &device)?;
         let bullet_model = Model::load(include_bytes!("../models/bullet.obj"), &device)?;
+        let cheese_rock_model = Model::load(include_bytes!("../models/cheese_rock.obj"), &device)?;
 
         // Load textures
 
@@ -331,6 +333,7 @@ impl Renderer {
                 surface_model,
                 mouse_box_model,
                 bullet_model,
+                cheese_rock_model,
                 // Textures
                 surface_texture,
                 box_colours_texture,
@@ -364,7 +367,12 @@ impl Renderer {
         self.window.set_cursor_icon(cursor_icon);
     }
 
-    pub fn render(&mut self, view: Mat4, instance_buffers: &mut InstanceBuffers) {
+    pub fn render(
+        &mut self,
+        view: Mat4,
+        instance_buffers: &mut InstanceBuffers,
+        cheese_rocks: &StaticBuffer,
+    ) {
         self.queue
             .write_buffer(&self.view_buffer, 0, bytemuck::bytes_of(&view));
 
@@ -426,6 +434,12 @@ impl Renderer {
                     render_pass.set_vertex_buffer(1, slice);
                     render_pass.draw(0..self.mouse_box_model.num_vertices, 0..num);
                 }
+
+                // Draw rocks
+                render_pass.set_bind_group(1, &self.surface_texture, &[]);
+                render_pass.set_vertex_buffer(0, self.cheese_rock_model.buffer.slice(..));
+                render_pass.set_vertex_buffer(1, cheese_rocks.buffer.slice(..));
+                render_pass.draw(0 .. self.cheese_rock_model.num_vertices, 0 .. cheese_rocks.len);
 
                 // Draw surface
                 render_pass.set_bind_group(1, &self.surface_texture, &[]);
@@ -590,6 +604,31 @@ impl<T: bytemuck::Pod> GpuBuffer<T> {
         } else {
             None
         }
+    }
+}
+
+pub struct StaticBuffer {
+    buffer: wgpu::Buffer,
+    len: u32,
+}
+
+impl StaticBuffer {
+    pub fn new<T: bytemuck::Pod>(
+        device: &wgpu::Device, items: &[T], label: &'static str, usage: wgpu::BufferUsage,
+    ) -> anyhow::Result<Self> {
+        if items.is_empty() {
+            return Err(anyhow::anyhow!("You must pass additional items!"));
+        }
+
+        Ok(Self {
+            buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(label),
+                contents: bytemuck::cast_slice(items),
+                usage,
+            }),
+
+            len: items.len() as u32,
+        })
     }
 }
 

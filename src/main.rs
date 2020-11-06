@@ -31,6 +31,20 @@ async fn run() -> anyhow::Result<()> {
     let (mut renderer, instance_buffers, screen_dimensions) =
         renderer::Renderer::new(&event_loop).await?;
 
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    use ultraviolet::Mat4;
+    let items = (0 .. 1000).map(|_| {
+        let rotation = rng.gen_range(0.0, 2.0 * std::f32::consts::PI);
+        let translation = Vec3::new(rng.gen_range(-10.0, 10.0), 0.0, rng.gen_range(-10.0, 10.0));
+
+        renderer::Instance {
+            transform: Mat4::from_translation(translation) * Mat4::from_rotation_y(rotation),
+            uv_x_offset: 0.0
+        }
+    }).collect::<Vec<_>>();
+    let cheese_rocks = renderer::StaticBuffer::new(&renderer.device, &items, "Cheese cheese rocks", wgpu::BufferUsage::VERTEX)?;
+
     let mut world = World::default();
     let mut resources = Resources::default();
     resources.insert(instance_buffers);
@@ -177,7 +191,7 @@ async fn run() -> anyhow::Result<()> {
             Event::RedrawRequested(_) => {
                 let mut instance_buffers = resources.get_mut::<InstanceBuffers>().unwrap();
                 let camera = resources.get::<Camera>().unwrap();
-                renderer.render(camera.to_matrix(), &mut instance_buffers)
+                renderer.render(camera.to_matrix(), &mut instance_buffers, &cheese_rocks)
             }
             _ => {}
         }
