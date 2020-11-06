@@ -79,21 +79,21 @@ pub struct Avoidable;
 
 #[legion::system]
 #[read_component(Position)]
+#[read_component(Radius)]
 pub fn avoidance(world: &SubWorld, command_buffer: &mut CommandBuffer) {
-    let desired_seperation = 2.0_f32;
-
-    <(Entity, &Position)>::query()
+    <(Entity, &Position, &Radius)>::query()
         .filter(component::<Avoids>())
-        .for_each(world, |(entity, position)| {
+        .for_each(world, |(entity, position, radius)| {
             let mut avoidance_direction = Vec2::new(0.0, 0.0);
             let mut count = 0;
 
-            for other_position in <&Position>::query()
+            for (other_position, other_radius) in <(&Position, &Radius)>::query()
                 .filter(component::<Avoidable>())
                 .iter(world)
             {
                 let away_vector = position.0 - other_position.0;
                 let distance_sq = away_vector.mag_sq();
+                let desired_seperation = radius.0 + other_radius.0;
 
                 if distance_sq > 0.0 && distance_sq < desired_seperation.powi(2) {
                     let distance = distance_sq.sqrt();
