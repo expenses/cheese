@@ -1,5 +1,6 @@
 use crate::renderer::{Vertex, TEXTURE_FORMAT};
 use wgpu::util::DeviceExt;
+use ultraviolet::Vec2;
 
 pub struct Model {
     pub buffer: wgpu::Buffer,
@@ -27,10 +28,14 @@ impl Model {
                     let texture_index = texture_index.unwrap();
                     let normal_index = normal_index.unwrap();
 
+                    // We need to flip uvs because of the way textures work or something..
+                    let mut uv: Vec2 = texture[texture_index].into();
+                    uv.y = 1.0 - uv.y;
+
                     Vertex {
                         position: position[position_index].into(),
                         normal: normal[normal_index].into(),
-                        uv: texture[texture_index].into(),
+                        uv,
                     }
                 },
             )

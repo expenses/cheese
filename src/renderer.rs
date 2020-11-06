@@ -34,12 +34,12 @@ pub struct Renderer {
     torus_renderer: torus::Renderer,
 
     surface_model: Model,
-    mouse_box_model: Model,
     bullet_model: Model,
+    mouse_model: Model,
 
     surface_texture: wgpu::BindGroup,
-    box_colours_texture: wgpu::BindGroup,
     colours_texture: wgpu::BindGroup,
+    mouse_texture: wgpu::BindGroup,
 }
 
 impl Renderer {
@@ -174,8 +174,8 @@ impl Renderer {
         // Load models
 
         let surface_model = Model::load(include_bytes!("../models/surface.obj"), &device)?;
-        let mouse_box_model = Model::load(include_bytes!("../models/mouse_box.obj"), &device)?;
         let bullet_model = Model::load(include_bytes!("../models/bullet.obj"), &device)?;
+        let mouse_model = Model::load(include_bytes!("../models/mouse.obj"), &device)?;
 
         // Load textures
 
@@ -190,13 +190,6 @@ impl Renderer {
             &mut init_encoder,
         )?;
 
-        let box_colours_texture = load_texture(
-            include_bytes!("../textures/box_colours.png"),
-            &texture_bind_group_layout,
-            &device,
-            &mut init_encoder,
-        )?;
-
         let colours_texture = load_texture(
             include_bytes!("../textures/colours.png"),
             &texture_bind_group_layout,
@@ -206,6 +199,13 @@ impl Renderer {
 
         let hud_texture = load_texture(
             include_bytes!("../textures/hud.png"),
+            &texture_bind_group_layout,
+            &device,
+            &mut init_encoder,
+        )?;
+
+        let mouse_texture = load_texture(
+            include_bytes!("../textures/mouse.png"),
             &texture_bind_group_layout,
             &device,
             &mut init_encoder,
@@ -329,12 +329,12 @@ impl Renderer {
                 torus_renderer,
                 // Models
                 surface_model,
-                mouse_box_model,
                 bullet_model,
+                mouse_model,
                 // Textures
                 surface_texture,
-                box_colours_texture,
                 colours_texture,
+                mouse_texture,
             },
             instance_buffers,
             ScreenDimensions {
@@ -421,10 +421,10 @@ impl Renderer {
 
                 // Draw mice
                 if let Some((slice, num)) = instance_buffers.mice.get() {
-                    render_pass.set_bind_group(1, &self.box_colours_texture, &[]);
-                    render_pass.set_vertex_buffer(0, self.mouse_box_model.buffer.slice(..));
+                    render_pass.set_bind_group(1, &self.mouse_texture, &[]);
+                    render_pass.set_vertex_buffer(0, self.mouse_model.buffer.slice(..));
                     render_pass.set_vertex_buffer(1, slice);
-                    render_pass.draw(0..self.mouse_box_model.num_vertices, 0..num);
+                    render_pass.draw(0..self.mouse_model.num_vertices, 0..num);
                 }
 
                 // Draw surface
@@ -613,7 +613,7 @@ fn create_render_pipeline(
 			entry_point: "main",
 		}),
 		rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-			cull_mode: wgpu::CullMode::Back,
+			//cull_mode: wgpu::CullMode::Back,
 			..Default::default()
 		}),
 		primitive_topology: primitives,

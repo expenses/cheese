@@ -21,7 +21,7 @@ pub fn render_boxes(
         transform: translation * rotation,
         uv_x_offset: match side {
             Side::Green => 0.0,
-            Side::Purple => 0.5,
+            Side::Purple => 0.0,
         },
     };
 
