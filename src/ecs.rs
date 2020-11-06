@@ -75,13 +75,13 @@ impl Unit {
                 max_health: 50,
                 firing_range: 10.0,
                 move_speed: 6.0,
-                radius: 2.0,
+                radius: 1.0,
             },
             Self::Hulk => UnitStats {
                 max_health: 500,
                 firing_range: 5.0,
                 move_speed: 6.0,
-                radius: 3.0,
+                radius: 1.5,
             },
         }
     }
