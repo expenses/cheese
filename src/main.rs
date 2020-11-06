@@ -11,7 +11,7 @@ use crate::resources::{
 use legion::*;
 use ultraviolet::{Vec2, Vec3};
 use winit::{
-    dpi::LogicalPosition,
+    dpi::PhysicalPosition,
     event::{
         DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta,
         VirtualKeyCode, WindowEvent,
@@ -124,7 +124,7 @@ async fn run() -> anyhow::Result<()> {
 
                         camera_controls.zoom_delta += match delta {
                             MouseScrollDelta::LineDelta(_, y) => y * 100.0,
-                            MouseScrollDelta::PixelDelta(LogicalPosition { y, .. }) => *y as f32,
+                            MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => *y as f32,
                         };
                     }
                     WindowEvent::CursorMoved { position, .. } => {

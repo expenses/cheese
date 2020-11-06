@@ -143,7 +143,10 @@ fn issue_command(
         .map(|(entity, ..)| entity);
 
     let command = match enemy_entity_under_cursor {
-        Some(entity) => Command::Attack { target: *entity, explicit: true },
+        Some(entity) => Command::Attack {
+            target: *entity,
+            explicit: true,
+        },
         None => match rts_controls.mode {
             CommandMode::Normal => Command::MoveTo(position),
             CommandMode::AttackMove => Command::AttackMove(position),

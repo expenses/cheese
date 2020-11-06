@@ -188,14 +188,19 @@ pub fn render_command_paths(
         let position = match command {
             Command::MoveTo(position) => Some(*position),
             Command::AttackMove(position) => Some(*position),
-            Command::Attack { target, explicit: true } => {
+            Command::Attack {
+                target,
+                explicit: true,
+            } => {
                 let position = <&Position>::query()
                     .get(world, *target)
                     .expect("We've cancelled attack commands on dead entities")
                     .0;
                 Some(position)
-            },
-            Command::Attack { explicit: false, .. } => None
+            }
+            Command::Attack {
+                explicit: false, ..
+            } => None,
         };
 
         if let Some(position) = position {

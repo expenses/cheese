@@ -94,7 +94,10 @@ pub fn handle_damaged(
 
     // If the unit is idle and got attacked, go attack back!
     if commands.0.is_empty() {
-        commands.0.push_front(Command::Attack { target: damaged.0, explicit: false });
+        commands.0.push_front(Command::Attack {
+            target: damaged.0,
+            explicit: false,
+        });
     }
 
     buffer.remove_component::<DamagedThisTick>(*entity);
@@ -122,7 +125,10 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
             .map(|(entity, ..)| entity);
 
         if let Some(target) = target {
-            commands.0.push_front(Command::Attack { target: *target, explicit: false })
+            commands.0.push_front(Command::Attack {
+                target: *target,
+                explicit: false,
+            })
         }
     }
 }
