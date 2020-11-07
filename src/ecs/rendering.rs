@@ -75,7 +75,6 @@ pub fn render_under_select_box(
 #[legion::system(for_each)]
 pub fn render_health_bars(
     position: &Position,
-    radius: &Radius,
     health: &Health,
     unit: &Unit,
     #[resource] camera: &Camera,
@@ -85,11 +84,17 @@ pub fn render_health_bars(
     let stats = unit.stats();
 
     if health.0 != stats.max_health {
-        let floating = Vec3::new(position.0.x, radius.0 * 2.0, position.0.y);
+        let floating = Vec3::new(position.0.x, stats.health_bar_height, position.0.y);
         let location = screen_location(floating, camera, screen_dimensions);
 
         let health_percentage = health.0 as f32 / stats.max_health as f32;
         let length = 60.0 * health_percentage;
+
+        line_buffers.draw_filled_rect(
+            location,
+            Vec2::new(length + 2.0, 12.0),
+            Vec3::new(0.0, 0.0, 0.0),
+        );
 
         line_buffers.draw_filled_rect(
             location,

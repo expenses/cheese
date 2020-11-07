@@ -72,6 +72,14 @@ pub enum Unit {
     Hulk,
 }
 
+pub struct UnitStats {
+    pub max_health: u16,
+    pub move_speed: f32,
+    pub radius: f32,
+    pub firing_range: f32,
+    pub health_bar_height: f32,
+}
+
 impl Unit {
     fn stats(self) -> UnitStats {
         match self {
@@ -80,12 +88,14 @@ impl Unit {
                 firing_range: 10.0,
                 move_speed: 6.0,
                 radius: 1.0,
+                health_bar_height: 3.0,
             },
             Self::Hulk => UnitStats {
                 max_health: 500,
                 firing_range: 5.0,
                 move_speed: 6.0,
                 radius: 1.5,
+                health_bar_height: 3.0,
             },
         }
     }
@@ -102,6 +112,7 @@ impl Unit {
             move_speed,
             radius,
             firing_range,
+            health_bar_height: _,
         } = self.stats();
 
         world.push((
@@ -120,13 +131,6 @@ impl Unit {
             Radius(radius),
         ))
     }
-}
-
-pub struct UnitStats {
-    pub max_health: u16,
-    pub move_speed: f32,
-    pub radius: f32,
-    pub firing_range: f32,
 }
 
 fn sort_points(a: Vec2, b: Vec2) -> (Vec2, Vec2) {
