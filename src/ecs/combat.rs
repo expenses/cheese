@@ -23,11 +23,12 @@ pub fn stop_attacks_on_dead_entities(commands: &mut CommandQueue, world: &SubWor
 #[read_component(Position)]
 pub fn firing(
     entity: &Entity,
+    facing: &mut Facing,
+    cooldown: &mut FiringCooldown,
+    firing_range: &FiringRange,
     command_queue: &CommandQueue,
     world: &SubWorld,
     buffer: &mut CommandBuffer,
-    cooldown: &mut FiringCooldown,
-    firing_range: &FiringRange,
 ) {
     if cooldown.0 != 0 {
         return;
@@ -42,7 +43,10 @@ pub fn firing(
             .get(world, *target)
             .expect("We've cancelled attack commands on dead entities");
 
-        if (position.0 - target_position.0).mag_sq() <= firing_range.0.powi(2) {
+        let vector = target_position.0 - position.0;
+        facing.0 = vector.y.atan2(vector.x);
+
+        if vector.mag_sq() <= firing_range.0.powi(2) {
             buffer.push((
                 Position(position.0),
                 Bullet {
@@ -121,7 +125,10 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
             .filter(|(_, entity_position, _)| {
                 (position.0 - entity_position.0).mag_sq() <= firing_range.0.powi(2)
             })
-            .next()
+            .min_by_key(|(_, entity_position, _)| {
+                let distance_sq = (position.0 - entity_position.0).mag_sq();
+                ordered_float::OrderedFloat(distance_sq)
+            })
             .map(|(entity, ..)| entity);
 
         if let Some(target) = target {

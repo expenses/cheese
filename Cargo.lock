@@ -846,7 +846,7 @@ dependencies = [
  "glyph_brush_draw_cache",
  "glyph_brush_layout",
  "log",
- "ordered-float",
+ "ordered-float 1.1.0",
  "rustc-hash",
  "twox-hash",
 ]
@@ -1247,6 +1247,7 @@ dependencies = [
  "lyon_tessellation",
  "ncollide3d",
  "obj",
+ "ordered-float 2.0.0",
  "ultraviolet",
  "wgpu",
  "wgpu_glyph",
@@ -1501,6 +1502,15 @@ name = "ordered-float"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3741934be594d77de1c8461ebcbbe866f585ea616a9753aa78f2bdc69f0e4579"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "ordered-float"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fe9037165d7023b1228bc4ae9a2fa1a2b0095eca6c2998c624723dfd01314a5"
 dependencies = [
  "num-traits",
 ]
