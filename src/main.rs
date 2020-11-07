@@ -23,6 +23,28 @@ fn main() -> anyhow::Result<()> {
     futures::executor::block_on(run())
 }
 
+fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
+    builder
+        .add_system(ecs::stop_attacks_on_dead_entities_system())
+        .add_system(ecs::control_camera_system())
+        .add_system(ecs::handle_left_click_system())
+        .add_system(ecs::handle_right_click_system())
+        .add_system(ecs::handle_stop_command_system())
+        .add_system(ecs::handle_drag_selection_system())
+        .add_system(ecs::set_move_to_system())
+        .add_system(ecs::set_move_to_for_bullets_system())
+        .add_system(ecs::avoidance_system())
+        .add_system(ecs::add_attack_commands_system())
+        .add_system(ecs::reduce_cooldowns_system())
+        .flush()
+        .add_system(ecs::move_units_system())
+        .add_system(ecs::apply_steering_system())
+        .add_system(ecs::firing_system())
+        .add_system(ecs::apply_bullets_system())
+        .flush()
+        .add_system(ecs::handle_damaged_system());
+}
+
 async fn run() -> anyhow::Result<()> {
     env_logger::init();
 
@@ -60,30 +82,15 @@ async fn run() -> anyhow::Result<()> {
         ecs::Side::Green,
     );
 
-    let mut schedule = Schedule::builder()
-        .add_system(ecs::stop_attacks_on_dead_entities_system())
-        .add_system(ecs::control_camera_system())
-        .add_system(ecs::handle_left_click_system())
-        .add_system(ecs::handle_right_click_system())
-        .add_system(ecs::handle_stop_command_system())
-        .add_system(ecs::handle_drag_selection_system())
-        .add_system(ecs::set_move_to_system())
-        .add_system(ecs::set_move_to_for_bullets_system())
-        .add_system(ecs::avoidance_system())
-        .add_system(ecs::add_attack_commands_system())
-        .add_system(ecs::reduce_cooldowns_system())
-        .flush()
-        .add_system(ecs::move_units_system())
-        .add_system(ecs::apply_steering_system())
-        .add_system(ecs::firing_system())
-        .add_system(ecs::apply_bullets_system())
-        .flush()
-        .add_system(ecs::handle_damaged_system())
+    let mut builder = Schedule::builder();
+    add_gameplay_systems(&mut builder);
+
+    let mut schedule = builder
         // Rendering
         .add_system(ecs::render_bullets_system())
         .add_system(ecs::render_boxes_system())
         .add_system(ecs::render_selections_system())
-        .add_system(ecs::render_firing_ranges_system())
+        //.add_system(ecs::render_firing_ranges_system())
         .add_system(ecs::render_under_select_box_system())
         .add_system(ecs::render_drag_box_system())
         .add_system(ecs::render_command_paths_system())

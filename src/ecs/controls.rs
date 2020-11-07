@@ -71,11 +71,11 @@ pub fn handle_left_click(
                 .next()
                 .map(|(entity, _, selected, side, _)| (entity, selected.is_some(), side));
 
-            if let Some((entity, is_selected, side)) = entity {
-                if !rts_controls.shift_held {
-                    deselect_all(world, commands);
-                }
+            if !rts_controls.shift_held {
+                deselect_all(world, commands);
+            }
 
+            if let Some((entity, is_selected, side)) = entity {
                 if rts_controls.shift_held && is_selected {
                     commands.remove_component::<Selected>(*entity);
                 } else if !rts_controls.shift_held {
@@ -234,4 +234,47 @@ fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {
         .for_each(world, |entity| {
             commands.remove_component::<Selected>(*entity)
         });
+}
+
+#[test]
+fn selection_and_deselection() {
+    use crate::resources::*;
+
+    let mut world = World::default();
+    let mut resources = Resources::default();
+    resources.insert(Camera::default());
+    resources.insert(CameraControls::default());
+    resources.insert(MouseState::default());
+    resources.insert(RtsControls::default());
+    resources.insert(PlayerSide(Side::Green));
+    resources.insert(ScreenDimensions { width: 1000, height: 1000 });
+    resources.insert(DeltaTime(1.0 / 60.0));
+
+    let mut builder = Schedule::builder();
+    crate::add_gameplay_systems(&mut builder);
+    let mut schedule = builder.build();
+    let entity =
+        Unit::MouseMarine.add_to_world(&mut world, Vec2::new(0.0, 0.0), Facing(0.0), Side::Green);
+    schedule.execute(&mut world, &mut resources);
+
+    let mut query = <Option<&Selected>>::query();
+    assert!(query.get(&world, entity).unwrap().is_none());
+
+    {
+        let mut mouse_state = resources.get_mut::<MouseState>().unwrap();
+        mouse_state.position = Vec2::new(500.0, 500.0);
+        mouse_state.left_state = MouseButtonState::Clicked;
+    }
+
+    schedule.execute(&mut world, &mut resources);
+    assert!(query.get(&world, entity).unwrap().is_some());
+
+    {
+        let mut mouse_state = resources.get_mut::<MouseState>().unwrap();
+        mouse_state.position = Vec2::new(1000.0, 50.0);
+        mouse_state.left_state = MouseButtonState::Clicked;
+    }
+
+    schedule.execute(&mut world, &mut resources);
+    assert!(query.get(&world, entity).unwrap().is_none());
 }

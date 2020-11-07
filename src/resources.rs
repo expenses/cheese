@@ -34,6 +34,15 @@ pub struct Camera {
     pub looking_at: Vec3,
 }
 
+impl Default for Camera {
+    fn default() -> Self {
+        Self {
+            position: Vec3::new(0.0, 20.0, 10.0),
+            looking_at: Vec3::new(0.0, 0.0, 0.0),
+        }
+    }
+}
+
 impl Camera {
     pub fn to_matrix(&self) -> Mat4 {
         Mat4::look_at(self.position, self.looking_at, Vec3::new(0.0, 1.0, 0.0))
@@ -86,7 +95,7 @@ pub enum MouseButtonState {
     Dragged(Vec2),
     Up,
     Clicked,
-    Down(u8, Vec2),
+    Down(Vec2),
 }
 
 impl Default for MouseButtonState {
@@ -99,16 +108,14 @@ impl MouseButtonState {
     pub fn update(&mut self, mouse: Vec2) {
         match *self {
             Self::Clicked => *self = Self::Up,
-            Self::Down(frames, start)
-                if frames > 10
-                    || (mouse.x - start.x).abs() > 10.0
-                    || (mouse.y - start.y).abs() > 10.0 =>
+            Self::Down(start) if
+                (mouse.x - start.x).abs() > 10.0 ||
+                (mouse.y - start.y).abs() > 10.0 =>
             {
                 *self = Self::Dragging(start)
             }
-            Self::Down(ref mut frames, _) => *frames += 1,
             Self::Dragged(_) => *self = Self::Up,
-            Self::Up | Self::Dragging(_) => {}
+            Self::Up | Self::Down(_) | Self::Dragging(_) => {}
         }
     }
 
@@ -121,12 +128,12 @@ impl MouseButtonState {
     }
 
     fn handle_down(&mut self, mouse: Vec2) {
-        *self = Self::Down(0, mouse)
+        *self = Self::Down(mouse)
     }
 
     fn handle_up(&mut self) {
         match *self {
-            Self::Down(_, _) => *self = Self::Clicked,
+            Self::Down(_) => *self = Self::Clicked,
             Self::Dragging(start) => *self = Self::Dragged(start),
             _ => *self = Self::Up,
         }

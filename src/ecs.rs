@@ -86,7 +86,7 @@ impl Unit {
         }
     }
 
-    pub fn add_to_world(self, world: &mut World, position: Vec2, facing: Facing, side: Side) {
+    pub fn add_to_world(self, world: &mut World, position: Vec2, facing: Facing, side: Side) -> Entity {
         let UnitStats {
             max_health,
             move_speed,
@@ -108,7 +108,7 @@ impl Unit {
             FiringRange(firing_range),
             MoveSpeed(move_speed),
             Radius(radius),
-        ));
+        ))
     }
 }
 
