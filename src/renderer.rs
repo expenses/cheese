@@ -24,6 +24,7 @@ pub struct Renderer {
     identity_instance_buffer: wgpu::Buffer,
 
     model_pipeline: wgpu::RenderPipeline,
+    transparent_pipeline: wgpu::RenderPipeline,
     line_pipeline: wgpu::RenderPipeline,
 
     perspective_buffer: wgpu::Buffer,
@@ -36,6 +37,7 @@ pub struct Renderer {
     surface_model: Model,
     bullet_model: Model,
     mouse_model: Model,
+    mouse_helmet_model: Model,
 
     surface_texture: wgpu::BindGroup,
     colours_texture: wgpu::BindGroup,
@@ -176,6 +178,7 @@ impl Renderer {
         let surface_model = Model::load(include_bytes!("../models/surface.obj"), &device)?;
         let bullet_model = Model::load(include_bytes!("../models/bullet.obj"), &device)?;
         let mouse_model = Model::load(include_bytes!("../models/mouse.obj"), &device)?;
+        let mouse_helmet_model = Model::load(include_bytes!("../models/mouse_helmet.obj"), &device)?;
 
         // Load textures
 
@@ -227,6 +230,9 @@ impl Renderer {
         let fs = wgpu::include_spirv!("../shaders/shader.frag.spv");
         let fs_module = device.create_shader_module(fs);
 
+        let fs_transparent = wgpu::include_spirv!("../shaders/transparent.frag.spv");
+        let fs_transparent_module = device.create_shader_module(fs_transparent);
+
         let model_pipeline = create_render_pipeline(
             &device,
             &pipeline_layout,
@@ -234,6 +240,17 @@ impl Renderer {
             wgpu::PrimitiveTopology::TriangleList,
             &vs_module,
             &fs_module,
+            false,
+        );
+
+        let transparent_pipeline = create_render_pipeline(
+            &device,
+            &pipeline_layout,
+            "Cheese transparent model pipeline",
+            wgpu::PrimitiveTopology::TriangleList,
+            &vs_module,
+            &fs_transparent_module,
+            true,
         );
 
         let line_pipeline = create_render_pipeline(
@@ -243,6 +260,7 @@ impl Renderer {
             wgpu::PrimitiveTopology::LineList,
             &vs_module,
             &fs_module,
+            false,
         );
 
         // Create the swap chain.
@@ -323,14 +341,18 @@ impl Renderer {
                 depth_texture,
                 identity_instance_buffer,
                 surface,
+                // Pipelines
                 model_pipeline,
+                transparent_pipeline,
                 line_pipeline,
+                // Renderers
                 line_renderer,
                 torus_renderer,
                 // Models
                 surface_model,
                 bullet_model,
                 mouse_model,
+                mouse_helmet_model,
                 // Textures
                 surface_texture,
                 colours_texture,
@@ -442,6 +464,7 @@ impl Renderer {
                     render_pass.draw(0..num, 0..1);
                 }
 
+                // Draw tori
                 self.torus_renderer.render(
                     &mut render_pass,
                     &mut instance_buffers.toruses,
@@ -449,6 +472,15 @@ impl Renderer {
                     &self.device,
                     &self.queue,
                 );
+
+                // Draw helmets
+                if let Some((slice, num)) = instance_buffers.mice.get() {
+                    render_pass.set_pipeline(&self.transparent_pipeline);
+                    render_pass.set_bind_group(1, &self.mouse_texture, &[]);
+                    render_pass.set_vertex_buffer(0, self.mouse_helmet_model.buffer.slice(..));
+                    render_pass.set_vertex_buffer(1, slice);
+                    render_pass.draw(0..self.mouse_helmet_model.num_vertices, 0..num);
+                }
 
                 // Draw UI
 
@@ -600,7 +632,32 @@ fn create_render_pipeline(
     primitives: wgpu::PrimitiveTopology,
     vs_module: &wgpu::ShaderModule,
     fs_module: &wgpu::ShaderModule,
+    alpha_blend: bool,
 ) -> wgpu::RenderPipeline {
+    let colour_state_descriptor = if alpha_blend {
+        wgpu::ColorStateDescriptor {
+            format: DISPLAY_FORMAT,
+            color_blend: wgpu::BlendDescriptor {
+                src_factor: wgpu::BlendFactor::SrcAlpha,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
+            },
+            alpha_blend: wgpu::BlendDescriptor {
+                src_factor: wgpu::BlendFactor::SrcAlpha,
+                dst_factor: wgpu::BlendFactor::DstAlpha,
+                operation: wgpu::BlendOperation::Max,
+            },
+            write_mask: wgpu::ColorWrite::ALL,
+        }
+    } else {
+		wgpu::ColorStateDescriptor {
+			format: DISPLAY_FORMAT,
+			color_blend: wgpu::BlendDescriptor::REPLACE,
+			alpha_blend: wgpu::BlendDescriptor::REPLACE,
+			write_mask: wgpu::ColorWrite::ALL,
+		}
+    };
+
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 		label: Some(label),
 		layout: Some(layout),
@@ -617,12 +674,7 @@ fn create_render_pipeline(
 			..Default::default()
 		}),
 		primitive_topology: primitives,
-		color_states: &[wgpu::ColorStateDescriptor {
-			format: DISPLAY_FORMAT,
-			color_blend: wgpu::BlendDescriptor::REPLACE,
-			alpha_blend: wgpu::BlendDescriptor::REPLACE,
-			write_mask: wgpu::ColorWrite::ALL,
-		}],
+		color_states: &[colour_state_descriptor],
 		depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
 			format: DEPTH_FORMAT,
 			depth_write_enabled: true,
