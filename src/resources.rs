@@ -82,11 +82,29 @@ pub struct ScreenDimensions {
     pub height: u32,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct MouseState {
     pub position: Vec2,
     pub left_state: MouseButtonState,
     pub right_state: MouseButtonState,
+}
+
+impl MouseState {
+    pub fn new(screen_dimensions: &ScreenDimensions) -> Self {
+        Self {
+            // On osx, the window can take a while to get into place because it's doing some wierd animation thing.
+            // While this is happening, the game is still running and if we set the mouse position to (0, 0) then
+            // the camera will be going off into the top left corner the whole time. The obvious fix to this is to simply
+            // have a title screen, but let's do things the hacky way for now and set the mouse position to the middle of the window
+            // until it can start responding to events.
+            position: Vec2::new(
+                screen_dimensions.width as f32 / 2.0,
+                screen_dimensions.height as f32 / 2.0,
+            ),
+            left_state: Default::default(),
+            right_state: Default::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -171,3 +189,4 @@ pub struct DeltaTime(pub f32);
 pub struct CursorIcon(pub winit::window::CursorIcon);
 #[derive(Default)]
 pub struct RayCastLocation(pub Vec2);
+pub struct DpiScaling(pub f32);

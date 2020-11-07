@@ -9,7 +9,7 @@ use crate::renderer::{
     TorusBuffer, TorusPipeline,
 };
 use crate::resources::{
-    Camera, CameraControls, CommandMode, CursorIcon, DeltaTime, MouseState, PlayerSide,
+    Camera, CameraControls, CommandMode, CursorIcon, DeltaTime, DpiScaling, MouseState, PlayerSide,
     RayCastLocation, RtsControls, ScreenDimensions,
 };
 use legion::*;
@@ -17,8 +17,8 @@ use ultraviolet::{Vec2, Vec3};
 use winit::{
     dpi::PhysicalPosition,
     event::{
-        DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta,
-        VirtualKeyCode, WindowEvent,
+        ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, VirtualKeyCode,
+        WindowEvent,
     },
     event_loop::{ControlFlow, EventLoop},
 };
@@ -78,10 +78,17 @@ async fn run() -> anyhow::Result<()> {
         position: Vec3::new(0.0, 20.0, 10.0),
         looking_at: Vec3::new(0.0, 0.0, 0.0),
     });
-    resources.insert(MouseState::default());
+    resources.insert(MouseState::new(&render_context.screen_dimensions()));
     resources.insert(RtsControls::default());
     resources.insert(RayCastLocation::default());
     resources.insert(PlayerSide(ecs::Side::Purple));
+    // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
+    // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
+    // and the other can take up 2 pixels. So I guess the best solution is to just round the value
+    // idk.
+    resources.insert(DpiScaling(
+        render_context.window.scale_factor().round() as f32
+    ));
 
     for i in 0..10 {
         ecs::Unit::MouseMarine.add_to_world(
@@ -140,16 +147,32 @@ async fn run() -> anyhow::Result<()> {
                             height: size.height as u32,
                         })
                     }
-                    /*WindowEvent::KeyboardInput { input: KeyboardInput { state, virtual_keycode: Some(code), .. }, ..} => {
-                        // Disabled due to a bug where a right keypress gets inserted at the start.
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                state,
+                                virtual_keycode: Some(code),
+                                ..
+                            },
+                        ..
+                    } => {
+                        // Was previously disabled due to a bug where a right keypress gets
+                        // inserted at the start. This doesn't seem to happen now as we start the
+                        // window in fullscreen.
 
                         let pressed = *state == ElementState::Pressed;
 
                         let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
                         let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
 
-                        handle_key(code, pressed, &mut camera_controls, &mut rts_controls);
-                    },*/
+                        handle_key(
+                            code,
+                            pressed,
+                            &mut camera_controls,
+                            &mut rts_controls,
+                            control_flow,
+                        );
+                    }
                     WindowEvent::MouseWheel { delta, .. } => {
                         let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
 
@@ -176,7 +199,8 @@ async fn run() -> anyhow::Result<()> {
                     _ => {}
                 }
             }
-            Event::DeviceEvent { ref event, .. } => match event {
+            // This doesn't work on osx
+            /*Event::DeviceEvent { ref event, .. } => match event {
                 DeviceEvent::Key(KeyboardInput {
                     state,
                     virtual_keycode: Some(code),
@@ -187,10 +211,10 @@ async fn run() -> anyhow::Result<()> {
                     let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
                     let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
 
-                    handle_key(code, pressed, &mut camera_controls, &mut rts_controls);
+                    //handle_key(code, pressed, &mut camera_controls, &mut rts_controls, control_flow);
                 }
                 _ => {}
-            },
+            },*/
             Event::MainEventsCleared => {
                 let now = std::time::Instant::now();
                 let elapsed = (now - time).as_secs_f32();
@@ -325,6 +349,7 @@ fn handle_key(
     pressed: bool,
     camera_controls: &mut CameraControls,
     rts_controls: &mut RtsControls,
+    control_flow: &mut ControlFlow,
 ) {
     log::debug!("{:?} pressed: {}", code, pressed);
 
@@ -336,7 +361,7 @@ fn handle_key(
         VirtualKeyCode::LShift => rts_controls.shift_held = pressed,
         VirtualKeyCode::S if pressed => rts_controls.stop_pressed = true,
         VirtualKeyCode::A if pressed => rts_controls.mode = CommandMode::AttackMove,
-        //VirtualKeyCode::Escape if pressed => rts_controls.mode = CommandMode::Normal,
+        VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
         _ => {}
     }
 }

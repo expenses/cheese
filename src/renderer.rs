@@ -352,11 +352,15 @@ impl TextBuffer {
         Ok(Self { glyph_brush })
     }
 
-    pub fn render_text(&mut self, screen_position: (f32, f32), text: &str) {
+    pub fn render_text(&mut self, screen_position: (f32, f32), text: &str, dpi_scaling: f32) {
         self.glyph_brush.queue(
             wgpu_glyph::Section::new()
                 .with_screen_position(screen_position)
-                .add_text(wgpu_glyph::Text::new(text).with_color([1.0; 4])),
+                .add_text(
+                    wgpu_glyph::Text::new(text)
+                        .with_color([1.0; 4])
+                        .with_scale(24.0 * dpi_scaling),
+                ),
         );
     }
 }

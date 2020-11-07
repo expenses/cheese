@@ -236,7 +236,14 @@ impl LineBuffers {
         }
     }
 
-    pub fn draw_filled_rect(&mut self, center: Vec2, dimensions: Vec2, colour: Vec3) {
+    pub fn draw_filled_rect(
+        &mut self,
+        center: Vec2,
+        mut dimensions: Vec2,
+        colour: Vec3,
+        dpi_scaling: f32,
+    ) {
+        dimensions *= dpi_scaling;
         let top_left = center - dimensions / 2.0;
 
         fill_rectangle(
@@ -247,12 +254,15 @@ impl LineBuffers {
         .unwrap();
     }
 
-    pub fn draw_rect(&mut self, top_left: Vec2, bottom_right: Vec2) {
+    pub fn draw_rect(&mut self, top_left: Vec2, bottom_right: Vec2, dpi_scaling: f32) {
         let dimensions = bottom_right - top_left;
+
+        let mut options = StrokeOptions::default();
+        options.line_width = dpi_scaling;
 
         stroke_rectangle(
             &rect(top_left.x, top_left.y, dimensions.x, dimensions.y),
-            &StrokeOptions::default(),
+            &options,
             &mut BuffersBuilder::new(
                 &mut self.lyon_buffers,
                 Constructor {

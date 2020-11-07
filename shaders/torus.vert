@@ -36,10 +36,11 @@ void main() {
     // When the radius is 1 there should be no change.
     float new_length = length(position_no_y) + radius - 1;
     // Rescale the position by the new length and add the y coordinate back.
-    vec3 new = normalize(position_no_y) * new_length;
-    new.y = position.y;
+    // Haha, had to rename this from 'new' because that's a reserved keyword in metal.
+    vec3 new_position = normalize(position_no_y) * new_length;
+    new_position.y = position.y;
     
     mat4 transform = mat4_from_translation(center);
     mat4 modelview = view * transform;
-    gl_Position = perspective * modelview * vec4(new, 1.0);
+    gl_Position = perspective * modelview * vec4(new_position, 1.0);
 }

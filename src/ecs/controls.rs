@@ -263,13 +263,14 @@ fn selection_and_deselection() {
     let mut resources = Resources::default();
     resources.insert(Camera::default());
     resources.insert(CameraControls::default());
-    resources.insert(MouseState::default());
-    resources.insert(RtsControls::default());
-    resources.insert(PlayerSide(Side::Green));
-    resources.insert(ScreenDimensions {
+    let screen_dimensions = ScreenDimensions {
         width: 1000,
         height: 1000,
-    });
+    };
+    resources.insert(MouseState::new(&screen_dimensions));
+    resources.insert(screen_dimensions);
+    resources.insert(RtsControls::default());
+    resources.insert(PlayerSide(Side::Green));
     resources.insert(DeltaTime(1.0 / 60.0));
     resources.insert(RayCastLocation::default());
 

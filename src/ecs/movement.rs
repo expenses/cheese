@@ -87,7 +87,7 @@ pub fn move_units(
                 .front()
                 .map(|command| match command {
                     Command::MoveTo(_) | Command::AttackMove(_) => true,
-                    Command::Attack { .. } => false
+                    Command::Attack { .. } => false,
                 })
                 .unwrap_or(false)
             {

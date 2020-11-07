@@ -2,7 +2,7 @@ use super::*;
 use crate::renderer::{
     LineBuffers, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance, Vertex,
 };
-use crate::resources::{CursorIcon, RayCastLocation};
+use crate::resources::{CursorIcon, DpiScaling, RayCastLocation};
 use ultraviolet::Vec4;
 
 const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
@@ -79,6 +79,7 @@ pub fn render_health_bars(
     unit: &Unit,
     #[resource] camera: &Camera,
     #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] dpi_scaling: &DpiScaling,
     #[resource] line_buffers: &mut LineBuffers,
 ) {
     let stats = unit.stats();
@@ -94,12 +95,14 @@ pub fn render_health_bars(
             location,
             Vec2::new(length + 2.0, 12.0),
             Vec3::new(0.0, 0.0, 0.0),
+            dpi_scaling.0,
         );
 
         line_buffers.draw_filled_rect(
             location,
             Vec2::new(length, 10.0),
             Vec3::new(1.0 - health_percentage, health_percentage, 0.0),
+            dpi_scaling.0,
         );
     }
 }
@@ -142,6 +145,7 @@ pub fn render_firing_ranges(
 #[read_component(Health)]
 pub fn render_ui(
     #[resource] rts_controls: &RtsControls,
+    #[resource] dpi_scaling: &DpiScaling,
     #[resource] text_buffer: &mut TextBuffer,
     world: &SubWorld,
 ) {
@@ -155,7 +159,7 @@ pub fn render_ui(
 
     let text: String = mode.chain(unit_info).collect();
 
-    text_buffer.render_text((10.0, 10.0), &text);
+    text_buffer.render_text((10.0, 10.0), &text, dpi_scaling.0);
 }
 
 #[legion::system(for_each)]
@@ -227,11 +231,12 @@ fn position_to_vertex(pos: Vec2, uv: Vec2) -> Vertex {
 #[legion::system]
 pub fn render_drag_box(
     #[resource] mouse_state: &MouseState,
+    #[resource] dpi_scaling: &DpiScaling,
     #[resource] line_buffers: &mut LineBuffers,
 ) {
     if let Some(start) = mouse_state.left_state.is_being_dragged() {
         let (top_left, bottom_right) = sort_points(start, mouse_state.position);
-        line_buffers.draw_rect(top_left, bottom_right);
+        line_buffers.draw_rect(top_left, bottom_right, dpi_scaling.0);
     }
 }
 
