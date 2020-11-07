@@ -1,4 +1,3 @@
-use crate::renderer::{Instance, InstanceBuffers, Vertex};
 use crate::resources::{
     Camera, CameraControls, MouseState, PlayerSide, RtsControls, ScreenDimensions,
 };

@@ -87,9 +87,7 @@ pub fn handle_left_click(
             let entity = <(Entity, &Position, Option<&Selected>, &Side, &Radius)>::query()
                 .filter(component::<Selectable>())
                 .iter(world)
-                .filter(|(_, pos, .., radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
-                //.min_by_key(|(_, pos)| (position - pos.0).mag_sq());
-                .next()
+                .find(|(_, pos, .., radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
                 .map(|(entity, _, selected, side, _)| (entity, selected.is_some(), side));
 
             if !rts_controls.shift_held {
@@ -159,8 +157,7 @@ fn issue_command(
     let enemy_entity_under_cursor = <(Entity, &Position, &Side, &Radius)>::query()
         .iter(world)
         .filter(|(.., side, _)| **side != player_side.0)
-        .filter(|(_, pos, _, radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
-        .next()
+        .find(|(_, pos, _, radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
         .map(|(entity, ..)| entity);
 
     let command = match enemy_entity_under_cursor {

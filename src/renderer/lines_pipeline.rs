@@ -1,79 +1,88 @@
-use super::{GpuBuffer, DEPTH_FORMAT, DISPLAY_FORMAT};
+use super::{DynamicBuffer, RenderContext, DEPTH_FORMAT, DISPLAY_FORMAT};
+use crate::assets::Assets;
 use ultraviolet::{Vec2, Vec3};
 use wgpu::util::DeviceExt;
 
-pub struct Renderer {
+pub struct LinesPipeline {
     uniforms_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
-    hud_texture: wgpu::BindGroup,
     hud_buffer: wgpu::Buffer,
 }
 
-impl Renderer {
-    pub fn new(
-        device: &wgpu::Device,
-        texture_bind_group_layout: &wgpu::BindGroupLayout,
-        sampler: &wgpu::Sampler,
-        width: u32,
-        height: u32,
-        hud_texture: wgpu::BindGroup,
-    ) -> (Self, LineBuffers) {
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Cheese line bind group layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStage::VERTEX,
-                    ty: wgpu::BindingType::UniformBuffer {
-                        dynamic: false,
-                        min_binding_size: None,
+impl LinesPipeline {
+    pub fn new(context: &RenderContext, assets: &Assets) -> Self {
+        let dimensions = context.window.inner_size();
+        let width = dimensions.width;
+        let height = dimensions.height;
+        let sampler = &context.sampler;
+
+        let bind_group_layout =
+            context
+                .device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Cheese line bind group layout"),
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStage::VERTEX,
+                            ty: wgpu::BindingType::UniformBuffer {
+                                dynamic: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStage::FRAGMENT,
+                            ty: wgpu::BindingType::Sampler { comparison: false },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let uniforms_buffer =
+            context
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Cheese line uniforms buffer"),
+                    contents: bytemuck::bytes_of(&Uniforms::new(width, height)),
+                    usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+                });
+
+        let bind_group = context
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Cheese line bind group"),
+                layout: &bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer(uniforms_buffer.slice(..)),
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler { comparison: false },
-                    count: None,
-                },
-            ],
-        });
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(sampler),
+                    },
+                ],
+            });
 
-        let uniforms_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Cheese line uniforms buffer"),
-            contents: bytemuck::bytes_of(&Uniforms::new(width, height)),
-            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        });
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Cheese line bind group"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer(uniforms_buffer.slice(..)),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(sampler),
-                },
-            ],
-        });
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Cheese line pipeline layout"),
-            bind_group_layouts: &[&bind_group_layout, texture_bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let pipeline_layout =
+            context
+                .device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("Cheese line pipeline layout"),
+                    bind_group_layouts: &[&bind_group_layout, &assets.texture_bind_group_layout],
+                    push_constant_ranges: &[],
+                });
 
         let vs = wgpu::include_spirv!("../../shaders/lines.vert.spv");
-        let vs_module = device.create_shader_module(vs);
+        let vs_module = context.device.create_shader_module(vs);
 
         let fs = wgpu::include_spirv!("../../shaders/lines.frag.spv");
-        let fs_module = device.create_shader_module(fs);
+        let fs_module = context.device.create_shader_module(fs);
 
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let pipeline = context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Cheese line pipeline"),
             layout: Some(&pipeline_layout),
             vertex_stage: wgpu::ProgrammableStageDescriptor {
@@ -119,45 +128,29 @@ impl Renderer {
             alpha_to_coverage_enabled: false,
         });
 
-        let hud_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Cheese line hud buffer"),
-            contents: bytemuck::cast_slice(&generate_hud_vertices(width, height)),
-            usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
-        });
+        let hud_buffer = context
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Cheese line hud buffer"),
+                contents: bytemuck::cast_slice(&generate_hud_vertices(width, height)),
+                usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
+            });
 
-        (
-            Self {
-                uniforms_buffer,
-                bind_group,
-                pipeline,
-                hud_texture,
-                hud_buffer,
-            },
-            LineBuffers {
-                vertices: GpuBuffer::new(
-                    device,
-                    50,
-                    "Cheese line vertex buffer",
-                    wgpu::BufferUsage::VERTEX,
-                ),
-                indices: GpuBuffer::new(
-                    device,
-                    50,
-                    "Cheese line index buffer",
-                    wgpu::BufferUsage::INDEX,
-                ),
-                lyon_buffers: VertexBuffers::new(),
-            },
-        )
+        Self {
+            uniforms_buffer,
+            bind_group,
+            pipeline,
+            hud_buffer,
+        }
     }
 
-    pub fn resize(&self, queue: &wgpu::Queue, width: u32, height: u32) {
-        queue.write_buffer(
+    pub fn resize(&self, context: &RenderContext, width: u32, height: u32) {
+        context.queue.write_buffer(
             &self.uniforms_buffer,
             0,
             bytemuck::bytes_of(&Uniforms::new(width, height)),
         );
-        queue.write_buffer(
+        context.queue.write_buffer(
             &self.hud_buffer,
             0,
             bytemuck::cast_slice(&generate_hud_vertices(width, height)),
@@ -167,21 +160,9 @@ impl Renderer {
     pub fn render<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
-        line_buffers: &'a mut LineBuffers,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        line_buffers: &'a LineBuffers,
+        assets: &'a Assets,
     ) {
-        for vertex in line_buffers.lyon_buffers.vertices.drain(..) {
-            line_buffers.vertices.push(vertex);
-        }
-
-        for index in line_buffers.lyon_buffers.indices.drain(..) {
-            line_buffers.indices.push(index);
-        }
-
-        line_buffers.vertices.upload(device, queue);
-        line_buffers.indices.upload(device, queue);
-
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
 
@@ -191,7 +172,7 @@ impl Renderer {
             render_pass.draw_indexed(0..num_indices, 0, 0..1);
         }
 
-        render_pass.set_bind_group(1, &self.hud_texture, &[]);
+        render_pass.set_bind_group(1, &assets.hud_texture, &[]);
         render_pass.set_vertex_buffer(0, self.hud_buffer.slice(..));
         render_pass.draw(0..6, 0..1);
     }
@@ -231,12 +212,30 @@ impl BasicVertexConstructor<Vertex> for Constructor {
 }
 
 pub struct LineBuffers {
-    vertices: GpuBuffer<Vertex>,
-    indices: GpuBuffer<u16>,
+    vertices: DynamicBuffer<Vertex>,
+    indices: DynamicBuffer<u16>,
     lyon_buffers: VertexBuffers<Vertex, u16>,
 }
 
 impl LineBuffers {
+    pub fn new(device: &wgpu::Device) -> Self {
+        Self {
+            vertices: DynamicBuffer::new(
+                device,
+                50,
+                "Cheese line vertex buffer",
+                wgpu::BufferUsage::VERTEX,
+            ),
+            indices: DynamicBuffer::new(
+                device,
+                50,
+                "Cheese line index buffer",
+                wgpu::BufferUsage::INDEX,
+            ),
+            lyon_buffers: VertexBuffers::new(),
+        }
+    }
+
     pub fn draw_filled_rect(&mut self, center: Vec2, dimensions: Vec2, colour: Vec3) {
         let top_left = center - dimensions / 2.0;
 
@@ -262,6 +261,19 @@ impl LineBuffers {
             ),
         )
         .unwrap();
+    }
+
+    pub fn upload(&mut self, context: &RenderContext) {
+        for vertex in self.lyon_buffers.vertices.drain(..) {
+            self.vertices.push(vertex);
+        }
+
+        for index in self.lyon_buffers.indices.drain(..) {
+            self.indices.push(index);
+        }
+
+        self.vertices.upload(context);
+        self.indices.upload(context);
     }
 
     fn get(&self) -> Option<(wgpu::BufferSlice, wgpu::BufferSlice, u32)> {

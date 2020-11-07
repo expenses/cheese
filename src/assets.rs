@@ -2,6 +2,81 @@ use crate::renderer::{Vertex, TEXTURE_FORMAT};
 use ultraviolet::Vec2;
 use wgpu::util::DeviceExt;
 
+pub struct Assets {
+    pub surface_model: Model,
+    pub bullet_model: Model,
+    pub mouse_model: Model,
+    pub mouse_helmet_model: Model,
+    pub torus_model: Model,
+
+    pub texture_bind_group_layout: wgpu::BindGroupLayout,
+
+    pub surface_texture: wgpu::BindGroup,
+    pub colours_texture: wgpu::BindGroup,
+    pub hud_texture: wgpu::BindGroup,
+    pub mouse_texture: wgpu::BindGroup,
+}
+
+impl Assets {
+    pub fn new(device: &wgpu::Device) -> anyhow::Result<(Self, wgpu::CommandBuffer)> {
+        let mut init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Cheese init_encoder"),
+        });
+
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Cheese texture bind group layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::SampledTexture {
+                        multisampled: false,
+                        dimension: wgpu::TextureViewDimension::D2,
+                        component_type: wgpu::TextureComponentType::Float,
+                    },
+                    count: None,
+                }],
+            });
+
+        let assets = Self {
+            surface_model: Model::load(include_bytes!("../models/surface.obj"), device)?,
+            bullet_model: Model::load(include_bytes!("../models/bullet.obj"), device)?,
+            mouse_model: Model::load(include_bytes!("../models/mouse.obj"), device)?,
+            mouse_helmet_model: Model::load(include_bytes!("../models/mouse_helmet.obj"), device)?,
+            torus_model: Model::load(include_bytes!("../models/torus.obj"), device)?,
+
+            surface_texture: load_texture(
+                include_bytes!("../textures/surface.png"),
+                &texture_bind_group_layout,
+                device,
+                &mut init_encoder,
+            )?,
+            colours_texture: load_texture(
+                include_bytes!("../textures/colours.png"),
+                &texture_bind_group_layout,
+                device,
+                &mut init_encoder,
+            )?,
+            hud_texture: load_texture(
+                include_bytes!("../textures/hud.png"),
+                &texture_bind_group_layout,
+                device,
+                &mut init_encoder,
+            )?,
+            mouse_texture: load_texture(
+                include_bytes!("../textures/mouse.png"),
+                &texture_bind_group_layout,
+                device,
+                &mut init_encoder,
+            )?,
+
+            texture_bind_group_layout,
+        };
+
+        Ok((assets, init_encoder.finish()))
+    }
+}
+
 pub struct Model {
     pub buffer: wgpu::Buffer,
     pub num_vertices: u32,
@@ -54,7 +129,7 @@ impl Model {
     }
 }
 
-pub fn load_texture(
+fn load_texture(
     bytes: &[u8],
     bind_group_layout: &wgpu::BindGroupLayout,
     device: &wgpu::Device,

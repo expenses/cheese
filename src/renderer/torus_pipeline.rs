@@ -1,5 +1,6 @@
-use super::{GpuBuffer, Vertex, DEPTH_FORMAT, DISPLAY_FORMAT};
+use super::{DynamicBuffer, RenderContext, Vertex, DEPTH_FORMAT, DISPLAY_FORMAT};
 use crate::assets::Model;
+use std::sync::Arc;
 use ultraviolet::Vec3;
 
 // I want to draw lots of toruses (I'd use tori but then you'd have to look that word up) with
@@ -7,27 +8,31 @@ use ultraviolet::Vec3;
 // just scale the model, so you have to run some different code in the vertex shader.
 // See shaders/torus.vert for more.
 
-pub struct Renderer {
-    torus_model: Model,
+pub struct TorusPipeline {
     pipeline: wgpu::RenderPipeline,
+    main_bind_group: Arc<wgpu::BindGroup>,
 }
 
-impl Renderer {
-    pub fn new(
-        device: &wgpu::Device,
-        pipeline_layout: &wgpu::PipelineLayout,
-    ) -> anyhow::Result<Self> {
-        let torus_model = Model::load(include_bytes!("../../models/torus.obj"), &device)?;
+impl TorusPipeline {
+    pub fn new(context: &RenderContext) -> Self {
+        let pipeline_layout =
+            context
+                .device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("Cheese torus pipeline layout"),
+                    bind_group_layouts: &[&context.main_bind_group_layout],
+                    push_constant_ranges: &[],
+                });
 
         let vs = wgpu::include_spirv!("../../shaders/torus.vert.spv");
-        let vs_module = device.create_shader_module(vs);
+        let vs_module = context.device.create_shader_module(vs);
 
         let fs = wgpu::include_spirv!("../../shaders/torus.frag.spv");
-        let fs_module = device.create_shader_module(fs);
+        let fs_module = context.device.create_shader_module(fs);
 
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let pipeline = context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Cheese torus pipeline"),
-            layout: Some(pipeline_layout),
+            layout: Some(&pipeline_layout),
             vertex_stage: wgpu::ProgrammableStageDescriptor {
                 module: &vs_module,
                 entry_point: "main",
@@ -73,29 +78,46 @@ impl Renderer {
             alpha_to_coverage_enabled: false,
         });
 
-        Ok(Self {
-            torus_model,
+        Self {
             pipeline,
-        })
+            main_bind_group: context.main_bind_group.clone(),
+        }
     }
 
     pub fn render<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
-        torus_buffer: &'a mut GpuBuffer<TorusInstance>,
-        bind_group: &'a wgpu::BindGroup,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        torus_buffer: &'a DynamicBuffer<TorusInstance>,
+        torus_model: &'a Model,
     ) {
-        torus_buffer.upload(device, queue);
-
         if let Some((slice, num)) = torus_buffer.get() {
             render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_bind_group(0, bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.torus_model.buffer.slice(..));
+            render_pass.set_bind_group(0, &self.main_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, torus_model.buffer.slice(..));
             render_pass.set_vertex_buffer(1, slice);
-            render_pass.draw(0..self.torus_model.num_vertices, 0..num);
+            render_pass.draw(0..torus_model.num_vertices, 0..num);
         }
+    }
+}
+
+pub struct TorusBuffer {
+    pub toruses: DynamicBuffer<TorusInstance>,
+}
+
+impl TorusBuffer {
+    pub fn new(device: &wgpu::Device) -> Self {
+        Self {
+            toruses: DynamicBuffer::new(
+                device,
+                1,
+                "Cheese torus buffer",
+                wgpu::BufferUsage::VERTEX,
+            ),
+        }
+    }
+
+    pub fn upload(&mut self, context: &RenderContext) {
+        self.toruses.upload(context);
     }
 }
 

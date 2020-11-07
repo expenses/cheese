@@ -3,7 +3,11 @@ mod ecs;
 mod renderer;
 mod resources;
 
-use crate::renderer::InstanceBuffers;
+use crate::assets::Assets;
+use crate::renderer::{
+    LineBuffers, LinesPipeline, ModelBuffers, ModelPipelines, RenderContext, TextBuffer,
+    TorusBuffer, TorusPipeline,
+};
 use crate::resources::{
     Camera, CameraControls, CommandMode, CursorIcon, DeltaTime, MouseState, PlayerSide,
     RayCastLocation, RtsControls, ScreenDimensions,
@@ -51,13 +55,24 @@ async fn run() -> anyhow::Result<()> {
 
     let event_loop = EventLoop::new();
 
-    let (mut renderer, instance_buffers, screen_dimensions) =
-        renderer::Renderer::new(&event_loop).await?;
+    let mut render_context = RenderContext::new(&event_loop).await?;
+    let (assets, command_buffer) = Assets::new(&render_context.device())?;
+    render_context.submit(command_buffer);
+    let model_pipelines = ModelPipelines::new(&render_context, &assets);
+    let torus_pipeline = TorusPipeline::new(&render_context);
+    let lines_pipeline = LinesPipeline::new(&render_context, &assets);
+    let model_buffers = ModelBuffers::new(render_context.device());
+    let torus_buffer = TorusBuffer::new(render_context.device());
+    let lines_buffers = LineBuffers::new(render_context.device());
+    let text_buffer = TextBuffer::new(render_context.device())?;
 
     let mut world = World::default();
     let mut resources = Resources::default();
-    resources.insert(instance_buffers);
-    resources.insert(screen_dimensions);
+    resources.insert(model_buffers);
+    resources.insert(torus_buffer);
+    resources.insert(lines_buffers);
+    resources.insert(text_buffer);
+    resources.insert(render_context.screen_dimensions());
     resources.insert(CameraControls::default());
     resources.insert(Camera {
         position: Vec3::new(0.0, 20.0, 10.0),
@@ -114,7 +129,12 @@ async fn run() -> anyhow::Result<()> {
                 match event {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                     WindowEvent::Resized(size) => {
-                        renderer.resize(size.width as u32, size.height as u32);
+                        render_context.resize(size.width as u32, size.height as u32);
+                        lines_pipeline.resize(
+                            &render_context,
+                            size.width as u32,
+                            size.height as u32,
+                        );
                         resources.insert(ScreenDimensions {
                             width: size.width as u32,
                             height: size.height as u32,
@@ -181,14 +201,119 @@ async fn run() -> anyhow::Result<()> {
                 schedule.execute(&mut world, &mut resources);
 
                 let cursor_icon = resources.get::<CursorIcon>().unwrap();
-                renderer.set_cursor_icon(cursor_icon.0);
-
-                renderer.request_redraw()
+                render_context.set_cursor_icon(cursor_icon.0);
+                render_context.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                let mut instance_buffers = resources.get_mut::<InstanceBuffers>().unwrap();
                 let camera = resources.get::<Camera>().unwrap();
-                renderer.render(camera.to_matrix(), &mut instance_buffers)
+                let mut model_buffers = resources.get_mut::<ModelBuffers>().unwrap();
+                let mut torus_buffer = resources.get_mut::<TorusBuffer>().unwrap();
+                let mut line_buffers = resources.get_mut::<LineBuffers>().unwrap();
+                let mut text_buffer = resources.get_mut::<TextBuffer>().unwrap();
+
+                // Upload buffers to the gpu.
+                render_context.update_view(camera.to_matrix());
+                model_buffers.upload(&render_context);
+                torus_buffer.upload(&render_context);
+                line_buffers.upload(&render_context);
+
+                if let Ok(frame) = render_context.swap_chain.get_current_frame() {
+                    let mut encoder = render_context.device.create_command_encoder(
+                        &wgpu::CommandEncoderDescriptor {
+                            label: Some("Cheese render encoder"),
+                        },
+                    );
+
+                    // This is super messy and should be abstracted.
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                            attachment: &frame.output.view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color {
+                                    r: 0.0,
+                                    g: 0.125,
+                                    b: 0.125,
+                                    a: 1.0,
+                                }),
+                                store: true,
+                            },
+                        }],
+                        depth_stencil_attachment: Some(
+                            wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                                attachment: &render_context.depth_texture,
+                                depth_ops: Some(wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(1.0),
+                                    store: true,
+                                }),
+                                stencil_ops: None,
+                            },
+                        ),
+                    });
+
+                    // Render a bunch of models.
+                    model_pipelines.render_instanced(
+                        &mut render_pass,
+                        &model_buffers.mice,
+                        &assets.mouse_texture,
+                        &assets.mouse_model,
+                    );
+                    model_pipelines.render_instanced(
+                        &mut render_pass,
+                        &model_buffers.bullets,
+                        &assets.colours_texture,
+                        &assets.bullet_model,
+                    );
+                    torus_pipeline.render(
+                        &mut render_pass,
+                        &torus_buffer.toruses,
+                        &assets.torus_model,
+                    );
+                    model_pipelines.render_lines(
+                        &mut render_pass,
+                        &model_buffers.command_paths,
+                        &assets.colours_texture,
+                    );
+                    model_pipelines.render_single(
+                        &mut render_pass,
+                        &assets.surface_texture,
+                        &assets.surface_model,
+                    );
+                    model_pipelines.render_transparent(
+                        &mut render_pass,
+                        &model_buffers.mice,
+                        &assets.mouse_helmet_model,
+                    );
+
+                    // Render 2D items.
+                    lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
+
+                    // We're done with this pass.
+                    drop(render_pass);
+
+                    let size = render_context.window.inner_size();
+                    let mut staging_belt = wgpu::util::StagingBelt::new(10);
+
+                    // Now render all the text to a seperate render pass.
+                    text_buffer
+                        .glyph_brush
+                        .draw_queued(
+                            &render_context.device,
+                            &mut staging_belt,
+                            &mut encoder,
+                            &frame.output.view,
+                            size.width,
+                            size.height,
+                        )
+                        .unwrap();
+
+                    staging_belt.finish();
+
+                    // Do I need to do this?
+                    // staging_belt.recall();
+
+                    render_context.queue.submit(Some(encoder.finish()));
+                }
             }
             _ => {}
         }

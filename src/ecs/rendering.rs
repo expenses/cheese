@@ -1,5 +1,7 @@
 use super::*;
-use crate::renderer::TorusInstance;
+use crate::renderer::{
+    LineBuffers, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance, Vertex,
+};
 use crate::resources::{CursorIcon, RayCastLocation};
 use ultraviolet::Vec4;
 
@@ -12,11 +14,11 @@ const PURPLE: Vec3 = Vec3::new(196.0, 0.0, 109.0);
 pub fn render_units(
     position: &Position,
     facing: &Facing,
-    #[resource] buffers: &mut InstanceBuffers,
+    #[resource] model_buffers: &mut ModelBuffers,
 ) {
     let translation = Mat4::from_translation(Vec3::new(position.0.x, 0.0, position.0.y));
     let rotation = Mat4::from_rotation_y(facing.0);
-    buffers.mice.push(Instance {
+    model_buffers.mice.push(ModelInstance {
         transform: translation * rotation,
         uv_x_offset: 0.0,
     });
@@ -28,9 +30,9 @@ pub fn render_selections(
     position: &Position,
     side: &Side,
     radius: &Radius,
-    #[resource] buffers: &mut InstanceBuffers,
+    #[resource] torus_buffer: &mut TorusBuffer,
 ) {
-    buffers.toruses.push(TorusInstance {
+    torus_buffer.toruses.push(TorusInstance {
         center: Vec3::new(position.0.x, 0.0, position.0.y),
         colour: match side {
             Side::Green => GREEN / COLOUR_MAX,
@@ -49,7 +51,7 @@ pub fn render_under_select_box(
     #[resource] camera: &Camera,
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] player_side: &PlayerSide,
-    #[resource] buffers: &mut InstanceBuffers,
+    #[resource] torus_buffer: &mut TorusBuffer,
     world: &SubWorld,
 ) {
     if let Some(start) = mouse_state.left_state.is_being_dragged() {
@@ -61,11 +63,11 @@ pub fn render_under_select_box(
             .filter(|(.., side)| **side == player_side.0)
             .filter(|(position, ..)| select_box.contains(position.0))
             .for_each(|(position, radius, _)| {
-                buffers.toruses.push(TorusInstance {
+                torus_buffer.toruses.push(TorusInstance {
                     center: Vec3::new(position.0.x, 0.0, position.0.y),
                     colour: Vec3::new(1.0, 1.0, 1.0),
                     radius: radius.0,
-                })
+                });
             });
     }
 }
@@ -78,7 +80,7 @@ pub fn render_health_bars(
     unit: &Unit,
     #[resource] camera: &Camera,
     #[resource] screen_dimensions: &ScreenDimensions,
-    #[resource] buffers: &mut InstanceBuffers,
+    #[resource] line_buffers: &mut LineBuffers,
 ) {
     let stats = unit.stats();
 
@@ -89,7 +91,7 @@ pub fn render_health_bars(
         let health_percentage = health.0 as f32 / stats.max_health as f32;
         let length = 60.0 * health_percentage;
 
-        buffers.line_buffers.draw_filled_rect(
+        line_buffers.draw_filled_rect(
             location,
             Vec2::new(length, 10.0),
             Vec3::new(1.0 - health_percentage, health_percentage, 0.0),
@@ -117,13 +119,13 @@ pub fn render_firing_ranges(
     firing_range: &FiringRange,
     side: &Side,
     #[resource] player_side: &PlayerSide,
-    #[resource] buffers: &mut InstanceBuffers,
+    #[resource] torus_buffer: &mut TorusBuffer,
 ) {
     if *side != player_side.0 {
         return;
     }
 
-    buffers.toruses.push(TorusInstance {
+    torus_buffer.toruses.push(TorusInstance {
         center: Vec3::new(position.0.x, 0.0, position.0.y),
         colour: Vec3::new(0.5, 0.0, 0.0),
         radius: firing_range.0,
@@ -135,7 +137,7 @@ pub fn render_firing_ranges(
 #[read_component(Health)]
 pub fn render_ui(
     #[resource] rts_controls: &RtsControls,
-    #[resource] buffers: &mut InstanceBuffers,
+    #[resource] text_buffer: &mut TextBuffer,
     world: &SubWorld,
 ) {
     let mode = Some(format!("Mode: {:?}\n", rts_controls.mode)).into_iter();
@@ -148,7 +150,7 @@ pub fn render_ui(
 
     let text: String = mode.chain(unit_info).collect();
 
-    buffers.render_text((10.0, 10.0), &text);
+    text_buffer.render_text((10.0, 10.0), &text);
 }
 
 #[legion::system(for_each)]
@@ -158,7 +160,7 @@ pub fn render_command_paths(
     queue: &CommandQueue,
     entity: &Entity,
     side: &Side,
-    #[resource] buffers: &mut InstanceBuffers,
+    #[resource] model_buffers: &mut ModelBuffers,
     #[resource] player_side: &PlayerSide,
     world: &SubWorld,
 ) {
@@ -201,8 +203,8 @@ pub fn render_command_paths(
         if let Some(position) = position {
             let vertex = position_to_vertex(position, uv);
 
-            buffers.command_paths.push(prev);
-            buffers.command_paths.push(vertex);
+            model_buffers.command_paths.push(prev);
+            model_buffers.command_paths.push(vertex);
 
             prev = vertex;
         }
@@ -220,11 +222,11 @@ fn position_to_vertex(pos: Vec2, uv: Vec2) -> Vertex {
 #[legion::system]
 pub fn render_drag_box(
     #[resource] mouse_state: &MouseState,
-    #[resource] buffers: &mut InstanceBuffers,
+    #[resource] line_buffers: &mut LineBuffers,
 ) {
     if let Some(start) = mouse_state.left_state.is_being_dragged() {
         let (top_left, bottom_right) = sort_points(start, mouse_state.position);
-        buffers.line_buffers.draw_rect(top_left, bottom_right);
+        line_buffers.draw_rect(top_left, bottom_right);
     }
 }
 
@@ -233,12 +235,12 @@ pub fn render_drag_box(
 pub fn render_bullets(
     position: &Position,
     facing: &Facing,
-    #[resource] buffers: &mut InstanceBuffers,
+    #[resource] model_buffers: &mut ModelBuffers,
 ) {
     let translation = Mat4::from_translation(Vec3::new(position.0.x, 1.0, position.0.y));
     let rotation = Mat4::from_rotation_y(facing.0);
 
-    buffers.bullets.push(Instance {
+    model_buffers.bullets.push(ModelInstance {
         transform: translation * rotation,
         uv_x_offset: 0.0,
     });
@@ -250,12 +252,12 @@ pub fn render_bullets(
 pub fn render_unit_under_cursor(
     #[resource] ray_cast_location: &RayCastLocation,
     #[resource] cursor_icon: &mut CursorIcon,
-    #[resource] buffers: &mut InstanceBuffers,
+    #[resource] torus_buffer: &mut TorusBuffer,
     world: &SubWorld,
 ) {
     if let Some((pos, radius)) = unit_under_cursor(ray_cast_location, world) {
         cursor_icon.0 = winit::window::CursorIcon::Hand;
-        buffers.toruses.push(TorusInstance {
+        torus_buffer.toruses.push(TorusInstance {
             center: Vec3::new(pos.x, 0.0, pos.y),
             colour: Vec3::new(1.0, 1.0, 1.0),
             radius,
@@ -268,7 +270,6 @@ fn unit_under_cursor(ray_cast_location: &RayCastLocation, world: &SubWorld) -> O
 
     <(&Position, &Radius)>::query()
         .iter(world)
-        .filter(|(pos, radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
-        .next()
+        .find(|(pos, radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
         .map(|(pos, radius)| (pos.0, radius.0))
 }
