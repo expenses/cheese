@@ -95,7 +95,7 @@ pub enum MouseButtonState {
     Dragged(Vec2),
     Up,
     Clicked,
-    Down(Vec2),
+    Down(u8, Vec2),
 }
 
 impl Default for MouseButtonState {
@@ -108,13 +108,20 @@ impl MouseButtonState {
     pub fn update(&mut self, mouse: Vec2) {
         match *self {
             Self::Clicked => *self = Self::Up,
-            Self::Down(start)
-                if (mouse.x - start.x).abs() > 10.0 || (mouse.y - start.y).abs() > 10.0 =>
-            {
-                *self = Self::Dragging(start)
-            }
+            Self::Down(ref mut frames, start) => {
+                let drag = *frames > 2 && (*frames > 10
+                    || (mouse.x - start.x).abs() > 10.0
+                    || (mouse.y - start.y).abs() > 10.0);
+
+                if drag {
+                    *self = Self::Dragging(start)
+                } else {
+                    *frames += 1;
+                }
+
+            },
             Self::Dragged(_) => *self = Self::Up,
-            Self::Up | Self::Down(_) | Self::Dragging(_) => {}
+            Self::Up | Self::Dragging(_) => {}
         }
     }
 
@@ -127,12 +134,12 @@ impl MouseButtonState {
     }
 
     fn handle_down(&mut self, mouse: Vec2) {
-        *self = Self::Down(mouse)
+        *self = Self::Down(0, mouse)
     }
 
     fn handle_up(&mut self) {
         match *self {
-            Self::Down(_) => *self = Self::Clicked,
+            Self::Down(_, _) => *self = Self::Clicked,
             Self::Dragging(start) => *self = Self::Dragged(start),
             _ => *self = Self::Up,
         }

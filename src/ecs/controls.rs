@@ -5,28 +5,37 @@ use crate::resources::{CommandMode, RayCastLocation};
 pub fn control_camera(
     #[resource] camera: &mut Camera,
     #[resource] camera_controls: &mut CameraControls,
+    #[resource] mouse_state: &MouseState,
+    #[resource] screen_dimensions: &ScreenDimensions,
 ) {
     let speed = 0.5;
+
+    let edge_thickness = 50.0;
+    let &ScreenDimensions { width: screen_width, height: screen_height } = screen_dimensions;
+    let screen_width = screen_width as f32;
+    let screen_height = screen_height as f32;
+    let mouse_x = mouse_state.position.x;
+    let mouse_y = mouse_state.position.y;
 
     let right = Vec3::new(speed, 0.0, 0.0);
     let forwards = Vec3::new(0.0, 0.0, -speed);
 
-    if camera_controls.left {
+    if camera_controls.left || mouse_x < edge_thickness {
         camera.position -= right;
         camera.looking_at -= right;
     }
 
-    if camera_controls.right {
+    if camera_controls.right || mouse_x > screen_width - edge_thickness {
         camera.position += right;
         camera.looking_at += right;
     }
 
-    if camera_controls.up {
+    if camera_controls.up || mouse_y < edge_thickness {
         camera.position += forwards;
         camera.looking_at += forwards;
     }
 
-    if camera_controls.down {
+    if camera_controls.down || mouse_y > screen_height - edge_thickness {
         camera.position -= forwards;
         camera.looking_at -= forwards;
     }
