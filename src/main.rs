@@ -6,7 +6,7 @@ mod resources;
 use crate::renderer::InstanceBuffers;
 use crate::resources::{
     Camera, CameraControls, CommandMode, CursorIcon, DeltaTime, MouseState, PlayerSide,
-    RtsControls, ScreenDimensions,
+    RayCastLocation, RtsControls, ScreenDimensions,
 };
 use legion::*;
 use ultraviolet::{Vec2, Vec3};
@@ -25,6 +25,7 @@ fn main() -> anyhow::Result<()> {
 
 fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
     builder
+        .add_system(ecs::cast_ray_system())
         .add_system(ecs::stop_attacks_on_dead_entities_system())
         .add_system(ecs::control_camera_system())
         .add_system(ecs::handle_left_click_system())
@@ -64,6 +65,7 @@ async fn run() -> anyhow::Result<()> {
     });
     resources.insert(MouseState::default());
     resources.insert(RtsControls::default());
+    resources.insert(RayCastLocation::default());
     resources.insert(PlayerSide(ecs::Side::Purple));
 
     for i in 0..10 {
@@ -96,7 +98,7 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::render_command_paths_system())
         .add_system(ecs::render_ui_system())
         .add_system(ecs::render_health_bars_system())
-        .add_system(ecs::set_cursor_if_unit_under_system())
+        .add_system(ecs::render_unit_under_cursor_system())
         // Cleanup
         .flush()
         .add_system(ecs::update_mouse_buttons_system())

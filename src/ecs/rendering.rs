@@ -1,6 +1,6 @@
 use super::*;
 use crate::renderer::TorusInstance;
-use crate::resources::CursorIcon;
+use crate::resources::{CursorIcon, RayCastLocation};
 use ultraviolet::Vec4;
 
 const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
@@ -252,27 +252,28 @@ pub fn render_bullets(
 #[legion::system]
 #[read_component(Position)]
 #[read_component(Radius)]
-pub fn set_cursor_if_unit_under(
-    #[resource] camera: &Camera,
-    #[resource] mouse_state: &MouseState,
-    #[resource] screen_position: &ScreenDimensions,
+pub fn render_unit_under_cursor(
+    #[resource] ray_cast_location: &RayCastLocation,
     #[resource] cursor_icon: &mut CursorIcon,
+    #[resource] buffers: &mut InstanceBuffers,
     world: &SubWorld,
 ) {
-    if unit_under_cursor(camera, mouse_state, screen_position, world) {
+    if let Some((pos, radius)) = unit_under_cursor(ray_cast_location, world) {
         cursor_icon.0 = winit::window::CursorIcon::Hand;
+        buffers.toruses.push(TorusInstance {
+            center: Vec3::new(pos.x, 0.0, pos.y),
+            colour: Vec3::new(1.0, 1.0, 1.0),
+            radius,
+        });
     }
 }
 
-fn unit_under_cursor(
-    camera: &Camera,
-    mouse_state: &MouseState,
-    screen_dimensions: &ScreenDimensions,
-    world: &SubWorld,
-) -> bool {
-    let position = camera.cast_ray(mouse_state.position, screen_dimensions);
+fn unit_under_cursor(ray_cast_location: &RayCastLocation, world: &SubWorld) -> Option<(Vec2, f32)> {
+    let position = ray_cast_location.0;
 
     <(&Position, &Radius)>::query()
         .iter(world)
-        .any(|(pos, radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
+        .filter(|(pos, radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
+        .next()
+        .map(|(pos, radius)| (pos.0, radius.0))
 }

@@ -178,7 +178,8 @@ impl Renderer {
         let surface_model = Model::load(include_bytes!("../models/surface.obj"), &device)?;
         let bullet_model = Model::load(include_bytes!("../models/bullet.obj"), &device)?;
         let mouse_model = Model::load(include_bytes!("../models/mouse.obj"), &device)?;
-        let mouse_helmet_model = Model::load(include_bytes!("../models/mouse_helmet.obj"), &device)?;
+        let mouse_helmet_model =
+            Model::load(include_bytes!("../models/mouse_helmet.obj"), &device)?;
 
         // Load textures
 
@@ -650,12 +651,12 @@ fn create_render_pipeline(
             write_mask: wgpu::ColorWrite::ALL,
         }
     } else {
-		wgpu::ColorStateDescriptor {
-			format: DISPLAY_FORMAT,
-			color_blend: wgpu::BlendDescriptor::REPLACE,
-			alpha_blend: wgpu::BlendDescriptor::REPLACE,
-			write_mask: wgpu::ColorWrite::ALL,
-		}
+        wgpu::ColorStateDescriptor {
+            format: DISPLAY_FORMAT,
+            color_blend: wgpu::BlendDescriptor::REPLACE,
+            alpha_blend: wgpu::BlendDescriptor::REPLACE,
+            write_mask: wgpu::ColorWrite::ALL,
+        }
     };
 
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {

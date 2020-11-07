@@ -1,5 +1,5 @@
 use super::*;
-use crate::resources::CommandMode;
+use crate::resources::{CommandMode, RayCastLocation};
 
 #[legion::system]
 pub fn control_camera(
@@ -37,6 +37,16 @@ pub fn control_camera(
 }
 
 #[legion::system]
+pub fn cast_ray(
+    #[resource] camera: &Camera,
+    #[resource] mouse_state: &MouseState,
+    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] ray_cast_location: &mut RayCastLocation,
+) {
+    ray_cast_location.0 = camera.cast_ray(mouse_state.position, screen_dimensions);
+}
+
+#[legion::system]
 #[read_component(Entity)]
 #[read_component(Selected)]
 #[read_component(Position)]
@@ -44,9 +54,8 @@ pub fn control_camera(
 #[read_component(Radius)]
 #[write_component(CommandQueue)]
 pub fn handle_left_click(
-    #[resource] camera: &Camera,
     #[resource] mouse_state: &MouseState,
-    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] ray_cast_location: &RayCastLocation,
     #[resource] rts_controls: &mut RtsControls,
     #[resource] player_side: &PlayerSide,
     world: &mut SubWorld,
@@ -56,13 +65,13 @@ pub fn handle_left_click(
         return;
     }
 
-    let position = camera.cast_ray(mouse_state.position, screen_dimensions);
-
     match rts_controls.mode {
         CommandMode::AttackMove => {
-            issue_command(position, rts_controls, player_side, world);
+            issue_command(ray_cast_location, rts_controls, player_side, world);
         }
         CommandMode::Normal => {
+            let position = ray_cast_location.0;
+
             let entity = <(Entity, &Position, Option<&Selected>, &Side, &Radius)>::query()
                 .filter(component::<Selectable>())
                 .iter(world)
@@ -107,9 +116,8 @@ pub fn handle_left_click(
 #[read_component(Radius)]
 #[write_component(CommandQueue)]
 pub fn handle_right_click(
-    #[resource] camera: &Camera,
     #[resource] mouse_state: &MouseState,
-    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] ray_cast_location: &RayCastLocation,
     #[resource] rts_controls: &mut RtsControls,
     #[resource] player_side: &PlayerSide,
     world: &mut SubWorld,
@@ -125,16 +133,17 @@ pub fn handle_right_click(
         return;
     }
 
-    let position = camera.cast_ray(mouse_state.position, screen_dimensions);
-    issue_command(position, rts_controls, player_side, world)
+    issue_command(ray_cast_location, rts_controls, player_side, world)
 }
 
 fn issue_command(
-    position: Vec2,
+    ray_cast_location: &RayCastLocation,
     rts_controls: &RtsControls,
     player_side: &PlayerSide,
     world: &mut SubWorld,
 ) {
+    let position = ray_cast_location.0;
+
     let enemy_entity_under_cursor = <(Entity, &Position, &Side, &Radius)>::query()
         .iter(world)
         .filter(|(.., side, _)| **side != player_side.0)
@@ -247,8 +256,12 @@ fn selection_and_deselection() {
     resources.insert(MouseState::default());
     resources.insert(RtsControls::default());
     resources.insert(PlayerSide(Side::Green));
-    resources.insert(ScreenDimensions { width: 1000, height: 1000 });
+    resources.insert(ScreenDimensions {
+        width: 1000,
+        height: 1000,
+    });
     resources.insert(DeltaTime(1.0 / 60.0));
+    resources.insert(RayCastLocation::default());
 
     let mut builder = Schedule::builder();
     crate::add_gameplay_systems(&mut builder);

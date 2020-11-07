@@ -86,7 +86,13 @@ impl Unit {
         }
     }
 
-    pub fn add_to_world(self, world: &mut World, position: Vec2, facing: Facing, side: Side) -> Entity {
+    pub fn add_to_world(
+        self,
+        world: &mut World,
+        position: Vec2,
+        facing: Facing,
+        side: Side,
+    ) -> Entity {
         let UnitStats {
             max_health,
             move_speed,

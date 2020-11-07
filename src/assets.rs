@@ -1,6 +1,6 @@
 use crate::renderer::{Vertex, TEXTURE_FORMAT};
-use wgpu::util::DeviceExt;
 use ultraviolet::Vec2;
+use wgpu::util::DeviceExt;
 
 pub struct Model {
     pub buffer: wgpu::Buffer,

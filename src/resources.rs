@@ -108,9 +108,8 @@ impl MouseButtonState {
     pub fn update(&mut self, mouse: Vec2) {
         match *self {
             Self::Clicked => *self = Self::Up,
-            Self::Down(start) if
-                (mouse.x - start.x).abs() > 10.0 ||
-                (mouse.y - start.y).abs() > 10.0 =>
+            Self::Down(start)
+                if (mouse.x - start.x).abs() > 10.0 || (mouse.y - start.y).abs() > 10.0 =>
             {
                 *self = Self::Dragging(start)
             }
@@ -163,3 +162,5 @@ impl MouseButtonState {
 pub struct PlayerSide(pub ecs::Side);
 pub struct DeltaTime(pub f32);
 pub struct CursorIcon(pub winit::window::CursorIcon);
+#[derive(Default)]
+pub struct RayCastLocation(pub Vec2);
