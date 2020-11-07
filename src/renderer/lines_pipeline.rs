@@ -222,13 +222,13 @@ impl LineBuffers {
         Self {
             vertices: DynamicBuffer::new(
                 device,
-                50,
+                200,
                 "Cheese line vertex buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
             indices: DynamicBuffer::new(
                 device,
-                50,
+                400,
                 "Cheese line index buffer",
                 wgpu::BufferUsage::INDEX,
             ),

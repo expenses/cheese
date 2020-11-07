@@ -109,7 +109,7 @@ impl TorusBuffer {
         Self {
             toruses: DynamicBuffer::new(
                 device,
-                1,
+                50,
                 "Cheese torus buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
