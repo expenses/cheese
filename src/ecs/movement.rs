@@ -73,7 +73,9 @@ pub fn move_units(
     #[resource] delta_time: &DeltaTime,
 ) {
     let direction = move_to.0 - position.0;
-    facing.0 = direction.y.atan2(direction.x);
+    if direction.mag_sq() > 0.0 {
+        facing.0 = direction.y.atan2(direction.x);
+    }
 
     let speed = move_speed.0 * delta_time.0;
 

@@ -77,12 +77,14 @@ async fn run() -> anyhow::Result<()> {
         );
     }
 
-    ecs::Unit::Hulk.add_to_world(
-        &mut world,
-        Vec2::new(10.0, 0.0),
-        ecs::Facing(1.0),
-        ecs::Side::Green,
-    );
+    for i in 0..10 {
+        ecs::Unit::MouseMarine.add_to_world(
+            &mut world,
+            Vec2::new(10.0, i as f32 / 100.0),
+            ecs::Facing(1.0),
+            ecs::Side::Green,
+        );
+    }
 
     let mut builder = Schedule::builder();
     add_gameplay_systems(&mut builder);
@@ -90,7 +92,7 @@ async fn run() -> anyhow::Result<()> {
     let mut schedule = builder
         // Rendering
         .add_system(ecs::render_bullets_system())
-        .add_system(ecs::render_boxes_system())
+        .add_system(ecs::render_units_system())
         .add_system(ecs::render_selections_system())
         //.add_system(ecs::render_firing_ranges_system())
         .add_system(ecs::render_under_select_box_system())

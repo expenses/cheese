@@ -8,24 +8,18 @@ const GREEN: Vec3 = Vec3::new(43.0, 140.0, 0.0);
 const PURPLE: Vec3 = Vec3::new(196.0, 0.0, 109.0);
 
 #[legion::system(for_each)]
-pub fn render_boxes(
+#[filter(component::<Unit>())]
+pub fn render_units(
     position: &Position,
     facing: &Facing,
-    side: &Side,
     #[resource] buffers: &mut InstanceBuffers,
 ) {
     let translation = Mat4::from_translation(Vec3::new(position.0.x, 0.0, position.0.y));
     let rotation = Mat4::from_rotation_y(facing.0);
-
-    let instance = Instance {
+    buffers.mice.push(Instance {
         transform: translation * rotation,
-        uv_x_offset: match side {
-            Side::Green => 0.0,
-            Side::Purple => 0.0,
-        },
-    };
-
-    buffers.mice.push(instance);
+        uv_x_offset: 0.0,
+    });
 }
 
 #[legion::system(for_each)]
