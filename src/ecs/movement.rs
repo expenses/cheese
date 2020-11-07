@@ -7,7 +7,7 @@ use crate::resources::DeltaTime;
 pub fn set_move_to(
     entity: &Entity,
     firing_range: &FiringRange,
-    commands: &CommandQueue,
+    commands: &mut CommandQueue,
     buffer: &mut CommandBuffer,
     world: &SubWorld,
 ) {
@@ -20,24 +20,45 @@ pub fn set_move_to(
     // Units try to get this much closer to enemies than their firing range.
     let fudge_factor = 0.05;
 
-    match commands.0.front().cloned() {
-        Some(Command::MoveTo(target)) => buffer.add_component(*entity, MoveTo(target)),
-        Some(Command::AttackMove(target)) => buffer.add_component(*entity, MoveTo(target)),
-        Some(Command::Attack { target, .. }) => {
+    let mut pop_front = false;
+
+    match commands.0.front_mut() {
+        Some(Command::MoveTo(target)) => buffer.add_component(*entity, MoveTo(*target)),
+        Some(Command::AttackMove(target)) => buffer.add_component(*entity, MoveTo(*target)),
+        Some(Command::Attack {
+            target,
+            first_out_of_range,
+            ..
+        }) => {
             let target_pos = <&Position>::query()
-                .get(world, target)
+                .get(world, *target)
                 .expect("We've cancelled attack commands on dead entities");
+
             let vector = target_pos.0 - position.0;
-            if vector.mag_sq() > (firing_range.0 - fudge_factor).powi(2) {
+
+            let out_of_range = vector.mag_sq() > (firing_range.0 - fudge_factor).powi(2);
+
+            // We check first_out_of_range here to make sure that units only chase when out of range
+            // once.
+            if out_of_range && *first_out_of_range {
                 let mag = vector.mag();
                 let distance_to_go = mag - (firing_range.0 - fudge_factor);
                 let target = position.0 + vector.normalized() * distance_to_go;
                 buffer.add_component(*entity, MoveTo(target));
+            } else if out_of_range && !*first_out_of_range {
+                // Remove the attack command so the unit can retarget.
+                pop_front = true;
+                buffer.remove_component::<MoveTo>(*entity);
             } else {
+                *first_out_of_range = false;
                 buffer.remove_component::<MoveTo>(*entity);
             }
         }
         None => buffer.remove_component::<MoveTo>(*entity),
+    }
+
+    if pop_front {
+        commands.0.pop_front();
     }
 }
 

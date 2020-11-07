@@ -11,7 +11,10 @@ pub fn control_camera(
     let speed = 0.5;
 
     let edge_thickness = 50.0;
-    let &ScreenDimensions { width: screen_width, height: screen_height } = screen_dimensions;
+    let &ScreenDimensions {
+        width: screen_width,
+        height: screen_height,
+    } = screen_dimensions;
     let screen_width = screen_width as f32;
     let screen_height = screen_height as f32;
     let mouse_x = mouse_state.position.x;
@@ -164,6 +167,7 @@ fn issue_command(
         Some(entity) => Command::Attack {
             target: *entity,
             explicit: true,
+            first_out_of_range: true,
         },
         None => match rts_controls.mode {
             CommandMode::Normal => Command::MoveTo(position),

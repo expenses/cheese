@@ -36,6 +36,11 @@ pub enum Command {
         // Was the unit explicitly commanded to attack, or was this caused by attack moving or agro?
         // todo: attack moves need to give up when an enemy goes out of range.
         explicit: bool,
+        // Is the unit out of range for the first time? If so, go within range no matter what.
+        // If it's not an explicit attack and we're not out of range for the first time, then it's
+        // better to just switch targets than to chase. We set this to true initially and just 'and'
+        // it with whether the unit is out of range.
+        first_out_of_range: bool,
     },
     AttackMove(Vec2),
 }

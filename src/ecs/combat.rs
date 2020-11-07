@@ -101,6 +101,7 @@ pub fn handle_damaged(
         commands.0.push_front(Command::Attack {
             target: damaged.0,
             explicit: false,
+            first_out_of_range: true,
         });
     }
 
@@ -135,6 +136,7 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
             commands.0.push_front(Command::Attack {
                 target: *target,
                 explicit: false,
+                first_out_of_range: true,
             })
         }
     }

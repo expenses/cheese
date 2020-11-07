@@ -2,7 +2,10 @@ use crate::assets::{load_texture, Model};
 use crate::resources::ScreenDimensions;
 use ultraviolet::{Mat4, Vec2, Vec3};
 use wgpu::util::DeviceExt;
-use winit::{event_loop::EventLoop, window::{Window, WindowBuilder, Fullscreen}};
+use winit::{
+    event_loop::EventLoop,
+    window::{Fullscreen, Window, WindowBuilder},
+};
 
 mod lines;
 mod torus;
@@ -49,7 +52,9 @@ impl Renderer {
         event_loop: &EventLoop<()>,
     ) -> anyhow::Result<(Self, InstanceBuffers, ScreenDimensions)> {
         let monitor = event_loop.primary_monitor();
-        let window = WindowBuilder::new().with_fullscreen(Some(Fullscreen::Borderless(monitor))).build(event_loop)?;
+        let window = WindowBuilder::new()
+            .with_fullscreen(Some(Fullscreen::Borderless(monitor)))
+            .build(event_loop)?;
 
         let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
         let surface = unsafe { instance.create_surface(&window) };

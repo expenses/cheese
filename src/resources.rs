@@ -109,17 +109,17 @@ impl MouseButtonState {
         match *self {
             Self::Clicked => *self = Self::Up,
             Self::Down(ref mut frames, start) => {
-                let drag = *frames > 2 && (*frames > 10
-                    || (mouse.x - start.x).abs() > 10.0
-                    || (mouse.y - start.y).abs() > 10.0);
+                let drag = *frames > 2
+                    && (*frames > 10
+                        || (mouse.x - start.x).abs() > 10.0
+                        || (mouse.y - start.y).abs() > 10.0);
 
                 if drag {
                     *self = Self::Dragging(start)
                 } else {
                     *frames += 1;
                 }
-
-            },
+            }
             Self::Dragged(_) => *self = Self::Up,
             Self::Up | Self::Dragging(_) => {}
         }

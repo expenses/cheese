@@ -191,6 +191,7 @@ pub fn render_command_paths(
             Command::Attack {
                 target,
                 explicit: true,
+                ..
             } => {
                 let position = <&Position>::query()
                     .get(world, *target)
