@@ -613,7 +613,7 @@ fn create_render_pipeline(
 			entry_point: "main",
 		}),
 		rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-			//cull_mode: wgpu::CullMode::Back,
+			cull_mode: wgpu::CullMode::Back,
 			..Default::default()
 		}),
 		primitive_topology: primitives,
