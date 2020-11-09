@@ -213,7 +213,7 @@ impl BasicVertexConstructor<Vertex> for Constructor {
 
 pub struct LineBuffers {
     vertices: DynamicBuffer<Vertex>,
-    indices: DynamicBuffer<u16>,
+    indices: DynamicBuffer<u32>,
     lyon_buffers: VertexBuffers<Vertex, u16>,
 }
 
@@ -279,7 +279,7 @@ impl LineBuffers {
         }
 
         for index in self.lyon_buffers.indices.drain(..) {
-            self.indices.push(index);
+            self.indices.push(index as u32);
         }
 
         self.vertices.upload(context);

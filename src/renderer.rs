@@ -364,3 +364,17 @@ impl TextBuffer {
         );
     }
 }
+
+use crate::assets::Model;
+
+pub fn draw_model<'a>(
+    render_pass: &mut wgpu::RenderPass<'a>,
+    model: &'a Model,
+    instances: wgpu::BufferSlice<'a>,
+    num_instances: u32,
+) {
+    render_pass.set_vertex_buffer(0, model.vertices.slice(..));
+    render_pass.set_vertex_buffer(1, instances);
+    render_pass.set_index_buffer(model.indices.slice(..));
+    render_pass.draw_indexed(0..model.num_indices, 0, 0..num_instances);
+}

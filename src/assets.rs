@@ -38,28 +38,28 @@ impl Assets {
             });
 
         let assets = Self {
-            surface_model: Model::load(
-                include_bytes!("../models/surface.obj"),
+            surface_model: Model::load_gltf(
+                include_bytes!("../models/surface.gltf"),
                 "Cheese surface model",
                 device,
             )?,
-            bullet_model: Model::load(
-                include_bytes!("../models/bullet.obj"),
+            bullet_model: Model::load_gltf(
+                include_bytes!("../models/bullet.gltf"),
                 "Cheese bullet model",
                 device,
             )?,
-            mouse_model: Model::load(
-                include_bytes!("../models/mouse.obj"),
+            mouse_model: Model::load_gltf(
+                include_bytes!("../models/mouse.gltf"),
                 "Cheese mouse model",
                 device,
             )?,
-            mouse_helmet_model: Model::load(
-                include_bytes!("../models/mouse_helmet.obj"),
+            mouse_helmet_model: Model::load_gltf(
+                include_bytes!("../models/mouse_helmet.gltf"),
                 "Cheese mouse helmet model",
                 device,
             )?,
-            torus_model: Model::load(
-                include_bytes!("../models/torus.obj"),
+            torus_model: Model::load_gltf(
+                include_bytes!("../models/torus.gltf"),
                 "Cheese torus model",
                 device,
             )?,
@@ -101,83 +101,42 @@ impl Assets {
 }
 
 pub struct Model {
-    pub buffer: wgpu::Buffer,
-    pub num_vertices: u32,
-    pub indices: Option<Indices>,
-}
-
-pub struct Indices {
-    pub buffer: wgpu::Buffer,
+    pub vertices: wgpu::Buffer,
+    pub indices: wgpu::Buffer,
     pub num_indices: u32,
 }
 
 impl Model {
-    pub fn from_vertices(vertices: Vec<Vertex>, indices: Option<Vec<u32>>, label: &str, device: &wgpu::Device) -> Self {
-        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(label),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsage::VERTEX,
-        });
-
+    pub fn from_vertices(
+        vertices: Vec<Vertex>,
+        indices: Vec<u32>,
+        label: &str,
+        device: &wgpu::Device,
+    ) -> Self {
         Self {
-            buffer,
-            num_vertices: vertices.len() as u32,
-            indices: indices.map(|indices| {
-                let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
-                    contents: bytemuck::cast_slice(&indices),
-                    usage: wgpu::BufferUsage::INDEX,
-                });
-                Indices {
-                    buffer,
-                    num_indices: indices.len() as u32,
-                }
-            })
+            vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(label),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsage::VERTEX,
+            }),
+            indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::cast_slice(&indices),
+                usage: wgpu::BufferUsage::INDEX,
+            }),
+            num_indices: indices.len() as u32,
         }
     }
 
-    pub fn load(obj_bytes: &[u8], label: &str, device: &wgpu::Device) -> anyhow::Result<Self> {
-        let mut reader = std::io::BufReader::new(obj_bytes);
-        let obj::ObjData {
-            texture,
-            normal,
-            position,
-            objects,
-            ..
-        } = obj::ObjData::load_buf(&mut reader)?;
-
-        let mut vertices: Vec<_> = objects
-            .into_iter()
-            .flat_map(|object| object.groups)
-            .flat_map(|group| group.polys)
-            .flat_map(|polygon| polygon.0)
-            .map(
-                |obj::IndexTuple(position_index, texture_index, normal_index)| {
-                    let texture_index = texture_index.unwrap();
-                    let normal_index = normal_index.unwrap();
-
-                    Vertex {
-                        position: position[position_index].into(),
-                        normal: normal[normal_index].into(),
-                        uv: texture[texture_index].into(),
-                    }
-                },
-            )
-            .collect();
-
-        // We need to flip uvs because of the way textures work or something..
-        // Only on OBJs though, not gltf ;^)
-        vertices.iter_mut().for_each(|vertex| vertex.uv.y = 1.0 - vertex.uv.y);
-
-        Ok(Self::from_vertices(vertices, None, label, device))
-    }
-
-    pub fn load_gltf(gltf_bytes: &[u8], label: &str, device: &wgpu::Device) -> anyhow::Result<Self> {
+    pub fn load_gltf(
+        gltf_bytes: &[u8],
+        label: &str,
+        device: &wgpu::Device,
+    ) -> anyhow::Result<Self> {
         const OCTET_STREAM_URI: &str = "data:application/octet-stream;base64,";
-        
+
         let gltf = gltf::Gltf::from_slice(gltf_bytes)?;
 
-        
         // Load the buffers into a vector of byte vectors.
         // I mostly copied what bevy does for this because it's a little confusing at first.
         // https://github.com/bevyengine/bevy/blob/master/crates/bevy_gltf/src/loader.rs
@@ -189,7 +148,9 @@ impl Model {
                     if uri.starts_with(OCTET_STREAM_URI) {
                         buffer_data.push(base64::decode(&uri[OCTET_STREAM_URI.len()..])?);
                     } else {
-                        return Err(anyhow::anyhow!("Only octet streams are supported with data:"))
+                        return Err(anyhow::anyhow!(
+                            "Only octet streams are supported with data:"
+                        ));
                     }
                 }
                 gltf::buffer::Source::Bin => {
@@ -203,31 +164,44 @@ impl Model {
         }
 
         let mut vertices = Vec::new();
-        let mut indices = None;
+        let mut indices = Vec::new();
 
         for mesh in gltf.meshes() {
             for primitive in mesh.primitives() {
                 if primitive.mode() != gltf::mesh::Mode::Triangles {
-                    return Err(anyhow::anyhow!("Primitives with {:?} are not allowed. Triangles only.", primitive.mode()));
+                    return Err(anyhow::anyhow!(
+                        "Primitives with {:?} are not allowed. Triangles only.",
+                        primitive.mode()
+                    ));
                 }
-                
+
                 let reader = primitive.reader(|buffer| Some(&buffer_data[buffer.index()]));
-                
+
                 let positions = reader.read_positions().unwrap();
                 let tex_coordinates = reader.read_tex_coords(0).unwrap().into_f32();
                 let normals = reader.read_normals().unwrap();
 
-                positions.zip(tex_coordinates).zip(normals).for_each(|((p, uv), n)| {
-                    vertices.push(Vertex {
-                        position: p.into(),
-                        normal: n.into(),
-                        uv: uv.into()
+                positions
+                    .zip(tex_coordinates)
+                    .zip(normals)
+                    .for_each(|((p, uv), n)| {
+                        vertices.push(Vertex {
+                            position: p.into(),
+                            normal: n.into(),
+                            uv: uv.into(),
+                        });
                     });
-                });
 
-                indices = reader.read_indices().map(|indices| indices.into_u32().collect());
+                indices.extend(reader.read_indices().unwrap().into_u32());
             }
         }
+
+        log::debug!(
+            "Gltf model {} loaded. Vertices: {}. Indices: {}",
+            label,
+            vertices.len(),
+            indices.len(),
+        );
 
         Ok(Self::from_vertices(vertices, indices, label, device))
     }

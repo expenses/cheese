@@ -1,4 +1,4 @@
-use super::{DynamicBuffer, RenderContext, Vertex, DEPTH_FORMAT, DISPLAY_FORMAT};
+use super::{DynamicBuffer, RenderContext, Vertex, DEPTH_FORMAT, DISPLAY_FORMAT, draw_model};
 use crate::assets::{Assets, Model};
 use std::sync::Arc;
 use ultraviolet::{Mat4, Vec4};
@@ -89,15 +89,7 @@ impl ModelPipelines {
         render_pass.set_pipeline(&self.model_pipeline);
         render_pass.set_bind_group(0, &self.main_bind_group, &[]);
         render_pass.set_bind_group(1, texture, &[]);
-        render_pass.set_vertex_buffer(0, model.buffer.slice(..));
-        render_pass.set_vertex_buffer(1, self.identity_instance_buffer.slice(..));
-        
-        if let Some(indices) = &model.indices {
-            render_pass.set_index_buffer(indices.buffer.slice(..));
-            render_pass.draw_indexed(0 .. indices.num_indices, 0, 0 .. 1);
-        } else {
-            render_pass.draw(0..model.num_vertices, 0..1);
-        }
+        draw_model(render_pass, model, self.identity_instance_buffer.slice(..), 1);
     }
 
     pub fn render_instanced<'a>(
@@ -111,9 +103,7 @@ impl ModelPipelines {
             render_pass.set_pipeline(&self.model_pipeline);
             render_pass.set_bind_group(0, &self.main_bind_group, &[]);
             render_pass.set_bind_group(1, texture, &[]);
-            render_pass.set_vertex_buffer(0, model.buffer.slice(..));
-            render_pass.set_vertex_buffer(1, slice);
-            render_pass.draw(0..model.num_vertices, 0..num);
+            draw_model(render_pass, model, slice, num);
         }
     }
 
@@ -126,9 +116,7 @@ impl ModelPipelines {
         if let Some((slice, num)) = instances.get() {
             render_pass.set_pipeline(&self.transparent_pipeline);
             render_pass.set_bind_group(0, &self.main_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, model.buffer.slice(..));
-            render_pass.set_vertex_buffer(1, slice);
-            render_pass.draw(0..model.num_vertices, 0..num);
+            draw_model(render_pass, model, slice, num);
         }
     }
 

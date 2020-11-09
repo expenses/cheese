@@ -1,4 +1,4 @@
-use super::{DynamicBuffer, RenderContext, Vertex, DEPTH_FORMAT, DISPLAY_FORMAT};
+use super::{DynamicBuffer, RenderContext, Vertex, DEPTH_FORMAT, DISPLAY_FORMAT, draw_model};
 use crate::assets::Model;
 use std::sync::Arc;
 use ultraviolet::Vec3;
@@ -93,9 +93,7 @@ impl TorusPipeline {
         if let Some((slice, num)) = torus_buffer.get() {
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_bind_group(0, &self.main_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, torus_model.buffer.slice(..));
-            render_pass.set_vertex_buffer(1, slice);
-            render_pass.draw(0..torus_model.num_vertices, 0..num);
+            draw_model(render_pass, torus_model, slice, num);
         }
     }
 }
