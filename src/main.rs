@@ -276,7 +276,7 @@ async fn run() -> anyhow::Result<()> {
                     });
 
                     // Render a bunch of models.
-                    model_pipelines.render_instanced(
+                    /*model_pipelines.render_instanced(
                         &mut render_pass,
                         &model_buffers.mice,
                         &assets.mouse_texture,
@@ -307,6 +307,11 @@ async fn run() -> anyhow::Result<()> {
                         &mut render_pass,
                         &model_buffers.mice,
                         &assets.mouse_helmet_model,
+                    );*/
+                    model_pipelines.render_single(
+                        &mut render_pass,
+                        &assets.character_texture,
+                        &assets.gltf_model,
                     );
 
                     // Render 2D items.

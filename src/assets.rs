@@ -1,5 +1,6 @@
 use crate::renderer::{Vertex, TEXTURE_FORMAT};
 use wgpu::util::DeviceExt;
+use ultraviolet::Mat4;
 
 pub struct Assets {
     pub surface_model: Model,
@@ -7,6 +8,7 @@ pub struct Assets {
     pub mouse_model: Model,
     pub mouse_helmet_model: Model,
     pub torus_model: Model,
+    pub gltf_model: Model,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
@@ -14,6 +16,7 @@ pub struct Assets {
     pub colours_texture: wgpu::BindGroup,
     pub hud_texture: wgpu::BindGroup,
     pub mouse_texture: wgpu::BindGroup,
+    pub character_texture: wgpu::BindGroup,
 }
 
 impl Assets {
@@ -63,6 +66,11 @@ impl Assets {
                 "Cheese torus model",
                 device,
             )?,
+            gltf_model: Model::load_gltf(
+                include_bytes!("../animation/character.gltf"),
+                "X",
+                device,
+            )?,
 
             surface_texture: load_texture(
                 include_bytes!("../textures/surface.png"),
@@ -92,6 +100,13 @@ impl Assets {
                 device,
                 &mut init_encoder,
             )?,
+            character_texture: load_texture(
+                include_bytes!("../animation/Character Texture.png"),
+                "Cheese mouse texture",
+                &texture_bind_group_layout,
+                device,
+                &mut init_encoder,
+            )?,
 
             texture_bind_group_layout,
         };
@@ -104,12 +119,20 @@ pub struct Model {
     pub vertices: wgpu::Buffer,
     pub indices: wgpu::Buffer,
     pub num_indices: u32,
+    pub animation_info: Option<AnimationInfo>,
+}
+
+pub struct AnimationInfo {
+    pub inverse_bind_matrices: wgpu::Buffer,
+    pub num_inverse_bind_matrices: u32,
+    pub joints: Vec<Mat4>,
 }
 
 impl Model {
     pub fn from_vertices(
         vertices: Vec<Vertex>,
         indices: Vec<u32>,
+        animation_info: Option<AnimationInfo>,
         label: &str,
         device: &wgpu::Device,
     ) -> Self {
@@ -125,6 +148,7 @@ impl Model {
                 usage: wgpu::BufferUsage::INDEX,
             }),
             num_indices: indices.len() as u32,
+            animation_info,
         }
     }
 
@@ -196,6 +220,29 @@ impl Model {
             }
         }
 
+        let mut animation_info = None;
+
+        debug_assert!(gltf.skins().len() == 0 || gltf.skins().len() == 1);
+
+        if let Some(skin) = gltf.skins().next() {
+            let reader = skin.reader(|buffer| Some(&buffer_data[buffer.index()]));
+            let inverse_bind_matrices: Vec<Mat4> = reader.read_inverse_bind_matrices().unwrap()
+                .map(|matrix| matrix.into())
+                .collect();
+
+            
+
+            animation_info = Some(AnimationInfo {
+                inverse_bind_matrices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: bytemuck::cast_slice(&inverse_bind_matrices),
+                    usage: wgpu::BufferUsage::STORAGE,
+                }),
+                num_inverse_bind_matrices: inverse_bind_matrices.len() as u32,
+                joints: skin.joints().map(|node| node.transform().matrix().into()).collect(),
+            });
+        }
+
         log::debug!(
             "Gltf model {} loaded. Vertices: {}. Indices: {}",
             label,
@@ -203,7 +250,7 @@ impl Model {
             indices.len(),
         );
 
-        Ok(Self::from_vertices(vertices, indices, label, device))
+        Ok(Self::from_vertices(vertices, indices, animation_info, label, device))
     }
 }
 
