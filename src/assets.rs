@@ -1,5 +1,4 @@
 use crate::renderer::{Vertex, TEXTURE_FORMAT};
-use ultraviolet::Vec2;
 use wgpu::util::DeviceExt;
 
 pub struct Assets {
@@ -107,6 +106,22 @@ pub struct Model {
 }
 
 impl Model {
+    pub fn from_vertices(mut vertices: Vec<Vertex>, label: &str, device: &wgpu::Device) -> Self {
+        // We need to flip uvs because of the way textures work or something..
+        vertices.iter_mut().for_each(|vertex| vertex.uv.y = 1.0 - vertex.uv.y);
+
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(label),
+            contents: bytemuck::cast_slice(&vertices),
+            usage: wgpu::BufferUsage::VERTEX,
+        });
+
+        Self {
+            buffer,
+            num_vertices: vertices.len() as u32,
+        }
+    }
+
     pub fn load(obj_bytes: &[u8], label: &str, device: &wgpu::Device) -> anyhow::Result<Self> {
         let mut reader = std::io::BufReader::new(obj_bytes);
         let obj::ObjData {
@@ -127,29 +142,16 @@ impl Model {
                     let texture_index = texture_index.unwrap();
                     let normal_index = normal_index.unwrap();
 
-                    // We need to flip uvs because of the way textures work or something..
-                    let mut uv: Vec2 = texture[texture_index].into();
-                    uv.y = 1.0 - uv.y;
-
                     Vertex {
                         position: position[position_index].into(),
                         normal: normal[normal_index].into(),
-                        uv,
+                        uv: texture[texture_index].into(),
                     }
                 },
             )
             .collect();
 
-        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(label),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsage::VERTEX,
-        });
-
-        Ok(Self {
-            buffer,
-            num_vertices: vertices.len() as u32,
-        })
+        Ok(Self::from_vertices(vertices, label, device))
     }
 }
 
