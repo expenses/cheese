@@ -69,11 +69,17 @@ impl Camera {
             &ncollide3d::math::Point::new(0.0, 0.0, 0.0),
             &ncollide3d::math::Vector::new(0.0, 1.0, 0.0),
             &ray,
-        )
-        .unwrap();
+        );
 
-        let contact = self.position + direction * toi;
-        Vec2::new(contact.x, contact.z)
+        match toi {
+            Some(toi) => {
+                let contact = self.position + direction * toi;
+                Vec2::new(contact.x, contact.z)
+            }
+            // The above ray cast can fail in odd cases such as where the window is minimized,
+            // So let's just return the point the camera is centered on.
+            None => Vec2::new(self.looking_at.x, self.looking_at.z),
+        }
     }
 }
 

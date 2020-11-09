@@ -9,10 +9,15 @@ const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
 const GREEN: Vec3 = Vec3::new(43.0, 140.0, 0.0);
 const PURPLE: Vec3 = Vec3::new(196.0, 0.0, 109.0);
 
+fn mix(colour_a: Vec3, colour_b: Vec3, factor: f32) -> Vec3 {
+    colour_a * (1.0 - factor) + colour_b * factor
+}
+
 #[legion::system(for_each)]
 #[filter(component::<Unit>())]
 pub fn render_units(
     position: &Position,
+    side: &Side,
     facing: &Facing,
     #[resource] model_buffers: &mut ModelBuffers,
 ) {
@@ -20,7 +25,15 @@ pub fn render_units(
     let rotation = Mat4::from_rotation_y(facing.0);
     model_buffers.mice.push(ModelInstance {
         transform: translation * rotation,
-        uv_x_offset: 0.0,
+        flat_colour: {
+            let colour = match side {
+                Side::Green => GREEN,
+                Side::Purple => PURPLE,
+            } / COLOUR_MAX;
+            let colour = mix(colour, Vec3::new(1.0, 1.0, 1.0), 0.25);
+
+            Vec4::new(colour.x, colour.y, colour.z, 0.2)
+        },
     });
 }
 
@@ -252,7 +265,7 @@ pub fn render_bullets(
 
     model_buffers.bullets.push(ModelInstance {
         transform: translation * rotation,
-        uv_x_offset: 0.0,
+        flat_colour: Vec4::one(),
     });
 }
 

@@ -1,7 +1,9 @@
 #version 450
 
+layout(location = 1) in vec4 flat_colour;
+
 layout(location = 0) out vec4 colour;
 
 void main() {
-    colour = vec4(1.0, 1.0, 1.0, 0.25);
+    colour = flat_colour;
 }

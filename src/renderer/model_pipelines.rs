@@ -1,7 +1,7 @@
 use super::{DynamicBuffer, RenderContext, Vertex, DEPTH_FORMAT, DISPLAY_FORMAT};
 use crate::assets::{Assets, Model};
 use std::sync::Arc;
-use ultraviolet::Mat4;
+use ultraviolet::{Mat4, Vec4};
 use wgpu::util::DeviceExt;
 
 pub struct ModelPipelines {
@@ -14,8 +14,6 @@ pub struct ModelPipelines {
 
 impl ModelPipelines {
     pub fn new(context: &RenderContext, assets: &Assets) -> Self {
-        // Create the shaders and pipeline
-
         let vs = wgpu::include_spirv!("../../shaders/shader.vert.spv");
         let vs_module = context.device.create_shader_module(vs);
 
@@ -68,7 +66,7 @@ impl ModelPipelines {
                     label: None,
                     contents: bytemuck::bytes_of(&ModelInstance {
                         transform: Mat4::identity(),
-                        uv_x_offset: 0.0,
+                        flat_colour: Vec4::one(),
                     }),
                     usage: wgpu::BufferUsage::VERTEX,
                 });
@@ -143,97 +141,6 @@ impl ModelPipelines {
             render_pass.draw(0..num, 0..1);
         }
     }
-
-    /*pub fn render(
-        &self, view: Mat4, instance_buffers: &mut InstanceBuffers, assets: &Assets, context: &RenderContext, render_pass: &mut wgpu::RenderPass,
-    ) {
-        instance_buffers.mice.upload(&context.device, &context.queue);
-        instance_buffers
-            .command_paths
-            .upload(&context.device, &context.queue);
-        instance_buffers.bullets.upload(&context.device, &context.queue);
-
-
-        render_pass.set_pipeline(&self.model_pipeline);
-        render_pass.set_bind_group(0, &self.main_bind_group, &[]);
-
-        // Draw bullets
-        render_instanced(
-            &mut render_pass, &instance_buffers.bullets,
-            &assets.colours_texture, &assets.bullet_model,
-        );
-
-        // Draw mice
-        render_instanced(
-            &mut render_pass, &instance_buffers.mice,
-            &assets.mouse_texture, &assets.mouse_model,
-        );
-
-        // Draw surface
-        render_pass.set_bind_group(1, &assets.surface_texture, &[]);
-        render_pass.set_vertex_buffer(0, assets.surface_model.buffer.slice(..));
-        render_pass.set_vertex_buffer(1, self.identity_instance_buffer.slice(..));
-        render_pass.draw(0..assets.surface_model.num_vertices, 0..1);
-
-        // Draw Command paths
-        if let Some((slice, num)) = instance_buffers.command_paths.get() {
-            render_pass.set_pipeline(&self.line_pipeline);
-            render_pass.set_bind_group(1, &assets.colours_texture, &[]);
-            render_pass.set_vertex_buffer(0, slice);
-            render_pass.set_vertex_buffer(1, self.identity_instance_buffer.slice(..));
-            render_pass.draw(0..num, 0..1);
-        }
-
-        // Draw tori
-        /*self.torus_renderer.render(
-            &mut render_pass,
-            &mut instance_buffers.toruses,
-            &self.main_bind_group,
-            &self.device,
-            &self.queue,
-        );*/
-
-        // Draw helmets
-        render_pass.set_pipeline(&self.transparent_pipeline);
-        render_instanced(
-            &mut render_pass, &instance_buffers.mice,
-            &assets.mouse_texture, &assets.mouse_helmet_model
-        );
-
-        /*// Draw UI
-
-        self.line_renderer.render(
-            &mut render_pass,
-            &mut instance_buffers.line_buffers,
-            &self.device,
-            &self.queue,
-            assets,
-        );*/
-
-            /*
-            let size = self.window.inner_size();
-            let mut staging_belt = wgpu::util::StagingBelt::new(10);
-
-            instance_buffers
-                .glyph_brush
-                .draw_queued(
-                    &self.device,
-                    &mut staging_belt,
-                    &mut encoder,
-                    &frame.output.view,
-                    size.width,
-                    size.height,
-                )
-                .unwrap();
-
-            staging_belt.finish();
-
-            self.queue.submit(Some(encoder.finish()));
-
-            // Do I need to do this?
-            // staging_belt.recall();
-            */
-    }*/
 }
 
 fn create_render_pipeline(
@@ -309,7 +216,7 @@ fn create_render_pipeline(
 				wgpu::VertexBufferDescriptor {
 					stride: std::mem::size_of::<ModelInstance>() as u64,
 					step_mode: wgpu::InputStepMode::Instance,
-					attributes: &wgpu::vertex_attr_array![3 => Float, 4 => Float4, 5 => Float4, 6 => Float4, 7 => Float4],
+					attributes: &wgpu::vertex_attr_array![3 => Float4, 4 => Float4, 5 => Float4, 6 => Float4, 7 => Float4],
 				},
 			],
 		},
@@ -359,6 +266,6 @@ impl ModelBuffers {
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy, Debug)]
 pub struct ModelInstance {
-    pub uv_x_offset: f32,
+    pub flat_colour: Vec4,
     pub transform: Mat4,
 }

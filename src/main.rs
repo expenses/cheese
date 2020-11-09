@@ -81,7 +81,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(MouseState::new(&render_context.screen_dimensions()));
     resources.insert(RtsControls::default());
     resources.insert(RayCastLocation::default());
-    resources.insert(PlayerSide(ecs::Side::Purple));
+    resources.insert(PlayerSide(ecs::Side::Green));
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
