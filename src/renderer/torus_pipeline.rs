@@ -59,7 +59,7 @@ impl TorusPipeline {
                 stencil: wgpu::StencilStateDescriptor::default(),
             }),
             vertex_state: wgpu::VertexStateDescriptor {
-                index_format: wgpu::IndexFormat::Uint16,
+                index_format: wgpu::IndexFormat::Uint32,
                 vertex_buffers: &[
                     wgpu::VertexBufferDescriptor {
                         stride: std::mem::size_of::<Vertex>() as u64,

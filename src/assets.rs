@@ -103,13 +103,16 @@ impl Assets {
 pub struct Model {
     pub buffer: wgpu::Buffer,
     pub num_vertices: u32,
+    pub indices: Option<Indices>,
+}
+
+pub struct Indices {
+    pub buffer: wgpu::Buffer,
+    pub num_indices: u32,
 }
 
 impl Model {
-    pub fn from_vertices(mut vertices: Vec<Vertex>, label: &str, device: &wgpu::Device) -> Self {
-        // We need to flip uvs because of the way textures work or something..
-        vertices.iter_mut().for_each(|vertex| vertex.uv.y = 1.0 - vertex.uv.y);
-
+    pub fn from_vertices(vertices: Vec<Vertex>, indices: Option<Vec<u32>>, label: &str, device: &wgpu::Device) -> Self {
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(label),
             contents: bytemuck::cast_slice(&vertices),
@@ -119,6 +122,17 @@ impl Model {
         Self {
             buffer,
             num_vertices: vertices.len() as u32,
+            indices: indices.map(|indices| {
+                let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: bytemuck::cast_slice(&indices),
+                    usage: wgpu::BufferUsage::INDEX,
+                });
+                Indices {
+                    buffer,
+                    num_indices: indices.len() as u32,
+                }
+            })
         }
     }
 
@@ -132,7 +146,7 @@ impl Model {
             ..
         } = obj::ObjData::load_buf(&mut reader)?;
 
-        let vertices: Vec<_> = objects
+        let mut vertices: Vec<_> = objects
             .into_iter()
             .flat_map(|object| object.groups)
             .flat_map(|group| group.polys)
@@ -151,7 +165,71 @@ impl Model {
             )
             .collect();
 
-        Ok(Self::from_vertices(vertices, label, device))
+        // We need to flip uvs because of the way textures work or something..
+        // Only on OBJs though, not gltf ;^)
+        vertices.iter_mut().for_each(|vertex| vertex.uv.y = 1.0 - vertex.uv.y);
+
+        Ok(Self::from_vertices(vertices, None, label, device))
+    }
+
+    pub fn load_gltf(gltf_bytes: &[u8], label: &str, device: &wgpu::Device) -> anyhow::Result<Self> {
+        const OCTET_STREAM_URI: &str = "data:application/octet-stream;base64,";
+        
+        let gltf = gltf::Gltf::from_slice(gltf_bytes)?;
+
+        
+        // Load the buffers into a vector of byte vectors.
+        // I mostly copied what bevy does for this because it's a little confusing at first.
+        // https://github.com/bevyengine/bevy/blob/master/crates/bevy_gltf/src/loader.rs
+
+        let mut buffer_data = Vec::new();
+        for buffer in gltf.buffers() {
+            match buffer.source() {
+                gltf::buffer::Source::Uri(uri) => {
+                    if uri.starts_with(OCTET_STREAM_URI) {
+                        buffer_data.push(base64::decode(&uri[OCTET_STREAM_URI.len()..])?);
+                    } else {
+                        return Err(anyhow::anyhow!("Only octet streams are supported with data:"))
+                    }
+                }
+                gltf::buffer::Source::Bin => {
+                    if let Some(blob) = gltf.blob.as_deref() {
+                        buffer_data.push(blob.into());
+                    } else {
+                        return Err(anyhow::anyhow!("Missing blob"));
+                    }
+                }
+            }
+        }
+
+        let mut vertices = Vec::new();
+        let mut indices = None;
+
+        for mesh in gltf.meshes() {
+            for primitive in mesh.primitives() {
+                if primitive.mode() != gltf::mesh::Mode::Triangles {
+                    return Err(anyhow::anyhow!("Primitives with {:?} are not allowed. Triangles only.", primitive.mode()));
+                }
+                
+                let reader = primitive.reader(|buffer| Some(&buffer_data[buffer.index()]));
+                
+                let positions = reader.read_positions().unwrap();
+                let tex_coordinates = reader.read_tex_coords(0).unwrap().into_f32();
+                let normals = reader.read_normals().unwrap();
+
+                positions.zip(tex_coordinates).zip(normals).for_each(|((p, uv), n)| {
+                    vertices.push(Vertex {
+                        position: p.into(),
+                        normal: n.into(),
+                        uv: uv.into()
+                    });
+                });
+
+                indices = reader.read_indices().map(|indices| indices.into_u32().collect());
+            }
+        }
+
+        Ok(Self::from_vertices(vertices, indices, label, device))
     }
 }
 

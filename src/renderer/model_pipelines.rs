@@ -91,7 +91,13 @@ impl ModelPipelines {
         render_pass.set_bind_group(1, texture, &[]);
         render_pass.set_vertex_buffer(0, model.buffer.slice(..));
         render_pass.set_vertex_buffer(1, self.identity_instance_buffer.slice(..));
-        render_pass.draw(0..model.num_vertices, 0..1);
+        
+        if let Some(indices) = &model.indices {
+            render_pass.set_index_buffer(indices.buffer.slice(..));
+            render_pass.draw_indexed(0 .. indices.num_indices, 0, 0 .. 1);
+        } else {
+            render_pass.draw(0..model.num_vertices, 0..1);
+        }
     }
 
     pub fn render_instanced<'a>(
@@ -206,7 +212,7 @@ fn create_render_pipeline(
 			stencil: wgpu::StencilStateDescriptor::default(),
 		}),
 		vertex_state: wgpu::VertexStateDescriptor {
-			index_format: wgpu::IndexFormat::Uint16,
+			index_format: wgpu::IndexFormat::Uint32,
 			vertex_buffers: &[
 				wgpu::VertexBufferDescriptor {
 					stride: std::mem::size_of::<Vertex>() as u64,
