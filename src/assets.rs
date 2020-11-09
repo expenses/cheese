@@ -39,32 +39,56 @@ impl Assets {
             });
 
         let assets = Self {
-            surface_model: Model::load(include_bytes!("../models/surface.obj"), device)?,
-            bullet_model: Model::load(include_bytes!("../models/bullet.obj"), device)?,
-            mouse_model: Model::load(include_bytes!("../models/mouse.obj"), device)?,
-            mouse_helmet_model: Model::load(include_bytes!("../models/mouse_helmet.obj"), device)?,
-            torus_model: Model::load(include_bytes!("../models/torus.obj"), device)?,
+            surface_model: Model::load(
+                include_bytes!("../models/surface.obj"),
+                "Cheese surface model",
+                device,
+            )?,
+            bullet_model: Model::load(
+                include_bytes!("../models/bullet.obj"),
+                "Cheese bullet model",
+                device,
+            )?,
+            mouse_model: Model::load(
+                include_bytes!("../models/mouse.obj"),
+                "Cheese mouse model",
+                device,
+            )?,
+            mouse_helmet_model: Model::load(
+                include_bytes!("../models/mouse_helmet.obj"),
+                "Cheese mouse helmet model",
+                device,
+            )?,
+            torus_model: Model::load(
+                include_bytes!("../models/torus.obj"),
+                "Cheese torus model",
+                device,
+            )?,
 
             surface_texture: load_texture(
                 include_bytes!("../textures/surface.png"),
+                "Cheese surface texture",
                 &texture_bind_group_layout,
                 device,
                 &mut init_encoder,
             )?,
             colours_texture: load_texture(
                 include_bytes!("../textures/colours.png"),
+                "Cheese colours texture",
                 &texture_bind_group_layout,
                 device,
                 &mut init_encoder,
             )?,
             hud_texture: load_texture(
                 include_bytes!("../textures/hud.png"),
+                "Cheese hud texture",
                 &texture_bind_group_layout,
                 device,
                 &mut init_encoder,
             )?,
             mouse_texture: load_texture(
                 include_bytes!("../textures/mouse.png"),
+                "Cheese mouse texture",
                 &texture_bind_group_layout,
                 device,
                 &mut init_encoder,
@@ -83,7 +107,7 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn load(obj_bytes: &[u8], device: &wgpu::Device) -> anyhow::Result<Self> {
+    pub fn load(obj_bytes: &[u8], label: &str, device: &wgpu::Device) -> anyhow::Result<Self> {
         let mut reader = std::io::BufReader::new(obj_bytes);
         let obj::ObjData {
             texture,
@@ -117,7 +141,7 @@ impl Model {
             .collect();
 
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
+            label: Some(label),
             contents: bytemuck::cast_slice(&vertices),
             usage: wgpu::BufferUsage::VERTEX,
         });
@@ -131,6 +155,7 @@ impl Model {
 
 fn load_texture(
     bytes: &[u8],
+    label: &str,
     bind_group_layout: &wgpu::BindGroupLayout,
     device: &wgpu::Device,
     encoder: &mut wgpu::CommandEncoder,
@@ -138,7 +163,7 @@ fn load_texture(
     let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png)?.into_rgba();
 
     let temp_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Cheese load_texture buffer"),
+        label: Some("Cheese texture staging buffer"),
         contents: &*image,
         usage: wgpu::BufferUsage::COPY_SRC,
     });
@@ -156,7 +181,7 @@ fn load_texture(
         dimension: wgpu::TextureDimension::D2,
         format: TEXTURE_FORMAT,
         usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
-        label: Some("Cheese texture"),
+        label: Some(label),
     });
 
     encoder.copy_buffer_to_texture(
@@ -179,7 +204,7 @@ fn load_texture(
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
     Ok(device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: None,
+        label: Some("Cheese texture bind group"),
         layout: bind_group_layout,
         entries: &[wgpu::BindGroupEntry {
             binding: 0,

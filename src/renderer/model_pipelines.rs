@@ -63,7 +63,7 @@ impl ModelPipelines {
             context
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
+                    label: Some("Cheese identity instance buffer"),
                     contents: bytemuck::bytes_of(&ModelInstance {
                         transform: Mat4::identity(),
                         flat_colour: Vec4::one(),
