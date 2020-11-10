@@ -308,7 +308,7 @@ async fn run() -> anyhow::Result<()> {
                         &model_buffers.mice,
                         &assets.mouse_helmet_model,
                     );*/
-                    model_pipelines.render_single(
+                    model_pipelines.render_animated(
                         &mut render_pass,
                         &assets.character_texture,
                         &assets.gltf_model,

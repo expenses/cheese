@@ -1,6 +1,6 @@
 use crate::resources::ScreenDimensions;
 use std::sync::Arc;
-use ultraviolet::{Mat4, Vec2, Vec3};
+use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 use winit::{
     event_loop::EventLoop,
@@ -328,14 +328,6 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
     }
 }
 
-#[repr(C)]
-#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
-pub struct Vertex {
-    pub position: Vec3,
-    pub normal: Vec3,
-    pub uv: Vec2,
-}
-
 pub struct TextBuffer {
     pub glyph_brush: wgpu_glyph::GlyphBrush<(), wgpu_glyph::ab_glyph::FontRef<'static>>,
 }
@@ -377,4 +369,22 @@ pub fn draw_model<'a>(
     render_pass.set_vertex_buffer(1, instances);
     render_pass.set_index_buffer(model.indices.slice(..));
     render_pass.draw_indexed(0..model.num_indices, 0, 0..num_instances);
+}
+
+#[repr(C)]
+#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
+pub struct Vertex {
+    pub position: Vec3,
+    pub normal: Vec3,
+    pub uv: Vec2,
+}
+
+#[repr(C)]
+#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
+pub struct AnimatedVertex {
+    pub position: Vec3,
+    pub normal: Vec3,
+    pub uv: Vec2,
+    pub joints: [u32; 4],
+    pub joint_weights: Vec4,
 }

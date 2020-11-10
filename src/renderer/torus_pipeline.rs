@@ -1,4 +1,4 @@
-use super::{DynamicBuffer, RenderContext, Vertex, DEPTH_FORMAT, DISPLAY_FORMAT, draw_model};
+use super::{draw_model, DynamicBuffer, RenderContext, Vertex, DEPTH_FORMAT, DISPLAY_FORMAT};
 use crate::assets::Model;
 use std::sync::Arc;
 use ultraviolet::Vec3;
