@@ -70,6 +70,7 @@ impl ModelPipelines {
             &[
                 &context.main_bind_group_layout,
                 &assets.texture_bind_group_layout,
+                &context.joint_bind_group_layout,
             ],
             &vs_animated_module,
             &fs_module,
@@ -102,10 +103,12 @@ impl ModelPipelines {
         render_pass: &mut wgpu::RenderPass<'a>,
         texture: &'a wgpu::BindGroup,
         model: &'a AnimatedModel,
+        joints: &'a wgpu::BindGroup,
     ) {
         render_pass.set_pipeline(&self.animated_pipeline);
         render_pass.set_bind_group(0, &self.main_bind_group, &[]);
         render_pass.set_bind_group(1, texture, &[]);
+        render_pass.set_bind_group(2, joints, &[]);
 
         render_pass.set_vertex_buffer(0, model.vertices.slice(..));
         render_pass.set_vertex_buffer(1, self.identity_instance_buffer.slice(..));
@@ -306,7 +309,7 @@ fn create_animated_pipeline(
 				wgpu::VertexBufferDescriptor {
 					stride: std::mem::size_of::<AnimatedVertex>() as u64,
 					step_mode: wgpu::InputStepMode::Vertex,
-					attributes: &wgpu::vertex_attr_array![0 => Float3, 1 => Float3, 2 => Float2, 3 => Uint4, 4 => Float4],
+					attributes: &wgpu::vertex_attr_array![0 => Float3, 1 => Float3, 2 => Float2, 3 => Float4, 4 => Float4],
 				},
 				wgpu::VertexBufferDescriptor {
 					stride: std::mem::size_of::<ModelInstance>() as u64,

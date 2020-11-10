@@ -3,7 +3,7 @@
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 uv;
-layout(location = 3) in uvec4 joints;
+layout(location = 3) in vec4 joint_indices;
 layout(location = 4) in vec4 joint_weights;
 
 layout(location = 5) in vec4 flat_colour;
@@ -20,10 +20,21 @@ layout(set = 0, binding = 1) uniform View {
     mat4 view;
 };
 
+layout(set = 2, binding = 0) readonly buffer Joints {
+	mat4 joints[];
+};
+
 void main() {
     out_uv = uv;
     out_flat_colour = flat_colour;
 
+    // Calculate skinned matrix from weights and joint indices of the current vertex
+	mat4 skin = 
+		joint_weights.x * joints[int(joint_indices.x)] +
+		joint_weights.y * joints[int(joint_indices.y)] +
+		joint_weights.z * joints[int(joint_indices.z)] +
+		joint_weights.w * joints[int(joint_indices.w)];
+
     mat4 modelview = view * transform;
-    gl_Position = perspective * modelview * vec4(position, 1.0);
+    gl_Position = perspective * modelview * skin * vec4(position, 1.0);
 }

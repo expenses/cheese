@@ -2,6 +2,7 @@ mod assets;
 mod ecs;
 mod renderer;
 mod resources;
+mod animation;
 
 use crate::assets::Assets;
 use crate::renderer::{
@@ -29,10 +30,10 @@ fn main() -> anyhow::Result<()> {
 
 fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
     builder
-        .add_system(ecs::cast_ray_system())
-        .add_system(ecs::stop_attacks_on_dead_entities_system())
-        .add_system(ecs::control_camera_system())
-        .add_system(ecs::handle_left_click_system())
+        //.add_system(ecs::cast_ray_system())
+        //.add_system(ecs::stop_attacks_on_dead_entities_system())
+        .add_system(ecs::control_camera_system());
+        /*.add_system(ecs::handle_left_click_system())
         .add_system(ecs::handle_right_click_system())
         .add_system(ecs::handle_stop_command_system())
         .add_system(ecs::handle_drag_selection_system())
@@ -47,7 +48,7 @@ fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(ecs::firing_system())
         .add_system(ecs::apply_bullets_system())
         .flush()
-        .add_system(ecs::handle_damaged_system());
+        .add_system(ecs::handle_damaged_system());*/
 }
 
 async fn run() -> anyhow::Result<()> {
@@ -56,7 +57,7 @@ async fn run() -> anyhow::Result<()> {
     let event_loop = EventLoop::new();
 
     let mut render_context = RenderContext::new(&event_loop).await?;
-    let (assets, command_buffer) = Assets::new(&render_context.device())?;
+    let (mut assets, command_buffer) = Assets::new(&render_context.device())?;
     render_context.submit(command_buffer);
     let model_pipelines = ModelPipelines::new(&render_context, &assets);
     let torus_pipeline = TorusPipeline::new(&render_context);
@@ -112,6 +113,7 @@ async fn run() -> anyhow::Result<()> {
     add_gameplay_systems(&mut builder);
 
     let mut schedule = builder
+        /*
         // Rendering
         .add_system(ecs::render_bullets_system())
         .add_system(ecs::render_units_system())
@@ -126,9 +128,12 @@ async fn run() -> anyhow::Result<()> {
         // Cleanup
         .flush()
         .add_system(ecs::update_mouse_buttons_system())
+        */
         .build();
 
     let mut time = std::time::Instant::now();
+
+    let mut T = 0.0;
 
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -206,7 +211,7 @@ async fn run() -> anyhow::Result<()> {
                 resources.insert(DeltaTime(elapsed));
                 resources.insert(CursorIcon(winit::window::CursorIcon::default()));
 
-                //schedule.execute(&mut world, &mut resources);
+                schedule.execute(&mut world, &mut resources);
 
                 let cursor_icon = resources.get::<CursorIcon>().unwrap();
                 render_context.set_cursor_icon(cursor_icon.0);
@@ -218,6 +223,31 @@ async fn run() -> anyhow::Result<()> {
                 let mut torus_buffer = resources.get_mut::<TorusBuffer>().unwrap();
                 let mut line_buffers = resources.get_mut::<LineBuffers>().unwrap();
                 let mut text_buffer = resources.get_mut::<TextBuffer>().unwrap();
+
+
+
+                let mut joints = &mut assets.gltf_model.joints;
+                assets.gltf_model.animations[0].interpolate(T, joints);
+                use wgpu::util::DeviceExt;
+                
+                let buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Cheese test joint buffer"),
+                    contents: bytemuck::cast_slice(&joints.as_vec(&assets.gltf_model.inverse_bind_matrices)),
+                    usage: wgpu::BufferUsage::STORAGE,
+                });
+
+                let joint_bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("Cheese test joint bind group"),
+                    layout: &render_context.joint_bind_group_layout,
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer(buffer.slice(..)),
+                    }],
+                });
+
+                T += 0.01;
+                T = T % 1.0_f32;
+
 
                 // Upload buffers to the gpu.
                 render_context.update_view(camera.to_matrix());
@@ -296,6 +326,7 @@ async fn run() -> anyhow::Result<()> {
                         &mut render_pass,
                         &assets.character_texture,
                         &assets.gltf_model,
+                        &joint_bind_group,
                     );
 
                     // Render 2D items.

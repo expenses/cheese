@@ -34,6 +34,8 @@ pub struct RenderContext {
     view_buffer: wgpu::Buffer,
     main_bind_group_layout: wgpu::BindGroupLayout,
     main_bind_group: Arc<wgpu::BindGroup>,
+
+    pub joint_bind_group_layout: wgpu::BindGroupLayout,
 }
 
 impl RenderContext {
@@ -160,6 +162,20 @@ impl RenderContext {
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
         let depth_texture = create_depth_texture(&device, window_size.width, window_size.height);
 
+        let joint_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Cheese joint bind group layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStage::VERTEX,
+                ty: wgpu::BindingType::StorageBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                    readonly: true,
+                },
+                count: None,
+            }]
+        });
+
         Ok(Self {
             swap_chain,
             window,
@@ -172,6 +188,7 @@ impl RenderContext {
             view_buffer,
             main_bind_group_layout,
             sampler,
+            joint_bind_group_layout,
             main_bind_group: Arc::new(main_bind_group),
         })
     }
@@ -383,6 +400,6 @@ pub struct AnimatedVertex {
     pub position: Vec3,
     pub normal: Vec3,
     pub uv: Vec2,
-    pub joints: [u32; 4],
+    pub joints: Vec4,
     pub joint_weights: Vec4,
 }

@@ -1,5 +1,5 @@
 use crate::renderer::{AnimatedVertex, Vertex, TEXTURE_FORMAT};
-use ultraviolet::Mat4;
+use ultraviolet::{Vec3, Vec4, Mat4};
 use wgpu::util::DeviceExt;
 
 pub struct Assets {
@@ -251,13 +251,88 @@ pub struct AnimatedModel {
     pub vertices: wgpu::Buffer,
     pub indices: wgpu::Buffer,
     pub num_indices: u32,
-    pub inverse_bind_matrices: wgpu::Buffer,
-    pub joints: Vec<Mat4>,
+    pub inverse_bind_matrices: Vec<Mat4>,
+    pub joints: crate::animation::JointTree,
+    pub animations: Vec<Animation>,
+}
+
+struct Joint {
+    transform: Mat4,
+
+}
+
+#[derive(Clone)]
+struct AnimationTransform {
+    translation: Vec3,
+    rotation: Vec4,
+    scale: Vec3,
+}
+
+impl AnimationTransform {
+    fn rotation_as_quat(&self) -> cgmath::Quaternion<f32> {
+        let rotation: [f32; 4] = self.rotation.into();
+        rotation.into()
+    }
+}
+
+fn cgmath_matrix4_to_mat4(matrix: cgmath::Matrix4<f32>) -> Mat4 {
+    let raw: [[f32; 4]; 4] = matrix.into();
+    raw.into()
+}
+
+pub struct Animation {
+    inputs: Vec<f32>,
+    // First Vec: joints. Second Vec: transforms.
+    outputs: Vec<Vec<AnimationTransform>>,
+}
+
+impl Animation {
+    pub fn interpolate(&self, time: f32, joint_tree: &mut crate::animation::JointTree) {
+        use cgmath::InnerSpace;
+
+        let mut first_index = 0;
+        let mut second_index = 0;
+
+        for (i, input_time) in self.inputs.iter().cloned().enumerate().skip(1) {
+            if input_time > time {
+                first_index = i - 1;
+                second_index = i;
+                break;
+            }
+        }
+
+        let first_value = self.inputs[first_index];
+        let second_value = self.inputs[second_index];
+        let interp_factor = map_value(time, first_value, second_value, 0.0, 1.0);
+
+        for i in 0 .. joint_tree.len() {
+            let first = &self.outputs[i][first_index];
+            let second = &self.outputs[i][second_index];
+
+            let first_quat = first.rotation_as_quat().normalize();
+            let second_quat = second.rotation_as_quat().normalize();
+            let rotation = first_quat.slerp(second_quat, interp_factor).normalize();
+            let rotation = cgmath_matrix4_to_mat4(rotation.into());
+
+            let translation = first.translation * (1.0 - interp_factor) +
+                second.translation * interp_factor;
+            let translation = Mat4::from_translation(translation);
+            let scale = first.scale * (1.0 - interp_factor) * second.scale * interp_factor;
+            let scale = Mat4::from_nonuniform_scale(scale);
+
+            let transform = translation * rotation;
+            joint_tree.set_local_transform(i, transform);
+        }
+    }
+}
+
+fn map_value(value: f32, start_i: f32, end_i: f32, start_o: f32, end_o: f32) -> f32 {
+	start_o + (end_o - start_o) * ((value - start_i) / (end_i - start_i))
 }
 
 impl AnimatedModel {
     pub fn load_gltf(
-        gltf_bytes: &[u8],
+        gltf_bytes: &'static [u8],
         label: &str,
         device: &wgpu::Device,
     ) -> anyhow::Result<Self> {
@@ -295,7 +370,7 @@ impl AnimatedModel {
                             position: p.into(),
                             normal: n.into(),
                             uv: uv.into(),
-                            joints: [j[0] as u32, j[1] as u32, j[2] as u32, j[3] as u32],
+                            joints: Vec4::new(j[0] as f32, j[1] as f32, j[2] as f32, j[3] as f32),
                             joint_weights: w.into(),
                         });
                     });
@@ -314,17 +389,66 @@ impl AnimatedModel {
             .map(|matrix| matrix.into())
             .collect();
 
-        let joints: Vec<_> = skin
-            .joints()
-            .map(|node| node.transform().matrix().into())
-            .collect();
+        let joints = crate::animation::JointTree::from_skin(&skin);
+
+        let mut animations = Vec::new();        
+
+        for animation in gltf.animations() {
+            log::debug!("Channels: {}. Samplers: {}", animation.channels().count(), animation.samplers().count());
+
+            assert_eq!(animation.channels().count(), joints.len() * 3);
+
+            let mut channels = animation.channels();
+
+            let mut animation = Animation {
+                inputs: Vec::new(),
+                outputs: vec![Vec::new(); joints.len()]
+            };
+
+            for i in 0 .. joints.len() {
+                let reader_a = channels.next().unwrap().reader(|buffer| Some(&buffers[buffer.index()]));
+                let reader_b = channels.next().unwrap().reader(|buffer| Some(&buffers[buffer.index()]));
+                let reader_c = channels.next().unwrap().reader(|buffer| Some(&buffers[buffer.index()]));
+
+                if i == 0 {
+                    animation.inputs = reader_a.read_inputs().unwrap().collect();
+                }
+
+                let translations = match reader_a.read_outputs().unwrap() {
+                    gltf::animation::util::ReadOutputs::Translations(translations) => translations,
+                    _ => panic!()
+                };
+
+                let rotations = match reader_b.read_outputs().unwrap() {
+                    gltf::animation::util::ReadOutputs::Rotations(rotations) => rotations.into_f32(),
+                    _ => panic!()
+                };
+
+                let scales = match reader_c.read_outputs().unwrap() {
+                    gltf::animation::util::ReadOutputs::Scales(scales) => scales,
+                    _ => panic!()
+                };
+
+                animation.outputs[i] = translations.zip(rotations).zip(scales)
+                    .map(|((t, r), s)| AnimationTransform {
+                        translation: t.into(),
+                        rotation: r.into(),
+                        scale: s.into()
+                    }).collect();
+            }
+
+            animations.push(animation);
+            assert!(channels.next().is_none());
+        }
+
 
         log::debug!(
-            "Animated gltf model {} loaded. Vertices: {}. Indices: {}. Joints: {}",
+            "Animated gltf model {} loaded. Vertices: {}. Indices: {}. Joints: {}. Animations: {}",
             label,
             vertices.len(),
             indices.len(),
             joints.len(),
+            animations.len(),
         );
 
         Ok(Self {
@@ -338,13 +462,9 @@ impl AnimatedModel {
                 contents: bytemuck::cast_slice(&indices),
                 usage: wgpu::BufferUsage::INDEX,
             }),
-            inverse_bind_matrices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(&inverse_bind_matrices),
-                usage: wgpu::BufferUsage::STORAGE,
-            }),
+            inverse_bind_matrices,
             num_indices: indices.len() as u32,
-            joints,
+            joints, animations,
         })
     }
 }
