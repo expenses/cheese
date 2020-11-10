@@ -13,7 +13,7 @@ use crate::resources::{
     RayCastLocation, RtsControls, ScreenDimensions,
 };
 use legion::*;
-use ultraviolet::{Vec2, Vec3};
+use ultraviolet::Vec2;
 use winit::{
     dpi::PhysicalPosition,
     event::{
@@ -74,10 +74,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(text_buffer);
     resources.insert(render_context.screen_dimensions());
     resources.insert(CameraControls::default());
-    resources.insert(Camera {
-        position: Vec3::new(0.0, 20.0, 10.0),
-        looking_at: Vec3::new(0.0, 0.0, 0.0),
-    });
+    resources.insert(Camera::default());
     resources.insert(MouseState::new(&render_context.screen_dimensions()));
     resources.insert(RtsControls::default());
     resources.insert(RayCastLocation::default());
