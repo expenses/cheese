@@ -199,22 +199,6 @@ async fn run() -> anyhow::Result<()> {
                     _ => {}
                 }
             }
-            // This doesn't work on osx
-            /*Event::DeviceEvent { ref event, .. } => match event {
-                DeviceEvent::Key(KeyboardInput {
-                    state,
-                    virtual_keycode: Some(code),
-                    ..
-                }) => {
-                    let pressed = *state == ElementState::Pressed;
-
-                    let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
-                    let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
-
-                    //handle_key(code, pressed, &mut camera_controls, &mut rts_controls, control_flow);
-                }
-                _ => {}
-            },*/
             Event::MainEventsCleared => {
                 let now = std::time::Instant::now();
                 let elapsed = (now - time).as_secs_f32();

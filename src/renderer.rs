@@ -4,7 +4,7 @@ use ultraviolet::{Mat4, Vec2, Vec3};
 use wgpu::util::DeviceExt;
 use winit::{
     event_loop::EventLoop,
-    window::{Fullscreen, Window, WindowBuilder},
+    window::{Window, WindowBuilder},
 };
 
 mod lines_pipeline;
@@ -38,9 +38,7 @@ pub struct RenderContext {
 
 impl RenderContext {
     pub async fn new(event_loop: &EventLoop<()>) -> anyhow::Result<Self> {
-        let monitor = event_loop.primary_monitor();
         let window = WindowBuilder::new()
-            .with_fullscreen(Some(Fullscreen::Borderless(monitor)))
             .build(event_loop)?;
 
         let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
