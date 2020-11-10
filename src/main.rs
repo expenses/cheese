@@ -75,8 +75,8 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(render_context.screen_dimensions());
     resources.insert(CameraControls::default());
     resources.insert(Camera {
-        position: Vec3::new(0.0, 20.0, 10.0),
-        looking_at: Vec3::new(0.0, 0.0, 0.0),
+        position: Vec3::new(0.0, 7.5, 10.0),
+        looking_at: Vec3::new(0.0, 0.0, -10.0),
     });
     resources.insert(MouseState::new(&render_context.screen_dimensions()));
     resources.insert(RtsControls::default());
@@ -206,7 +206,7 @@ async fn run() -> anyhow::Result<()> {
                 resources.insert(DeltaTime(elapsed));
                 resources.insert(CursorIcon(winit::window::CursorIcon::default()));
 
-                schedule.execute(&mut world, &mut resources);
+                //schedule.execute(&mut world, &mut resources);
 
                 let cursor_icon = resources.get::<CursorIcon>().unwrap();
                 render_context.set_cursor_icon(cursor_icon.0);
@@ -299,7 +299,7 @@ async fn run() -> anyhow::Result<()> {
                     );
 
                     // Render 2D items.
-                    lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
+                    //lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
 
                     // We're done with this pass.
                     drop(render_pass);
