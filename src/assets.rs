@@ -20,7 +20,7 @@ pub struct Assets {
 }
 
 impl Assets {
-    pub fn new(device: &wgpu::Device) -> anyhow::Result<(Self, wgpu::CommandBuffer)> {
+    pub fn new(device: &wgpu::Device) -> anyhow::Result<(Self, wgpu::CommandBuffer, crate::animation::skin::Skin, crate::animation::animation::Animations, crate::animation::node::Nodes, cgmath::Matrix4<f32>)> {
         let mut init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Cheese init_encoder"),
         });
@@ -39,6 +39,12 @@ impl Assets {
                     count: None,
                 }],
             });
+
+        let (gltf_model, skin, animations, nodes, trans) = AnimatedModel::load_gltf(
+            include_bytes!("../animation/character.gltf"),
+            "X",
+            device,
+        )?;
 
         let assets = Self {
             surface_model: Model::load_gltf(
@@ -66,12 +72,7 @@ impl Assets {
                 "Cheese torus model",
                 device,
             )?,
-            gltf_model: AnimatedModel::load_gltf(
-                include_bytes!("../animation/character.gltf"),
-                "X",
-                device,
-            )?,
-
+            gltf_model,
             surface_texture: load_texture(
                 include_bytes!("../textures/surface.png"),
                 "Cheese surface texture",
@@ -111,7 +112,7 @@ impl Assets {
             texture_bind_group_layout,
         };
 
-        Ok((assets, init_encoder.finish()))
+        Ok((assets, init_encoder.finish(), skin, animations, nodes, trans))
     }
 }
 
@@ -251,9 +252,9 @@ pub struct AnimatedModel {
     pub vertices: wgpu::Buffer,
     pub indices: wgpu::Buffer,
     pub num_indices: u32,
-    pub inverse_bind_matrices: Vec<Mat4>,
-    pub joints: crate::animation::JointTree,
-    pub animations: Vec<crate::animation::Animation>,
+    //pub inverse_bind_matrices: Vec<Mat4>,
+    //pub joints: crate::animation::JointTree,
+    //pub animations: Vec<crate::animation::Animation>,
 }
 
 impl AnimatedModel {
@@ -261,7 +262,7 @@ impl AnimatedModel {
         gltf_bytes: &'static [u8],
         label: &str,
         device: &wgpu::Device,
-    ) -> anyhow::Result<Self> {
+    ) -> anyhow::Result<(Self, crate::animation::skin::Skin, crate::animation::animation::Animations, crate::animation::node::Nodes, cgmath::Matrix4<f32>)> {
         let gltf = gltf::Gltf::from_slice(gltf_bytes)?;
 
         let buffers = load_buffers(&gltf)?;
@@ -305,76 +306,33 @@ impl AnimatedModel {
             }
         }
 
-        debug_assert!(gltf.skins().len() == 1);
-        let skin = gltf.skins().next().unwrap();
+        let mut skins = crate::animation::skin::create_skins_from_gltf(gltf.skins(), &buffers);
+        assert_eq!(skins.len(), 1);
+        let mut skin = skins.remove(0);
 
-        let reader = skin.reader(|buffer| Some(&buffers[buffer.index()]));
-        let inverse_bind_matrices: Vec<Mat4> = reader
-            .read_inverse_bind_matrices()
-            .unwrap()
-            .map(|matrix| matrix.into())
-            .collect();
+        let animations = crate::animation::animation::load_animations(gltf.animations(), &buffers)
+            .unwrap();
 
-        let joints = crate::animation::JointTree::from_skin(&skin, &inverse_bind_matrices);
+        let mut nodes = crate::animation::node::Nodes::from_gltf_nodes(gltf.nodes(), &gltf.scenes().next().unwrap());
 
-        let mut animations = Vec::new();        
+        let meshes = crate::animation::mesh::create_meshes_from_gltf(&gltf, &buffers).unwrap();
+        let meshes = meshes.meshes;
 
-        for animation in gltf.animations() {
-            log::debug!("Channels: {}. Samplers: {}", animation.channels().count(), animation.samplers().count());
+        let global_transform = {
+            let aabb = compute_aabb(&nodes, &meshes);
+            let transform = compute_unit_cube_at_origin_transform(aabb);
+            nodes.transform(Some(transform));
+            nodes
+                .get_skins_transform()
+                .iter()
+                .for_each(|(index, transform)| {
+                    //let skin = &mut skins[*index];
+                    skin.compute_joints_matrices(*transform, &nodes.nodes());
+                });
+            transform
+        };
 
-            assert_eq!(animation.channels().count(), joints.len() * 3);
-
-            let mut channels = animation.channels();
-
-            let mut animation = crate::animation::Animation {
-                inputs: Vec::new(),
-                outputs: vec![Vec::new(); joints.len()]
-            };
-
-            for i in 0 .. joints.len() {
-                let reader_a = channels.next().unwrap().reader(|buffer| Some(&buffers[buffer.index()]));
-                let reader_b = channels.next().unwrap().reader(|buffer| Some(&buffers[buffer.index()]));
-                // Would be scale but we don't care about that.
-                let _ = channels.next().unwrap();
-
-                if i == 0 {
-                    animation.inputs = reader_a.read_inputs().unwrap().collect();
-                }
-
-                let translations = match reader_a.read_outputs().unwrap() {
-                    gltf::animation::util::ReadOutputs::Translations(translations) => translations,
-                    _ => panic!()
-                };
-
-                let rotations = match reader_b.read_outputs().unwrap() {
-                    gltf::animation::util::ReadOutputs::Rotations(rotations) => rotations.into_f32(),
-                    _ => panic!()
-                };
-
-                assert_eq!(translations.clone().count(), rotations.clone().count());
-
-                animation.outputs[i] = translations.zip(rotations)
-                    .map(|(t, r)| crate::animation::AnimationTransform {
-                        translation: t.into(),
-                        rotation: r.into(),
-                    }).collect();
-            }
-
-            animations.push(animation);
-            assert!(channels.next().is_none());
-        }
-
-
-        log::debug!(
-            "Animated gltf model {} loaded. Vertices: {}. Indices: {}. Joints: {}. Animations: {}",
-            label,
-            vertices.len(),
-            indices.len(),
-            joints.len(),
-            animations.len(),
-        );
-
-        Ok(Self {
+        Ok((Self {
             vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(label),
                 contents: bytemuck::cast_slice(&vertices),
@@ -385,10 +343,10 @@ impl AnimatedModel {
                 contents: bytemuck::cast_slice(&indices),
                 usage: wgpu::BufferUsage::INDEX,
             }),
-            inverse_bind_matrices,
+            //inverse_bind_matrices,
             num_indices: indices.len() as u32,
-            joints, animations,
-        })
+            //joints, animations,
+        }, skin, animations, nodes, global_transform))
     }
 }
 
@@ -422,4 +380,31 @@ fn load_buffers(gltf: &gltf::Gltf) -> anyhow::Result<Vec<Vec<u8>>> {
     }
 
     Ok(buffers)
+}
+
+use crate::animation::math::AABB;
+
+fn compute_aabb(nodes: &crate::animation::node::Nodes, meshes: &[crate::animation::mesh::Mesh]) -> AABB<f32> {
+    let aabbs = nodes
+        .nodes()
+        .iter()
+        .filter(|n| n.mesh_index().is_some())
+        .map(|n| {
+            let mesh = &meshes[n.mesh_index().unwrap()];
+            mesh.aabb() * n.transform()
+        })
+        .collect::<Vec<_>>();
+    AABB::union(&aabbs).unwrap()
+}
+
+fn compute_unit_cube_at_origin_transform(aabb: AABB<f32>) -> cgmath::Matrix4<f32> {
+    let larger_side = aabb.get_larger_side_size();
+    let scale_factor = (1.0_f32 / larger_side) * 10.0;
+
+    let aabb = aabb * scale_factor;
+    let center = aabb.get_center();
+
+    let translation = cgmath::Matrix4::from_translation(-center);
+    let scale = cgmath::Matrix4::from_scale(scale_factor);
+    translation * scale
 }
