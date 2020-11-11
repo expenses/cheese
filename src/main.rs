@@ -224,12 +224,12 @@ async fn run() -> anyhow::Result<()> {
                 let mut line_buffers = resources.get_mut::<LineBuffers>().unwrap();
                 let mut text_buffer = resources.get_mut::<TextBuffer>().unwrap();
 
-
-
                 let mut joints = &mut assets.gltf_model.joints;
-                assets.gltf_model.animations[0].interpolate(T, joints);
+                assets.gltf_model.animations[0].interpolate(T, joints, &assets.gltf_model.inverse_bind_matrices);
                 use wgpu::util::DeviceExt;
                 
+                //joints.set_local_transform(4, ultraviolet::Mat4::from_rotation_y(T));
+
                 let buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Cheese test joint buffer"),
                     contents: bytemuck::cast_slice(&joints.as_vec(&assets.gltf_model.inverse_bind_matrices)),
@@ -245,7 +245,7 @@ async fn run() -> anyhow::Result<()> {
                     }],
                 });
 
-                T += 0.01;
+                T += 0.02;
                 T = T % 1.0_f32;
 
 
@@ -311,13 +311,13 @@ async fn run() -> anyhow::Result<()> {
                         &mut render_pass,
                         &model_buffers.command_paths,
                         &assets.colours_texture,
-                    );
-                    model_pipelines.render_single(
+                    );*/
+                    /*model_pipelines.render_single(
                         &mut render_pass,
                         &assets.surface_texture,
                         &assets.surface_model,
-                    );
-                    model_pipelines.render_transparent(
+                    );*/
+                    /*model_pipelines.render_transparent(
                         &mut render_pass,
                         &model_buffers.mice,
                         &assets.mouse_helmet_model,

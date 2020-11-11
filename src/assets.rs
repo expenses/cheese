@@ -253,81 +253,7 @@ pub struct AnimatedModel {
     pub num_indices: u32,
     pub inverse_bind_matrices: Vec<Mat4>,
     pub joints: crate::animation::JointTree,
-    pub animations: Vec<Animation>,
-}
-
-struct Joint {
-    transform: Mat4,
-
-}
-
-#[derive(Clone)]
-struct AnimationTransform {
-    translation: Vec3,
-    rotation: Vec4,
-    scale: Vec3,
-}
-
-impl AnimationTransform {
-    fn rotation_as_quat(&self) -> cgmath::Quaternion<f32> {
-        let rotation: [f32; 4] = self.rotation.into();
-        rotation.into()
-    }
-}
-
-fn cgmath_matrix4_to_mat4(matrix: cgmath::Matrix4<f32>) -> Mat4 {
-    let raw: [[f32; 4]; 4] = matrix.into();
-    raw.into()
-}
-
-pub struct Animation {
-    inputs: Vec<f32>,
-    // First Vec: joints. Second Vec: transforms.
-    outputs: Vec<Vec<AnimationTransform>>,
-}
-
-impl Animation {
-    pub fn interpolate(&self, time: f32, joint_tree: &mut crate::animation::JointTree) {
-        use cgmath::InnerSpace;
-
-        let mut first_index = 0;
-        let mut second_index = 0;
-
-        for (i, input_time) in self.inputs.iter().cloned().enumerate().skip(1) {
-            if input_time > time {
-                first_index = i - 1;
-                second_index = i;
-                break;
-            }
-        }
-
-        let first_value = self.inputs[first_index];
-        let second_value = self.inputs[second_index];
-        let interp_factor = map_value(time, first_value, second_value, 0.0, 1.0);
-
-        for i in 0 .. joint_tree.len() {
-            let first = &self.outputs[i][first_index];
-            let second = &self.outputs[i][second_index];
-
-            let first_quat = first.rotation_as_quat().normalize();
-            let second_quat = second.rotation_as_quat().normalize();
-            let rotation = first_quat.slerp(second_quat, interp_factor).normalize();
-            let rotation = cgmath_matrix4_to_mat4(rotation.into());
-
-            let translation = first.translation * (1.0 - interp_factor) +
-                second.translation * interp_factor;
-            let translation = Mat4::from_translation(translation);
-            let scale = first.scale * (1.0 - interp_factor) * second.scale * interp_factor;
-            let scale = Mat4::from_nonuniform_scale(scale);
-
-            let transform = translation * rotation;
-            joint_tree.set_local_transform(i, transform);
-        }
-    }
-}
-
-fn map_value(value: f32, start_i: f32, end_i: f32, start_o: f32, end_o: f32) -> f32 {
-	start_o + (end_o - start_o) * ((value - start_i) / (end_i - start_i))
+    pub animations: Vec<crate::animation::Animation>,
 }
 
 impl AnimatedModel {
@@ -389,7 +315,7 @@ impl AnimatedModel {
             .map(|matrix| matrix.into())
             .collect();
 
-        let joints = crate::animation::JointTree::from_skin(&skin);
+        let joints = crate::animation::JointTree::from_skin(&skin, &inverse_bind_matrices);
 
         let mut animations = Vec::new();        
 
@@ -400,7 +326,7 @@ impl AnimatedModel {
 
             let mut channels = animation.channels();
 
-            let mut animation = Animation {
+            let mut animation = crate::animation::Animation {
                 inputs: Vec::new(),
                 outputs: vec![Vec::new(); joints.len()]
             };
@@ -408,7 +334,8 @@ impl AnimatedModel {
             for i in 0 .. joints.len() {
                 let reader_a = channels.next().unwrap().reader(|buffer| Some(&buffers[buffer.index()]));
                 let reader_b = channels.next().unwrap().reader(|buffer| Some(&buffers[buffer.index()]));
-                let reader_c = channels.next().unwrap().reader(|buffer| Some(&buffers[buffer.index()]));
+                // Would be scale but we don't care about that.
+                let _ = channels.next().unwrap();
 
                 if i == 0 {
                     animation.inputs = reader_a.read_inputs().unwrap().collect();
@@ -424,16 +351,12 @@ impl AnimatedModel {
                     _ => panic!()
                 };
 
-                let scales = match reader_c.read_outputs().unwrap() {
-                    gltf::animation::util::ReadOutputs::Scales(scales) => scales,
-                    _ => panic!()
-                };
+                assert_eq!(translations.clone().count(), rotations.clone().count());
 
-                animation.outputs[i] = translations.zip(rotations).zip(scales)
-                    .map(|((t, r), s)| AnimationTransform {
+                animation.outputs[i] = translations.zip(rotations)
+                    .map(|(t, r)| crate::animation::AnimationTransform {
                         translation: t.into(),
                         rotation: r.into(),
-                        scale: s.into()
                     }).collect();
             }
 
