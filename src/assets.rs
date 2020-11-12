@@ -20,7 +20,7 @@ pub struct Assets {
 }
 
 impl Assets {
-    pub fn new(device: &wgpu::Device) -> anyhow::Result<(Self, wgpu::CommandBuffer, crate::animation::skin::Skin, crate::animation::animation::Animations, crate::animation::node::Nodes, cgmath::Matrix4<f32>)> {
+    pub fn new(device: &wgpu::Device) -> anyhow::Result<(Self, wgpu::CommandBuffer, crate::animation::skin::Skin, crate::animation::animation::Animations)> {
         let mut init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Cheese init_encoder"),
         });
@@ -40,7 +40,7 @@ impl Assets {
                 }],
             });
 
-        let (gltf_model, skin, animations, nodes, trans) = AnimatedModel::load_gltf(
+        let (gltf_model, skin, animations) = AnimatedModel::load_gltf(
             include_bytes!("../animation/character.gltf"),
             "X",
             device,
@@ -112,7 +112,7 @@ impl Assets {
             texture_bind_group_layout,
         };
 
-        Ok((assets, init_encoder.finish(), skin, animations, nodes, trans))
+        Ok((assets, init_encoder.finish(), skin, animations))
     }
 }
 
@@ -262,7 +262,7 @@ impl AnimatedModel {
         gltf_bytes: &'static [u8],
         label: &str,
         device: &wgpu::Device,
-    ) -> anyhow::Result<(Self, crate::animation::skin::Skin, crate::animation::animation::Animations, crate::animation::node::Nodes, cgmath::Matrix4<f32>)> {
+    ) -> anyhow::Result<(Self, crate::animation::skin::Skin, crate::animation::animation::Animations)> {
         let gltf = gltf::Gltf::from_slice(gltf_bytes)?;
 
         let buffers = load_buffers(&gltf)?;
@@ -306,17 +306,13 @@ impl AnimatedModel {
             }
         }
 
-        let mut skins = crate::animation::skin::create_skins_from_gltf(gltf.skins(), &buffers);
-        assert_eq!(skins.len(), 1);
-        let mut skin = skins.remove(0);
+        let mut nodes = crate::animation::node::Nodes::from_gltf_nodes(gltf.nodes(), &gltf.scenes().next().unwrap());
+
+        let mut skin = crate::animation::skin::Skin::load(&gltf.skins().next().unwrap(), nodes, &buffers);
 
         let animations = crate::animation::animation::load_animations(gltf.animations(), &buffers)
             .unwrap();
 
-        let mut nodes = crate::animation::node::Nodes::from_gltf_nodes(gltf.nodes(), &gltf.scenes().next().unwrap());
-
-        use cgmath::SquareMatrix;
-        let global_transform = cgmath::Matrix4::identity();
 
         Ok((Self {
             vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -332,7 +328,7 @@ impl AnimatedModel {
             //inverse_bind_matrices,
             num_indices: indices.len() as u32,
             //joints, animations,
-        }, skin, animations, nodes, global_transform))
+        }, skin, animations))
     }
 }
 

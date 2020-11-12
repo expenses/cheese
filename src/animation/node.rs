@@ -15,13 +15,20 @@ impl Nodes {
         let mut nodes = Vec::with_capacity(node_count);
         for node in gltf_nodes {
             let node_index = node.index();
-            let local_transform = node.transform();
-            let global_transform_matrix = compute_transform_matrix(&local_transform);
+
+            let (local_translation, local_rotation, local_scale) = node.transform().decomposed();
+            let local_translation: Vector3<f32> = local_translation.into();
+            // Different order!!!
+            let [xr, yr, zr, wr] = local_rotation;
+            let local_rotation = cgmath::Quaternion::new(wr, xr, yr, zr);
+            let local_scale: Vector3<f32> = local_scale.into();
+
+            let global_transform_matrix = compute_transform_matrix(local_translation, local_rotation, local_scale);
             let mesh_index = node.mesh().map(|m| m.index());
             let skin_index = node.skin().map(|s| s.index());
             let children_indices = node.children().map(|c| c.index()).collect::<Vec<_>>();
             let node = Node {
-                local_transform,
+                local_translation, local_rotation, local_scale,
                 global_transform_matrix,
                 mesh_index,
                 skin_index,
@@ -62,14 +69,6 @@ impl Nodes {
             }
         }
     }
-
-    pub fn get_skins_transform(&self) -> Vec<(usize, Matrix4<f32>)> {
-        self.nodes
-            .iter()
-            .filter(|n| n.skin_index.is_some())
-            .map(|n| (n.skin_index.unwrap(), n.transform()))
-            .collect::<Vec<_>>()
-    }
 }
 
 fn build_graph_run_indices(roots_indices: &[usize], nodes: &[Node]) -> Vec<(usize, Option<usize>)> {
@@ -104,7 +103,9 @@ impl Nodes {
 
 #[derive(Clone, Debug)]
 pub struct Node {
-    local_transform: Transform,
+    pub local_translation: Vector3<f32>,
+    pub local_rotation: Quaternion<f32>,
+    pub local_scale: Vector3<f32>,
     global_transform_matrix: Matrix4<f32>,
     mesh_index: Option<usize>,
     skin_index: Option<usize>,
@@ -113,7 +114,10 @@ pub struct Node {
 
 impl Node {
     fn apply_transform(&mut self, transform: Matrix4<f32>) {
-        let new_tranform = transform * compute_transform_matrix(&self.local_transform);
+        let local_transform =
+            compute_transform_matrix(self.local_translation, self.local_rotation, self.local_scale);
+        
+        let new_tranform = transform * local_transform;
         self.global_transform_matrix = new_tranform;
     }
 }
@@ -130,61 +134,11 @@ impl Node {
     pub fn skin_index(&self) -> Option<usize> {
         self.skin_index
     }
-
-    pub fn set_translation(&mut self, translation: Vector3<f32>) {
-        if let Transform::Decomposed {
-            rotation, scale, ..
-        } = self.local_transform
-        {
-            self.local_transform = Transform::Decomposed {
-                translation: [translation.x, translation.y, translation.z],
-                rotation,
-                scale,
-            }
-        }
-    }
-
-    pub fn set_rotation(&mut self, rotation: Quaternion<f32>) {
-        if let Transform::Decomposed {
-            translation, scale, ..
-        } = self.local_transform
-        {
-            self.local_transform = Transform::Decomposed {
-                translation,
-                rotation: [rotation.v.x, rotation.v.y, rotation.v.z, rotation.s],
-                scale,
-            }
-        }
-    }
-
-    pub fn set_scale(&mut self, scale: Vector3<f32>) {
-        if let Transform::Decomposed {
-            translation,
-            rotation,
-            ..
-        } = self.local_transform
-        {
-            self.local_transform = Transform::Decomposed {
-                translation,
-                rotation,
-                scale: [scale.x, scale.y, scale.z],
-            }
-        }
-    }
 }
 
-fn compute_transform_matrix(transform: &Transform) -> Matrix4<f32> {
-    match transform {
-        Transform::Matrix { matrix } => Matrix4::from(*matrix),
-        Transform::Decomposed {
-            translation,
-            rotation: [xr, yr, zr, wr],
-            scale: [xs, ys, zs],
-        } => {
-            let translation = Matrix4::from_translation(Vector3::from(*translation));
-            let rotation = Matrix4::from(Quaternion::new(*wr, *xr, *yr, *zr));
-            let scale = Matrix4::from_nonuniform_scale(*xs, *ys, *zs);
-            translation * rotation * scale
-        }
-    }
+fn compute_transform_matrix(translation: Vector3<f32>, rotation: Quaternion<f32>, scale: Vector3<f32>) -> Matrix4<f32> {
+    let translation = Matrix4::from_translation(translation);
+    let rotation = Matrix4::from(rotation);
+    let scale = Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z);
+    translation * rotation * scale
 }

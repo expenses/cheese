@@ -57,7 +57,7 @@ async fn run() -> anyhow::Result<()> {
     let event_loop = EventLoop::new();
 
     let mut render_context = RenderContext::new(&event_loop).await?;
-    let (mut assets, command_buffer, mut skin, mut animations, mut nodes, trans) = Assets::new(&render_context.device())?;
+    let (mut assets, command_buffer, mut skin, mut animations) = Assets::new(&render_context.device())?;
     render_context.submit(command_buffer);
     let model_pipelines = ModelPipelines::new(&render_context, &assets);
     let torus_pipeline = TorusPipeline::new(&render_context);
@@ -224,15 +224,8 @@ async fn run() -> anyhow::Result<()> {
                 let mut line_buffers = resources.get_mut::<LineBuffers>().unwrap();
                 let mut text_buffer = resources.get_mut::<TextBuffer>().unwrap();
 
-                animations.update(&mut nodes, 1.0 / 60.0);
-                // I think this can just be an identity matrix.
-                nodes.transform(Some(trans));
-                nodes
-                    .get_skins_transform()
-                    .iter()
-                    .for_each(|(index, transform)| {
-                        skin.compute_joints_matrices(*transform, &nodes.nodes());
-                    });
+                animations.update(&mut skin.nodes, 1.0 / 60.0);
+                skin.update();
                 use ultraviolet::Mat4;
                 let mut matrices = vec![Mat4::identity(); skin.joints().len()];
                 for (i, j) in skin.joints().iter().enumerate() {
