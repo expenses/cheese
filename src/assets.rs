@@ -1,5 +1,5 @@
 use crate::renderer::{AnimatedVertex, Vertex, TEXTURE_FORMAT};
-use ultraviolet::{Vec3, Vec4, Mat4};
+use ultraviolet::{Mat4, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 
 pub struct Assets {
@@ -20,7 +20,14 @@ pub struct Assets {
 }
 
 impl Assets {
-    pub fn new(device: &wgpu::Device) -> anyhow::Result<(Self, wgpu::CommandBuffer, crate::animation::skin::Skin, crate::animation::animation::Animations)> {
+    pub fn new(
+        device: &wgpu::Device,
+    ) -> anyhow::Result<(
+        Self,
+        wgpu::CommandBuffer,
+        crate::animation::skin::Skin,
+        crate::animation::animation::Animations,
+    )> {
         let mut init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Cheese init_encoder"),
         });
@@ -40,11 +47,8 @@ impl Assets {
                 }],
             });
 
-        let (gltf_model, skin, animations) = AnimatedModel::load_gltf(
-            include_bytes!("../animation/character.gltf"),
-            "X",
-            device,
-        )?;
+        let (gltf_model, skin, animations) =
+            AnimatedModel::load_gltf(include_bytes!("../animation/character.gltf"), "X", device)?;
 
         let assets = Self {
             surface_model: Model::load_gltf(
@@ -262,7 +266,11 @@ impl AnimatedModel {
         gltf_bytes: &'static [u8],
         label: &str,
         device: &wgpu::Device,
-    ) -> anyhow::Result<(Self, crate::animation::skin::Skin, crate::animation::animation::Animations)> {
+    ) -> anyhow::Result<(
+        Self,
+        crate::animation::skin::Skin,
+        crate::animation::animation::Animations,
+    )> {
         let gltf = gltf::Gltf::from_slice(gltf_bytes)?;
 
         let buffers = load_buffers(&gltf)?;
@@ -306,29 +314,36 @@ impl AnimatedModel {
             }
         }
 
-        let mut nodes = crate::animation::node::Nodes::from_gltf_nodes(gltf.nodes(), &gltf.scenes().next().unwrap());
+        let mut nodes = crate::animation::node::Nodes::from_gltf_nodes(
+            gltf.nodes(),
+            &gltf.scenes().next().unwrap(),
+        );
 
-        let mut skin = crate::animation::skin::Skin::load(&gltf.skins().next().unwrap(), nodes, &buffers);
+        let mut skin =
+            crate::animation::skin::Skin::load(&gltf.skins().next().unwrap(), nodes, &buffers);
 
-        let animations = crate::animation::animation::load_animations(gltf.animations(), &buffers)
-            .unwrap();
+        let animations =
+            crate::animation::animation::load_animations(gltf.animations(), &buffers).unwrap();
 
-
-        Ok((Self {
-            vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(label),
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsage::VERTEX,
-            }),
-            indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(&indices),
-                usage: wgpu::BufferUsage::INDEX,
-            }),
-            //inverse_bind_matrices,
-            num_indices: indices.len() as u32,
-            //joints, animations,
-        }, skin, animations))
+        Ok((
+            Self {
+                vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some(label),
+                    contents: bytemuck::cast_slice(&vertices),
+                    usage: wgpu::BufferUsage::VERTEX,
+                }),
+                indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: bytemuck::cast_slice(&indices),
+                    usage: wgpu::BufferUsage::INDEX,
+                }),
+                //inverse_bind_matrices,
+                num_indices: indices.len() as u32,
+                //joints, animations,
+            },
+            skin,
+            animations,
+        ))
     }
 }
 

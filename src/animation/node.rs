@@ -1,4 +1,3 @@
-use gltf::{iter::Nodes as GltfNodes, scene::Transform, Scene};
 use cgmath::{Matrix4, Quaternion, Vector3};
 
 #[derive(Clone, Debug)]
@@ -9,7 +8,7 @@ pub struct Nodes {
 }
 
 impl Nodes {
-    pub fn from_gltf_nodes(gltf_nodes: GltfNodes, scene: &Scene) -> Nodes {
+    pub fn from_gltf_nodes(gltf_nodes: gltf::iter::Nodes, scene: &gltf::Scene) -> Nodes {
         let roots_indices = scene.nodes().map(|n| n.index()).collect::<Vec<_>>();
         let node_count = gltf_nodes.len();
         let mut nodes = Vec::with_capacity(node_count);
@@ -23,12 +22,15 @@ impl Nodes {
             let local_rotation = cgmath::Quaternion::new(wr, xr, yr, zr);
             let local_scale: Vector3<f32> = local_scale.into();
 
-            let global_transform_matrix = compute_transform_matrix(local_translation, local_rotation, local_scale);
+            let global_transform_matrix =
+                compute_transform_matrix(local_translation, local_rotation, local_scale);
             let mesh_index = node.mesh().map(|m| m.index());
             let skin_index = node.skin().map(|s| s.index());
             let children_indices = node.children().map(|c| c.index()).collect::<Vec<_>>();
             let node = Node {
-                local_translation, local_rotation, local_scale,
+                local_translation,
+                local_rotation,
+                local_scale,
                 global_transform_matrix,
                 mesh_index,
                 skin_index,
@@ -114,9 +116,12 @@ pub struct Node {
 
 impl Node {
     fn apply_transform(&mut self, transform: Matrix4<f32>) {
-        let local_transform =
-            compute_transform_matrix(self.local_translation, self.local_rotation, self.local_scale);
-        
+        let local_transform = compute_transform_matrix(
+            self.local_translation,
+            self.local_rotation,
+            self.local_scale,
+        );
+
         let new_tranform = transform * local_transform;
         self.global_transform_matrix = new_tranform;
     }
@@ -136,7 +141,11 @@ impl Node {
     }
 }
 
-fn compute_transform_matrix(translation: Vector3<f32>, rotation: Quaternion<f32>, scale: Vector3<f32>) -> Matrix4<f32> {
+fn compute_transform_matrix(
+    translation: Vector3<f32>,
+    rotation: Quaternion<f32>,
+    scale: Vector3<f32>,
+) -> Matrix4<f32> {
     let translation = Matrix4::from_translation(translation);
     let rotation = Matrix4::from(rotation);
     let scale = Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z);

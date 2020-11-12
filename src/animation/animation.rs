@@ -1,4 +1,5 @@
-use super::node::Nodes;
+use super::skin::Skin;
+use cgmath::{InnerSpace, Quaternion, Vector3, VectorSpace};
 use gltf::{
     animation::{
         iter::Channels,
@@ -9,7 +10,6 @@ use gltf::{
     iter::Animations as GltfAnimations,
     Animation as GltfAnimation,
 };
-use cgmath::{InnerSpace, Quaternion, Vector3, VectorSpace};
 use std::cmp::Ordering;
 
 /// slerp from cgmath is bugged.
@@ -47,7 +47,6 @@ pub fn slerp(left: Quaternion<f32>, right: Quaternion<f32>, amount: f32) -> Quat
         (num3 * left.v.z) + (num2 * right.v.z),
     )
 }
-
 
 trait Interpolate: Copy {
     fn linear(self, other: Self, amount: f32) -> Self;
@@ -250,7 +249,7 @@ pub enum PlaybackMode {
 }
 
 impl Animations {
-    pub fn update(&mut self, nodes: &mut Nodes, delta_time: f32) -> bool {
+    pub fn update(&mut self, skin: &mut Skin, delta_time: f32) -> bool {
         if self.playback_state.paused {
             return false;
         }
@@ -258,7 +257,7 @@ impl Animations {
         match self.animations.get_mut(self.playback_state.current) {
             Some(animation) => {
                 self.playback_state.advance(delta_time);
-                animation.animate(nodes, self.playback_state.time)
+                animation.animate(skin, self.playback_state.time)
             }
             _ => false,
         }
@@ -310,17 +309,19 @@ impl Animation {
     /// Update nodes' transforms from animation data.
     ///
     /// Returns true if any nodes was updated.
-    pub fn animate(&mut self, nodes: &mut Nodes, time: f32) -> bool {
+    pub fn animate(&mut self, skin: &mut Skin, time: f32) -> bool {
         let NodesKeyFrame(translations, rotations, scale) = self.sample(time);
         translations.iter().for_each(|(node_index, translation)| {
-            nodes.nodes_mut()[*node_index].local_translation = *translation;
+            skin.nodes.nodes_mut()[*node_index].local_translation = *translation;
         });
         rotations.iter().for_each(|(node_index, rotation)| {
-            nodes.nodes_mut()[*node_index].local_rotation = *rotation;
+            skin.nodes.nodes_mut()[*node_index].local_rotation = *rotation;
         });
         scale.iter().for_each(|(node_index, scale)| {
-            nodes.nodes_mut()[*node_index].local_scale = *scale;
+            skin.nodes.nodes_mut()[*node_index].local_scale = *scale;
         });
+
+        skin.update();
 
         !translations.is_empty() || !rotations.is_empty() || !scale.is_empty()
     }
@@ -399,7 +400,10 @@ fn map_animation(gltf_animation: &GltfAnimation, data: &[Vec<u8>]) -> Animation 
     }
 }
 
-fn map_translation_channels(gltf_channels: Channels, data: &[Vec<u8>]) -> Vec<Channel<Vector3<f32>>> {
+fn map_translation_channels(
+    gltf_channels: Channels,
+    data: &[Vec<u8>],
+) -> Vec<Channel<Vector3<f32>>> {
     gltf_channels
         .filter(|c| c.target().property() == Property::Translation)
         .filter_map(|c| map_translation_channel(&c, data))
@@ -430,7 +434,10 @@ fn map_translation_channel(
     }
 }
 
-fn map_rotation_channels(gltf_channels: Channels, data: &[Vec<u8>]) -> Vec<Channel<Quaternion<f32>>> {
+fn map_rotation_channels(
+    gltf_channels: Channels,
+    data: &[Vec<u8>],
+) -> Vec<Channel<Quaternion<f32>>> {
     gltf_channels
         .filter(|c| c.target().property() == Property::Rotation)
         .filter_map(|c| map_rotation_channel(&c, data))
@@ -468,7 +475,10 @@ fn map_scale_channels(gltf_channels: Channels, data: &[Vec<u8>]) -> Vec<Channel<
         .collect::<Vec<_>>()
 }
 
-fn map_scale_channel(gltf_channel: &GltfChannel, data: &[Vec<u8>]) -> Option<Channel<Vector3<f32>>> {
+fn map_scale_channel(
+    gltf_channel: &GltfChannel,
+    data: &[Vec<u8>],
+) -> Option<Channel<Vector3<f32>>> {
     let gltf_sampler = gltf_channel.sampler();
     if let Property::Scale = gltf_channel.target().property() {
         map_interpolation(gltf_sampler.interpolation()).map(|i| {

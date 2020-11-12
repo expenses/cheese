@@ -40,8 +40,7 @@ pub struct RenderContext {
 
 impl RenderContext {
     pub async fn new(event_loop: &EventLoop<()>) -> anyhow::Result<Self> {
-        let window = WindowBuilder::new()
-            .build(event_loop)?;
+        let window = WindowBuilder::new().build(event_loop)?;
 
         let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
         let surface = unsafe { instance.create_surface(&window) };
@@ -162,19 +161,20 @@ impl RenderContext {
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
         let depth_texture = create_depth_texture(&device, window_size.width, window_size.height);
 
-        let joint_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Cheese joint bind group layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStage::VERTEX,
-                ty: wgpu::BindingType::StorageBuffer {
-                    dynamic: false,
-                    min_binding_size: None,
-                    readonly: true,
-                },
-                count: None,
-            }]
-        });
+        let joint_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Cheese joint bind group layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX,
+                    ty: wgpu::BindingType::StorageBuffer {
+                        dynamic: false,
+                        min_binding_size: None,
+                        readonly: true,
+                    },
+                    count: None,
+                }],
+            });
 
         Ok(Self {
             swap_chain,
