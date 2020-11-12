@@ -25,16 +25,12 @@ impl Nodes {
 
             let global_transform_matrix =
                 compute_transform_matrix(local_translation, local_rotation, local_scale);
-            let mesh_index = node.mesh().map(|m| m.index());
-            let skin_index = node.skin().map(|s| s.index());
             let children_indices = node.children().map(|c| c.index()).collect::<Vec<_>>();
             let node = Node {
                 local_translation,
                 local_rotation,
                 local_scale,
                 global_transform_matrix,
-                mesh_index,
-                skin_index,
                 children_indices,
             };
             nodes.insert(node_index, node);
@@ -42,7 +38,7 @@ impl Nodes {
 
         let mut nodes = Self::new(nodes, roots_indices);
         // Derive the global transform
-        nodes.transform(None);
+        nodes.transform();
         nodes
     }
 
@@ -57,14 +53,12 @@ impl Nodes {
 }
 
 impl Nodes {
-    pub fn transform(&mut self, global_transform: Option<Mat4>) {
+    pub fn transform(&mut self) {
         for (index, parent_index) in &self.depth_first_taversal_indices {
-            let parent_transform = parent_index
-                .map(|id| {
-                    let parent = &self.nodes[id];
-                    parent.global_transform_matrix
-                })
-                .or(global_transform);
+            let parent_transform = parent_index.map(|id| {
+                let parent = &self.nodes[id];
+                parent.global_transform_matrix
+            });
 
             if let Some(matrix) = parent_transform {
                 let node = &mut self.nodes[*index];
@@ -110,8 +104,6 @@ pub struct Node {
     pub local_rotation: Quaternion<f32>,
     pub local_scale: Vec3,
     global_transform_matrix: Mat4,
-    mesh_index: Option<usize>,
-    skin_index: Option<usize>,
     children_indices: Vec<usize>,
 }
 
@@ -126,19 +118,9 @@ impl Node {
         let new_tranform = transform * local_transform;
         self.global_transform_matrix = new_tranform;
     }
-}
 
-impl Node {
     pub fn transform(&self) -> Mat4 {
         self.global_transform_matrix
-    }
-
-    pub fn mesh_index(&self) -> Option<usize> {
-        self.mesh_index
-    }
-
-    pub fn skin_index(&self) -> Option<usize> {
-        self.skin_index
     }
 }
 

@@ -33,22 +33,22 @@ fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         //.add_system(ecs::cast_ray_system())
         //.add_system(ecs::stop_attacks_on_dead_entities_system())
         .add_system(ecs::control_camera_system());
-        /*.add_system(ecs::handle_left_click_system())
-        .add_system(ecs::handle_right_click_system())
-        .add_system(ecs::handle_stop_command_system())
-        .add_system(ecs::handle_drag_selection_system())
-        .add_system(ecs::set_move_to_system())
-        .add_system(ecs::set_move_to_for_bullets_system())
-        .add_system(ecs::avoidance_system())
-        .add_system(ecs::add_attack_commands_system())
-        .add_system(ecs::reduce_cooldowns_system())
-        .flush()
-        .add_system(ecs::move_units_system())
-        .add_system(ecs::apply_steering_system())
-        .add_system(ecs::firing_system())
-        .add_system(ecs::apply_bullets_system())
-        .flush()
-        .add_system(ecs::handle_damaged_system());*/
+    /*.add_system(ecs::handle_left_click_system())
+    .add_system(ecs::handle_right_click_system())
+    .add_system(ecs::handle_stop_command_system())
+    .add_system(ecs::handle_drag_selection_system())
+    .add_system(ecs::set_move_to_system())
+    .add_system(ecs::set_move_to_for_bullets_system())
+    .add_system(ecs::avoidance_system())
+    .add_system(ecs::add_attack_commands_system())
+    .add_system(ecs::reduce_cooldowns_system())
+    .flush()
+    .add_system(ecs::move_units_system())
+    .add_system(ecs::apply_steering_system())
+    .add_system(ecs::firing_system())
+    .add_system(ecs::apply_bullets_system())
+    .flush()
+    .add_system(ecs::handle_damaged_system());*/
 }
 
 async fn run() -> anyhow::Result<()> {
@@ -57,8 +57,9 @@ async fn run() -> anyhow::Result<()> {
     let event_loop = EventLoop::new();
 
     let mut render_context = RenderContext::new(&event_loop).await?;
-    let (assets, command_buffer, mut skin, mut animations) = Assets::new(&render_context.device())?;
-    let mut skin_2 = skin.clone();
+    let (assets, command_buffer) = Assets::new(&render_context.device())?;
+    let mut skin = assets.gltf_model.skin.clone();
+    let mut skin_2 = assets.gltf_model.skin.clone();
     render_context.submit(command_buffer);
     let model_pipelines = ModelPipelines::new(&render_context, &assets);
     let torus_pipeline = TorusPipeline::new(&render_context);
@@ -223,8 +224,8 @@ async fn run() -> anyhow::Result<()> {
                 let mut line_buffers = resources.get_mut::<LineBuffers>().unwrap();
                 let mut text_buffer = resources.get_mut::<TextBuffer>().unwrap();
 
-                animations.animations[0].animate(&mut skin, 1.0 / 60.0);
-                animations.animations[0].animate(&mut skin_2, 15.0 / 60.0);
+                assets.gltf_model.animations[0].animate(&mut skin, 1.0 / 60.0);
+                assets.gltf_model.animations[0].animate(&mut skin_2, 15.0 / 60.0);
                 use ultraviolet::Mat4;
                 let mut matrices = vec![Mat4::identity(); skin.joints().len() * 2];
                 for (i, j) in skin.joints().iter().enumerate() {

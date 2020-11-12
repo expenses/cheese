@@ -16,7 +16,6 @@ impl Skin {
     ) -> Self {
         let nodes = Nodes::from_gltf_nodes(gltf_nodes, scene);
 
-        let joint_count = gltf_skin.joints().count();
         let inverse_bind_matrices: Vec<_> = gltf_skin
             .reader(|buffer| Some(&buffers[buffer.index()]))
             .read_inverse_bind_matrices()
@@ -40,7 +39,7 @@ impl Skin {
 
     /// Compute the joints matrices from the nodes matrices.
     pub fn update(&mut self) {
-        self.nodes.transform(None);
+        self.nodes.transform();
 
         let nodes = self.nodes.nodes();
 

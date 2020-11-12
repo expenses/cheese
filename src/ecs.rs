@@ -55,6 +55,12 @@ pub struct Radius(pub f32);
 
 pub struct DamagedThisTick(pub Entity);
 
+pub struct AnimationState {
+    pub animation: usize,
+    pub time: f32,
+    pub total_time: f32,
+}
+
 #[derive(Debug)]
 pub struct Bullet {
     source: Entity,

@@ -1,3 +1,4 @@
+use crate::animation::{Animation, Skin};
 use crate::renderer::{AnimatedVertex, Vertex, TEXTURE_FORMAT};
 use wgpu::util::DeviceExt;
 
@@ -19,14 +20,7 @@ pub struct Assets {
 }
 
 impl Assets {
-    pub fn new(
-        device: &wgpu::Device,
-    ) -> anyhow::Result<(
-        Self,
-        wgpu::CommandBuffer,
-        crate::animation::skin::Skin,
-        crate::animation::animation::Animations,
-    )> {
+    pub fn new(device: &wgpu::Device) -> anyhow::Result<(Self, wgpu::CommandBuffer)> {
         let mut init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Cheese init_encoder"),
         });
@@ -45,9 +39,6 @@ impl Assets {
                     count: None,
                 }],
             });
-
-        let (gltf_model, skin, animations) =
-            AnimatedModel::load_gltf(include_bytes!("../animation/character.gltf"), "X", device)?;
 
         let assets = Self {
             surface_model: Model::load_gltf(
@@ -75,7 +66,11 @@ impl Assets {
                 "Cheese torus model",
                 device,
             )?,
-            gltf_model,
+            gltf_model: AnimatedModel::load_gltf(
+                include_bytes!("../animation/character.gltf"),
+                "X",
+                device,
+            )?,
             surface_texture: load_texture(
                 include_bytes!("../textures/surface.png"),
                 "Cheese surface texture",
@@ -115,7 +110,7 @@ impl Assets {
             texture_bind_group_layout,
         };
 
-        Ok((assets, init_encoder.finish(), skin, animations))
+        Ok((assets, init_encoder.finish()))
     }
 }
 
@@ -256,6 +251,8 @@ pub struct AnimatedModel {
     pub indices: wgpu::Buffer,
     pub num_indices: u32,
     pub joint_uniforms: wgpu::Buffer,
+    pub skin: Skin,
+    pub animations: Vec<Animation>,
 }
 
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Copy, Clone)]
@@ -269,11 +266,7 @@ impl AnimatedModel {
         gltf_bytes: &'static [u8],
         label: &str,
         device: &wgpu::Device,
-    ) -> anyhow::Result<(
-        Self,
-        crate::animation::skin::Skin,
-        crate::animation::animation::Animations,
-    )> {
+    ) -> anyhow::Result<Self> {
         let gltf = gltf::Gltf::from_slice(gltf_bytes)?;
 
         let buffers = load_buffers(&gltf)?;
@@ -317,40 +310,37 @@ impl AnimatedModel {
             }
         }
 
-        let skin = crate::animation::skin::Skin::load(
+        let skin = Skin::load(
             &gltf.skins().next().unwrap(),
             gltf.nodes(),
             &gltf.scenes().next().unwrap(),
             &buffers,
         );
 
-        let animations =
-            crate::animation::animation::load_animations(gltf.animations(), &buffers).unwrap();
+        let animations = crate::animation::load_animations(gltf.animations(), &buffers);
 
-        Ok((
-            Self {
-                vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(label),
-                    contents: bytemuck::cast_slice(&vertices),
-                    usage: wgpu::BufferUsage::VERTEX,
+        Ok(Self {
+            vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(label),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsage::VERTEX,
+            }),
+            indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::cast_slice(&indices),
+                usage: wgpu::BufferUsage::INDEX,
+            }),
+            joint_uniforms: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::bytes_of(&JointUniforms {
+                    num_joints: skin.joints().len() as u32,
                 }),
-                indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
-                    contents: bytemuck::cast_slice(&indices),
-                    usage: wgpu::BufferUsage::INDEX,
-                }),
-                joint_uniforms: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
-                    contents: bytemuck::bytes_of(&JointUniforms {
-                        num_joints: skin.joints().len() as u32,
-                    }),
-                    usage: wgpu::BufferUsage::UNIFORM,
-                }),
-                num_indices: indices.len() as u32,
-            },
-            skin,
+                usage: wgpu::BufferUsage::UNIFORM,
+            }),
+            num_indices: indices.len() as u32,
             animations,
-        ))
+            skin,
+        })
     }
 }
 

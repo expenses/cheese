@@ -214,88 +214,6 @@ struct NodesKeyFrame(
 #[derive(Debug)]
 pub struct Animations {
     pub animations: Vec<Animation>,
-    playback_state: PlaybackState,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct PlaybackState {
-    pub current: usize,
-    pub time: f32,
-    pub total_time: f32,
-    pub paused: bool,
-    pub playback_mode: PlaybackMode,
-}
-
-impl PlaybackState {
-    fn advance(&mut self, delta_time: f32) {
-        self.time = match self.playback_mode {
-            PlaybackMode::LOOP => (self.time + delta_time) % self.total_time,
-            PlaybackMode::ONCE => f32::min(self.time + delta_time, self.total_time),
-        };
-    }
-
-    fn set_current(&mut self, index: usize, animation: &Animation) {
-        if self.current != index {
-            self.time = 0.0;
-            self.total_time = animation.total_time;
-            self.current = index;
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum PlaybackMode {
-    LOOP,
-    ONCE,
-}
-
-impl Animations {
-    pub fn update(&mut self, skin: &mut Skin, delta_time: f32) -> bool {
-        if self.playback_state.paused {
-            return false;
-        }
-
-        match self.animations.get_mut(self.playback_state.current) {
-            Some(animation) => {
-                self.playback_state.advance(delta_time);
-                animation.animate(skin, self.playback_state.time)
-            }
-            _ => false,
-        }
-    }
-
-    pub fn get_playback_state(&self) -> &PlaybackState {
-        &self.playback_state
-    }
-
-    pub fn set_current(&mut self, index: usize) {
-        if index < self.animations.len() {
-            if let Some(animation) = self.animations.get(index) {
-                self.playback_state.set_current(index, animation);
-            }
-        }
-    }
-
-    pub fn set_playback_mode(&mut self, playback_mode: PlaybackMode) {
-        self.playback_state.playback_mode = playback_mode;
-    }
-
-    pub fn toggle(&mut self) {
-        self.playback_state.paused = !self.playback_state.paused;
-    }
-
-    pub fn stop(&mut self) {
-        self.playback_state.paused = true;
-        self.reset();
-    }
-
-    pub fn reset(&mut self) {
-        self.playback_state.time = 0.0;
-    }
-
-    pub fn animations(&self) -> &[Animation] {
-        &self.animations
-    }
 }
 
 #[derive(Debug)]
@@ -310,7 +228,7 @@ impl Animation {
     /// Update nodes' transforms from animation data.
     ///
     /// Returns true if any nodes was updated.
-    pub fn animate(&mut self, skin: &mut Skin, time: f32) -> bool {
+    pub fn animate(&self, skin: &mut Skin, time: f32) -> bool {
         let NodesKeyFrame(translations, rotations, scale) = self.sample(time);
         translations.iter().for_each(|(node_index, translation)| {
             skin.nodes.nodes_mut()[*node_index].local_translation = *translation;
@@ -345,26 +263,10 @@ impl Animation {
     }
 }
 
-pub fn load_animations(gltf_animations: GltfAnimations, data: &[Vec<u8>]) -> Option<Animations> {
-    if gltf_animations.len() == 0 {
-        return None;
-    }
-
-    let animations = gltf_animations
+pub fn load_animations(gltf_animations: GltfAnimations, data: &[Vec<u8>]) -> Vec<Animation> {
+    gltf_animations
         .map(|a| map_animation(&a, data))
-        .collect::<Vec<_>>();
-    let total_time = animations.get(0).map_or(0.0, |a| a.total_time);
-
-    Some(Animations {
-        animations,
-        playback_state: PlaybackState {
-            current: 0,
-            time: 0.0,
-            total_time,
-            paused: false,
-            playback_mode: PlaybackMode::LOOP,
-        },
-    })
+        .collect::<Vec<_>>()
 }
 
 fn map_animation(gltf_animation: &GltfAnimation, data: &[Vec<u8>]) -> Animation {
