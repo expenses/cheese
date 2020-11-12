@@ -37,8 +37,8 @@ pub fn render_units(
             Vec4::new(colour.x, colour.y, colour.z, 0.2)
         },
     });
-    for joint in skin.joints() {
-        model_buffers.mice_joints.push(joint.matrix());
+    for joint in &skin.joints {
+        model_buffers.mice_joints.push(joint.matrix);
     }
 }
 

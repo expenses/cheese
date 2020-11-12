@@ -310,7 +310,7 @@ impl AnimatedModel {
             label,
             vertices.len(),
             indices.len(),
-            skin.joints().len(),
+            skin.joints.len(),
             animations.len(),
         );
 
@@ -328,7 +328,7 @@ impl AnimatedModel {
             joint_uniforms: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Cheese joint uniform buffer"),
                 contents: bytemuck::bytes_of(&JointUniforms {
-                    num_joints: skin.joints().len() as u32,
+                    num_joints: skin.joints.len() as u32,
                 }),
                 usage: wgpu::BufferUsage::UNIFORM,
             }),

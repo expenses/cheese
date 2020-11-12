@@ -1,10 +1,13 @@
+// This file was originally copied from gltf-viewer-rs:
+// https://github.com/adrien-ben/gltf-viewer-rs/blob/master/model/src/animation.rs
+
 use super::skin::Skin;
-use cgmath::{InnerSpace, Quaternion};
+use cgmath::Quaternion;
 use gltf::{
     animation::{
         iter::Channels,
         util::{ReadOutputs, Reader},
-        Channel as GltfChannel, Interpolation as GltfInterpolation, Property,
+        Channel as GltfChannel, Interpolation, Property,
     },
     buffer::Buffer,
     iter::Animations as GltfAnimations,
@@ -51,38 +54,11 @@ pub fn slerp(left: Quaternion<f32>, right: Quaternion<f32>, amount: f32) -> Quat
 
 trait Interpolate: Copy {
     fn linear(self, other: Self, amount: f32) -> Self;
-
-    fn cubic_spline(
-        source: [Self; 3],
-        source_time: f32,
-        target: [Self; 3],
-        target_time: f32,
-        current_time: f32,
-    ) -> Self;
 }
 
 impl Interpolate for Vec3 {
     fn linear(self, other: Self, amount: f32) -> Self {
         self.lerp(other, amount)
-    }
-
-    fn cubic_spline(
-        source: [Self; 3],
-        source_time: f32,
-        target: [Self; 3],
-        target_time: f32,
-        amount: f32,
-    ) -> Self {
-        let t = amount;
-        let p0 = source[1];
-        let m0 = (target_time - source_time) * source[2];
-        let p1 = target[1];
-        let m1 = (target_time - source_time) * target[0];
-
-        (2.0 * t * t * t - 3.0 * t * t + 1.0) * p0
-            + (t * t * t - 2.0 * t * t + t) * m0
-            + (-2.0 * t * t * t + 3.0 * t * t) * p1
-            + (t * t * t - t * t) * m1
     }
 }
 
@@ -90,51 +66,24 @@ impl Interpolate for Quaternion<f32> {
     fn linear(self, other: Self, amount: f32) -> Self {
         slerp(self, other, amount)
     }
-
-    fn cubic_spline(
-        source: [Self; 3],
-        source_time: f32,
-        target: [Self; 3],
-        target_time: f32,
-        amount: f32,
-    ) -> Self {
-        let t = amount;
-        let p0 = source[1];
-        let m0 = (target_time - source_time) * source[2];
-        let p1 = target[1];
-        let m1 = (target_time - source_time) * target[0];
-
-        let result = (2.0 * t * t * t - 3.0 * t * t + 1.0) * p0
-            + (t * t * t - 2.0 * t * t + t) * m0
-            + (-2.0 * t * t * t + 3.0 * t * t) * p1
-            + (t * t * t - t * t) * m1;
-
-        result.normalize()
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-enum Interpolation {
-    Linear,
-    Step,
-    CubicSpline,
 }
 
 #[derive(Debug)]
-struct Sampler<T> {
+struct Channel<T> {
     interpolation: Interpolation,
     times: Vec<f32>,
     values: Vec<T>,
+    node_index: usize,
 }
 
-impl<T> Sampler<T> {
+impl<T> Channel<T> {
     fn get_max_time(&self) -> f32 {
         self.times.last().copied().unwrap_or(0.0)
     }
 }
 
-impl<T: Interpolate> Sampler<T> {
-    fn sample(&self, t: f32) -> Option<T> {
+impl<T: Interpolate> Channel<T> {
+    fn sample(&self, t: f32) -> Option<(usize, T)> {
         let index = {
             let mut index = None;
             for i in 0..(self.times.len() - 1) {
@@ -155,65 +104,12 @@ impl<T: Interpolate> Sampler<T> {
             let from_start = t - previous_time;
             let factor = from_start / delta;
 
-            match self.interpolation {
-                Interpolation::Step => self.values[i],
-                Interpolation::Linear => {
-                    let previous_value = self.values[i];
-                    let next_value = self.values[i + 1];
+            let previous_value = self.values[i];
+            let next_value = self.values[i + 1];
 
-                    previous_value.linear(next_value, factor)
-                }
-                Interpolation::CubicSpline => {
-                    let previous_values = [
-                        self.values[i * 3],
-                        self.values[i * 3 + 1],
-                        self.values[i * 3 + 2],
-                    ];
-                    let next_values = [
-                        self.values[i * 3 + 3],
-                        self.values[i * 3 + 4],
-                        self.values[i * 3 + 5],
-                    ];
-                    Interpolate::cubic_spline(
-                        previous_values,
-                        previous_time,
-                        next_values,
-                        next_time,
-                        factor,
-                    )
-                }
-            }
+            (self.node_index, previous_value.linear(next_value, factor))
         })
     }
-}
-
-#[derive(Debug)]
-struct Channel<T> {
-    sampler: Sampler<T>,
-    node_index: usize,
-}
-
-impl<T> Channel<T> {
-    fn get_max_time(&self) -> f32 {
-        self.sampler.get_max_time()
-    }
-}
-
-impl<T: Interpolate> Channel<T> {
-    fn sample(&self, t: f32) -> Option<(usize, T)> {
-        self.sampler.sample(t).map(|s| (self.node_index, s))
-    }
-}
-
-struct NodesKeyFrame(
-    Vec<(usize, Vec3)>,
-    Vec<(usize, Quaternion<f32>)>,
-    Vec<(usize, Vec3)>,
-);
-
-#[derive(Debug)]
-pub struct Animations {
-    pub animations: Vec<Animation>,
 }
 
 #[derive(Debug)]
@@ -228,37 +124,39 @@ impl Animation {
     /// Update nodes' transforms from animation data.
     ///
     /// Returns true if any nodes was updated.
-    pub fn animate(&self, skin: &mut Skin, time: f32) -> bool {
-        let NodesKeyFrame(translations, rotations, scale) = self.sample(time);
-        translations.iter().for_each(|(node_index, translation)| {
-            skin.nodes.nodes_mut()[*node_index].local_translation = *translation;
+    pub fn animate(&self, skin: &mut Skin, time: f32) {
+        let (translations, rotations, scale) = self.sample(time);
+        translations.for_each(|(node_index, translation)| {
+            skin.nodes.nodes_mut()[node_index].local_translation = translation;
         });
-        rotations.iter().for_each(|(node_index, rotation)| {
-            skin.nodes.nodes_mut()[*node_index].local_rotation = *rotation;
+        rotations.for_each(|(node_index, rotation)| {
+            skin.nodes.nodes_mut()[node_index].local_rotation = rotation;
         });
-        scale.iter().for_each(|(node_index, scale)| {
-            skin.nodes.nodes_mut()[*node_index].local_scale = *scale;
+        scale.for_each(|(node_index, scale)| {
+            skin.nodes.nodes_mut()[node_index].local_scale = scale;
         });
 
         skin.update();
-
-        !translations.is_empty() || !rotations.is_empty() || !scale.is_empty()
     }
 
-    fn sample(&self, t: f32) -> NodesKeyFrame {
-        NodesKeyFrame(
+    fn sample(
+        &self,
+        t: f32,
+    ) -> (
+        impl Iterator<Item = (usize, Vec3)> + '_,
+        impl Iterator<Item = (usize, Quaternion<f32>)> + '_,
+        impl Iterator<Item = (usize, Vec3)> + '_,
+    ) {
+        (
             self.translation_channels
                 .iter()
-                .filter_map(|tc| tc.sample(t))
-                .collect::<Vec<_>>(),
+                .filter_map(move |tc| tc.sample(t)),
             self.rotation_channels
                 .iter()
-                .filter_map(|tc| tc.sample(t))
-                .collect::<Vec<_>>(),
+                .filter_map(move |tc| tc.sample(t)),
             self.scale_channels
                 .iter()
-                .filter_map(|tc| tc.sample(t))
-                .collect::<Vec<_>>(),
+                .filter_map(move |tc| tc.sample(t)),
         )
     }
 }
@@ -313,18 +211,14 @@ fn map_translation_channels(gltf_channels: Channels, data: &[Vec<u8>]) -> Vec<Ch
 fn map_translation_channel(gltf_channel: &GltfChannel, data: &[Vec<u8>]) -> Option<Channel<Vec3>> {
     let gltf_sampler = gltf_channel.sampler();
     if let Property::Translation = gltf_channel.target().property() {
-        map_interpolation(gltf_sampler.interpolation()).map(|i| {
-            let reader = gltf_channel.reader(|buffer| Some(&data[buffer.index()]));
-            let times = read_times(&reader);
-            let output = read_translations(&reader);
-            Channel {
-                sampler: Sampler {
-                    interpolation: i,
-                    times,
-                    values: output,
-                },
-                node_index: gltf_channel.target().node().index(),
-            }
+        let reader = gltf_channel.reader(|buffer| Some(&data[buffer.index()]));
+        let times = read_times(&reader);
+        let output = read_translations(&reader);
+        Some(Channel {
+            interpolation: gltf_sampler.interpolation(),
+            times,
+            values: output,
+            node_index: gltf_channel.target().node().index(),
         })
     } else {
         None
@@ -347,18 +241,14 @@ fn map_rotation_channel(
 ) -> Option<Channel<Quaternion<f32>>> {
     let gltf_sampler = gltf_channel.sampler();
     if let Property::Rotation = gltf_channel.target().property() {
-        map_interpolation(gltf_sampler.interpolation()).map(|interpolation| {
-            let reader = gltf_channel.reader(|buffer| Some(&data[buffer.index()]));
-            let times = read_times(&reader);
-            let output = read_rotations(&reader);
-            Channel {
-                sampler: Sampler {
-                    interpolation,
-                    times,
-                    values: output,
-                },
-                node_index: gltf_channel.target().node().index(),
-            }
+        let reader = gltf_channel.reader(|buffer| Some(&data[buffer.index()]));
+        let times = read_times(&reader);
+        let output = read_rotations(&reader);
+        Some(Channel {
+            interpolation: gltf_sampler.interpolation(),
+            times,
+            values: output,
+            node_index: gltf_channel.target().node().index(),
         })
     } else {
         None
@@ -375,29 +265,17 @@ fn map_scale_channels(gltf_channels: Channels, data: &[Vec<u8>]) -> Vec<Channel<
 fn map_scale_channel(gltf_channel: &GltfChannel, data: &[Vec<u8>]) -> Option<Channel<Vec3>> {
     let gltf_sampler = gltf_channel.sampler();
     if let Property::Scale = gltf_channel.target().property() {
-        map_interpolation(gltf_sampler.interpolation()).map(|i| {
-            let reader = gltf_channel.reader(|buffer| Some(&data[buffer.index()]));
-            let times = read_times(&reader);
-            let output = read_scales(&reader);
-            Channel {
-                sampler: Sampler {
-                    interpolation: i,
-                    times,
-                    values: output,
-                },
-                node_index: gltf_channel.target().node().index(),
-            }
+        let reader = gltf_channel.reader(|buffer| Some(&data[buffer.index()]));
+        let times = read_times(&reader);
+        let output = read_scales(&reader);
+        Some(Channel {
+            interpolation: gltf_sampler.interpolation(),
+            times,
+            values: output,
+            node_index: gltf_channel.target().node().index(),
         })
     } else {
         None
-    }
-}
-
-fn map_interpolation(gltf_interpolation: GltfInterpolation) -> Option<Interpolation> {
-    match gltf_interpolation {
-        GltfInterpolation::Linear => Some(Interpolation::Linear),
-        GltfInterpolation::Step => Some(Interpolation::Step),
-        GltfInterpolation::CubicSpline => Some(Interpolation::CubicSpline),
     }
 }
 

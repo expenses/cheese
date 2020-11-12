@@ -1,3 +1,6 @@
+// This file was originally copied from gltf-viewer-rs:
+// https://github.com/adrien-ben/gltf-viewer-rs/blob/master/model/src/node.rs
+
 use cgmath::Quaternion;
 use ultraviolet::{Mat4, Vec3};
 
@@ -23,14 +26,14 @@ impl Nodes {
             let local_rotation = cgmath::Quaternion::new(wr, xr, yr, zr);
             let local_scale: Vec3 = local_scale.into();
 
-            let global_transform_matrix =
-                compute_transform_matrix(local_translation, local_rotation, local_scale);
+            let global_transform =
+                compute_transform(local_translation, local_rotation, local_scale);
             let children_indices = node.children().map(|c| c.index()).collect::<Vec<_>>();
             let node = Node {
                 local_translation,
                 local_rotation,
                 local_scale,
-                global_transform_matrix,
+                global_transform,
                 children_indices,
             };
             nodes.insert(node_index, node);
@@ -57,7 +60,7 @@ impl Nodes {
         for (index, parent_index) in &self.depth_first_taversal_indices {
             let parent_transform = parent_index.map(|id| {
                 let parent = &self.nodes[id];
-                parent.global_transform_matrix
+                parent.global_transform
             });
 
             if let Some(matrix) = parent_transform {
@@ -103,28 +106,24 @@ pub struct Node {
     pub local_translation: Vec3,
     pub local_rotation: Quaternion<f32>,
     pub local_scale: Vec3,
-    global_transform_matrix: Mat4,
+    pub global_transform: Mat4,
     children_indices: Vec<usize>,
 }
 
 impl Node {
     fn apply_transform(&mut self, transform: Mat4) {
-        let local_transform = compute_transform_matrix(
+        let local_transform = compute_transform(
             self.local_translation,
             self.local_rotation,
             self.local_scale,
         );
 
         let new_tranform = transform * local_transform;
-        self.global_transform_matrix = new_tranform;
-    }
-
-    pub fn transform(&self) -> Mat4 {
-        self.global_transform_matrix
+        self.global_transform = new_tranform;
     }
 }
 
-fn compute_transform_matrix(translation: Vec3, rotation: Quaternion<f32>, scale: Vec3) -> Mat4 {
+fn compute_transform(translation: Vec3, rotation: Quaternion<f32>, scale: Vec3) -> Mat4 {
     let translation = Mat4::from_translation(translation);
     let rotation = cgmath::Matrix4::from(rotation);
     let rotation: [[f32; 4]; 4] = rotation.into();

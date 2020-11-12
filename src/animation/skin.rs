@@ -1,9 +1,12 @@
+// This file was originally copied from gltf-viewer-rs:
+// https://github.com/adrien-ben/gltf-viewer-rs/blob/master/model/src/skin.rs
+
 use super::node::{Node, Nodes};
 use ultraviolet::Mat4;
 
 #[derive(Clone, Debug)]
 pub struct Skin {
-    joints: Vec<Joint>,
+    pub joints: Vec<Joint>,
     pub nodes: Nodes,
 }
 
@@ -45,15 +48,11 @@ impl Skin {
 
         self.joints.iter_mut().for_each(|j| j.compute_matrix(nodes));
     }
-
-    pub fn joints(&self) -> &[Joint] {
-        &self.joints
-    }
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct Joint {
-    matrix: Mat4,
+    pub matrix: Mat4,
     inverse_bind_matrix: Mat4,
     node_id: usize,
 }
@@ -68,11 +67,7 @@ impl Joint {
     }
 
     fn compute_matrix(&mut self, nodes: &[Node]) {
-        let node_transform = nodes[self.node_id].transform();
+        let node_transform = nodes[self.node_id].global_transform;
         self.matrix = node_transform * self.inverse_bind_matrix;
-    }
-
-    pub fn matrix(&self) -> Mat4 {
-        self.matrix
     }
 }
