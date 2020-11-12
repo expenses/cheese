@@ -321,16 +321,21 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
             return false;
         }
 
+        self.len = self.waiting.len();
         let bytes = bytemuck::cast_slice(&self.waiting);
 
         if self.waiting.len() <= self.capacity {
             context.queue.write_buffer(&self.buffer, 0, bytes);
-            self.len = self.waiting.len();
             self.waiting.clear();
             return false;
         } else {
             self.capacity = (self.capacity * 2).max(self.waiting.len());
-            log::debug!("Resizing '{}' to {} items", self.label, self.capacity);
+            log::debug!(
+                "Resizing '{}' to {} items to fit {} items",
+                self.label,
+                self.capacity,
+                self.len
+            );
             self.buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(self.label),
                 size: (self.capacity * std::mem::size_of::<T>()) as u64,
@@ -342,7 +347,6 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
                 .get_mapped_range_mut()
                 .copy_from_slice(bytes);
             self.buffer.unmap();
-            self.len = self.waiting.len();
             self.waiting.clear();
             return true;
         }

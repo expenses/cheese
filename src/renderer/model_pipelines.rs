@@ -339,7 +339,7 @@ impl ModelBuffers {
     pub fn new(context: &RenderContext, assets: &Assets) -> Self {
         let mice_joints = DynamicBuffer::new(
             &context.device,
-            1000,
+            320,
             "Cheese mice joints buffer",
             wgpu::BufferUsage::STORAGE,
         );
@@ -351,24 +351,12 @@ impl ModelBuffers {
                 "Cheese mice instance buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
-            mice_joints_bind_group: context
-                .device
-                .create_bind_group(&wgpu::BindGroupDescriptor {
-                    layout: &context.joint_bind_group_layout,
-                    label: Some("Cheese mice joints bind group"),
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::Buffer(mice_joints.buffer.slice(..)),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Buffer(
-                                assets.gltf_model.joint_uniforms.slice(..),
-                            ),
-                        },
-                    ],
-                }),
+            mice_joints_bind_group: create_joint_bind_group(
+                context,
+                "Cheese mice joints bind group",
+                &mice_joints,
+                &assets.gltf_model,
+            ),
             mice_joints,
             bullets: DynamicBuffer::new(
                 &context.device,
@@ -393,29 +381,38 @@ impl ModelBuffers {
 
         // We need to recreate the bind group
         if mice_resized {
-            self.mice_joints_bind_group =
-                context
-                    .device
-                    .create_bind_group(&wgpu::BindGroupDescriptor {
-                        layout: &context.joint_bind_group_layout,
-                        label: Some("Cheese mice joints bind group"),
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: wgpu::BindingResource::Buffer(
-                                    self.mice_joints.buffer.slice(..),
-                                ),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 1,
-                                resource: wgpu::BindingResource::Buffer(
-                                    assets.gltf_model.joint_uniforms.slice(..),
-                                ),
-                            },
-                        ],
-                    });
+            self.mice_joints_bind_group = create_joint_bind_group(
+                context,
+                "Cheese mice joints bind group",
+                &self.mice_joints,
+                &assets.gltf_model,
+            );
         }
     }
+}
+
+fn create_joint_bind_group(
+    context: &RenderContext,
+    label: &str,
+    joint_buffer: &DynamicBuffer<Mat4>,
+    model: &AnimatedModel,
+) -> wgpu::BindGroup {
+    context
+        .device
+        .create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(label),
+            layout: &context.joint_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(joint_buffer.buffer.slice(..)),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Buffer(model.joint_uniforms.slice(..)),
+                },
+            ],
+        })
 }
 
 #[repr(C)]

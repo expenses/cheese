@@ -237,7 +237,7 @@ impl Model {
                 usage: wgpu::BufferUsage::VERTEX,
             }),
             indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
+                label: Some("Cheese index buffer"),
                 contents: bytemuck::cast_slice(&indices),
                 usage: wgpu::BufferUsage::INDEX,
             }),
@@ -326,12 +326,12 @@ impl AnimatedModel {
                 usage: wgpu::BufferUsage::VERTEX,
             }),
             indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
+                label: Some("Cheese index buffer"),
                 contents: bytemuck::cast_slice(&indices),
                 usage: wgpu::BufferUsage::INDEX,
             }),
             joint_uniforms: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
+                label: Some("Cheese joint uniform buffer"),
                 contents: bytemuck::bytes_of(&JointUniforms {
                     num_joints: skin.joints().len() as u32,
                 }),
