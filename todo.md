@@ -1,3 +1,2 @@
-- Mouse modeling, texturing rigging and animating (important, can save for later)
-- Add animation system to renderer (medium)
+- Make command paths nicer.
 - Fill out HUD (medium)
