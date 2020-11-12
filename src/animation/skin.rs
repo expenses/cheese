@@ -1,5 +1,5 @@
 use super::node::{Node, Nodes};
-use cgmath::{Matrix4, SquareMatrix};
+use ultraviolet::Mat4;
 
 #[derive(Clone, Debug)]
 pub struct Skin {
@@ -8,13 +8,20 @@ pub struct Skin {
 }
 
 impl Skin {
-    pub fn load(gltf_skin: &gltf::Skin, nodes: Nodes, buffers: &[Vec<u8>]) -> Self {
+    pub fn load(
+        gltf_skin: &gltf::Skin,
+        gltf_nodes: gltf::iter::Nodes,
+        scene: &gltf::Scene,
+        buffers: &[Vec<u8>],
+    ) -> Self {
+        let nodes = Nodes::from_gltf_nodes(gltf_nodes, scene);
+
         let joint_count = gltf_skin.joints().count();
         let inverse_bind_matrices: Vec<_> = gltf_skin
             .reader(|buffer| Some(&buffers[buffer.index()]))
             .read_inverse_bind_matrices()
             .unwrap()
-            .map(|mat| Matrix4::from(mat))
+            .map(|mat| mat.into())
             .collect();
 
         let node_ids = gltf_skin
@@ -49,15 +56,15 @@ impl Skin {
 
 #[derive(Copy, Clone, Debug)]
 pub struct Joint {
-    matrix: Matrix4<f32>,
-    inverse_bind_matrix: Matrix4<f32>,
+    matrix: Mat4,
+    inverse_bind_matrix: Mat4,
     node_id: usize,
 }
 
 impl Joint {
-    fn new(inverse_bind_matrix: Matrix4<f32>, node_id: usize) -> Self {
+    fn new(inverse_bind_matrix: Mat4, node_id: usize) -> Self {
         Joint {
-            matrix: Matrix4::identity(),
+            matrix: Mat4::identity(),
             inverse_bind_matrix,
             node_id,
         }
@@ -68,7 +75,7 @@ impl Joint {
         self.matrix = node_transform * self.inverse_bind_matrix;
     }
 
-    pub fn matrix(&self) -> Matrix4<f32> {
+    pub fn matrix(&self) -> Mat4 {
         self.matrix
     }
 }

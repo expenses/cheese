@@ -57,8 +57,7 @@ async fn run() -> anyhow::Result<()> {
     let event_loop = EventLoop::new();
 
     let mut render_context = RenderContext::new(&event_loop).await?;
-    let (mut assets, command_buffer, mut skin, mut animations) =
-        Assets::new(&render_context.device())?;
+    let (assets, command_buffer, mut skin, mut animations) = Assets::new(&render_context.device())?;
     render_context.submit(command_buffer);
     let model_pipelines = ModelPipelines::new(&render_context, &assets);
     let torus_pipeline = TorusPipeline::new(&render_context);
@@ -133,8 +132,6 @@ async fn run() -> anyhow::Result<()> {
         .build();
 
     let mut time = std::time::Instant::now();
-
-    let mut T = 0.0;
 
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -230,8 +227,7 @@ async fn run() -> anyhow::Result<()> {
                 use ultraviolet::Mat4;
                 let mut matrices = vec![Mat4::identity(); skin.joints().len()];
                 for (i, j) in skin.joints().iter().enumerate() {
-                    let x: [[f32; 4]; 4] = j.matrix().into();
-                    matrices[i] = x.into();
+                    matrices[i] = j.matrix();
                 }
 
                 use wgpu::util::DeviceExt;
@@ -256,9 +252,6 @@ async fn run() -> anyhow::Result<()> {
                                 resource: wgpu::BindingResource::Buffer(buffer.slice(..)),
                             }],
                         });
-
-                T += 0.02;
-                T = T % 1.0_f32;
 
                 // Upload buffers to the gpu.
                 render_context.update_view(camera.to_matrix());

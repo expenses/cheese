@@ -1,5 +1,4 @@
 use crate::renderer::{AnimatedVertex, Vertex, TEXTURE_FORMAT};
-use ultraviolet::{Mat4, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 
 pub struct Assets {
@@ -305,7 +304,7 @@ impl AnimatedModel {
                             position: p.into(),
                             normal: n.into(),
                             uv: uv.into(),
-                            joints: Vec4::new(j[0] as f32, j[1] as f32, j[2] as f32, j[3] as f32),
+                            joints: [j[0] as f32, j[1] as f32, j[2] as f32, j[3] as f32].into(),
                             joint_weights: w.into(),
                         });
                     });
@@ -314,13 +313,12 @@ impl AnimatedModel {
             }
         }
 
-        let mut nodes = crate::animation::node::Nodes::from_gltf_nodes(
+        let skin = crate::animation::skin::Skin::load(
+            &gltf.skins().next().unwrap(),
             gltf.nodes(),
             &gltf.scenes().next().unwrap(),
+            &buffers,
         );
-
-        let mut skin =
-            crate::animation::skin::Skin::load(&gltf.skins().next().unwrap(), nodes, &buffers);
 
         let animations =
             crate::animation::animation::load_animations(gltf.animations(), &buffers).unwrap();
@@ -337,9 +335,7 @@ impl AnimatedModel {
                     contents: bytemuck::cast_slice(&indices),
                     usage: wgpu::BufferUsage::INDEX,
                 }),
-                //inverse_bind_matrices,
                 num_indices: indices.len() as u32,
-                //joints, animations,
             },
             skin,
             animations,

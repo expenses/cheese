@@ -1,4 +1,5 @@
-use cgmath::{Matrix4, Quaternion, Vector3};
+use cgmath::Quaternion;
+use ultraviolet::{Mat4, Vec3};
 
 #[derive(Clone, Debug)]
 pub struct Nodes {
@@ -8,7 +9,7 @@ pub struct Nodes {
 }
 
 impl Nodes {
-    pub fn from_gltf_nodes(gltf_nodes: gltf::iter::Nodes, scene: &gltf::Scene) -> Nodes {
+    pub fn from_gltf_nodes(gltf_nodes: gltf::iter::Nodes, scene: &gltf::Scene) -> Self {
         let roots_indices = scene.nodes().map(|n| n.index()).collect::<Vec<_>>();
         let node_count = gltf_nodes.len();
         let mut nodes = Vec::with_capacity(node_count);
@@ -16,11 +17,11 @@ impl Nodes {
             let node_index = node.index();
 
             let (local_translation, local_rotation, local_scale) = node.transform().decomposed();
-            let local_translation: Vector3<f32> = local_translation.into();
+            let local_translation: Vec3 = local_translation.into();
             // Different order!!!
             let [xr, yr, zr, wr] = local_rotation;
             let local_rotation = cgmath::Quaternion::new(wr, xr, yr, zr);
-            let local_scale: Vector3<f32> = local_scale.into();
+            let local_scale: Vec3 = local_scale.into();
 
             let global_transform_matrix =
                 compute_transform_matrix(local_translation, local_rotation, local_scale);
@@ -39,7 +40,7 @@ impl Nodes {
             nodes.insert(node_index, node);
         }
 
-        let mut nodes = Nodes::new(nodes, roots_indices);
+        let mut nodes = Self::new(nodes, roots_indices);
         // Derive the global transform
         nodes.transform(None);
         nodes
@@ -56,7 +57,7 @@ impl Nodes {
 }
 
 impl Nodes {
-    pub fn transform(&mut self, global_transform: Option<Matrix4<f32>>) {
+    pub fn transform(&mut self, global_transform: Option<Mat4>) {
         for (index, parent_index) in &self.depth_first_taversal_indices {
             let parent_transform = parent_index
                 .map(|id| {
@@ -105,17 +106,17 @@ impl Nodes {
 
 #[derive(Clone, Debug)]
 pub struct Node {
-    pub local_translation: Vector3<f32>,
+    pub local_translation: Vec3,
     pub local_rotation: Quaternion<f32>,
-    pub local_scale: Vector3<f32>,
-    global_transform_matrix: Matrix4<f32>,
+    pub local_scale: Vec3,
+    global_transform_matrix: Mat4,
     mesh_index: Option<usize>,
     skin_index: Option<usize>,
     children_indices: Vec<usize>,
 }
 
 impl Node {
-    fn apply_transform(&mut self, transform: Matrix4<f32>) {
+    fn apply_transform(&mut self, transform: Mat4) {
         let local_transform = compute_transform_matrix(
             self.local_translation,
             self.local_rotation,
@@ -128,7 +129,7 @@ impl Node {
 }
 
 impl Node {
-    pub fn transform(&self) -> Matrix4<f32> {
+    pub fn transform(&self) -> Mat4 {
         self.global_transform_matrix
     }
 
@@ -141,13 +142,11 @@ impl Node {
     }
 }
 
-fn compute_transform_matrix(
-    translation: Vector3<f32>,
-    rotation: Quaternion<f32>,
-    scale: Vector3<f32>,
-) -> Matrix4<f32> {
-    let translation = Matrix4::from_translation(translation);
-    let rotation = Matrix4::from(rotation);
-    let scale = Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z);
+fn compute_transform_matrix(translation: Vec3, rotation: Quaternion<f32>, scale: Vec3) -> Mat4 {
+    let translation = Mat4::from_translation(translation);
+    let rotation = cgmath::Matrix4::from(rotation);
+    let rotation: [[f32; 4]; 4] = rotation.into();
+    let rotation = Mat4::from(rotation);
+    let scale = Mat4::from_nonuniform_scale(scale);
     translation * rotation * scale
 }

@@ -1,5 +1,5 @@
 use super::skin::Skin;
-use cgmath::{InnerSpace, Quaternion, Vector3, VectorSpace};
+use cgmath::{InnerSpace, Quaternion};
 use gltf::{
     animation::{
         iter::Channels,
@@ -11,6 +11,7 @@ use gltf::{
     Animation as GltfAnimation,
 };
 use std::cmp::Ordering;
+use ultraviolet::{Lerp, Vec3};
 
 /// slerp from cgmath is bugged.
 ///
@@ -60,7 +61,7 @@ trait Interpolate: Copy {
     ) -> Self;
 }
 
-impl Interpolate for Vector3<f32> {
+impl Interpolate for Vec3 {
     fn linear(self, other: Self, amount: f32) -> Self {
         self.lerp(other, amount)
     }
@@ -205,9 +206,9 @@ impl<T: Interpolate> Channel<T> {
 }
 
 struct NodesKeyFrame(
-    Vec<(usize, Vector3<f32>)>,
+    Vec<(usize, Vec3)>,
     Vec<(usize, Quaternion<f32>)>,
-    Vec<(usize, Vector3<f32>)>,
+    Vec<(usize, Vec3)>,
 );
 
 #[derive(Debug)]
@@ -300,9 +301,9 @@ impl Animations {
 #[derive(Debug)]
 pub struct Animation {
     total_time: f32,
-    translation_channels: Vec<Channel<Vector3<f32>>>,
+    translation_channels: Vec<Channel<Vec3>>,
     rotation_channels: Vec<Channel<Quaternion<f32>>>,
-    scale_channels: Vec<Channel<Vector3<f32>>>,
+    scale_channels: Vec<Channel<Vec3>>,
 }
 
 impl Animation {
@@ -400,20 +401,14 @@ fn map_animation(gltf_animation: &GltfAnimation, data: &[Vec<u8>]) -> Animation 
     }
 }
 
-fn map_translation_channels(
-    gltf_channels: Channels,
-    data: &[Vec<u8>],
-) -> Vec<Channel<Vector3<f32>>> {
+fn map_translation_channels(gltf_channels: Channels, data: &[Vec<u8>]) -> Vec<Channel<Vec3>> {
     gltf_channels
         .filter(|c| c.target().property() == Property::Translation)
         .filter_map(|c| map_translation_channel(&c, data))
         .collect::<Vec<_>>()
 }
 
-fn map_translation_channel(
-    gltf_channel: &GltfChannel,
-    data: &[Vec<u8>],
-) -> Option<Channel<Vector3<f32>>> {
+fn map_translation_channel(gltf_channel: &GltfChannel, data: &[Vec<u8>]) -> Option<Channel<Vec3>> {
     let gltf_sampler = gltf_channel.sampler();
     if let Property::Translation = gltf_channel.target().property() {
         map_interpolation(gltf_sampler.interpolation()).map(|i| {
@@ -468,17 +463,14 @@ fn map_rotation_channel(
     }
 }
 
-fn map_scale_channels(gltf_channels: Channels, data: &[Vec<u8>]) -> Vec<Channel<Vector3<f32>>> {
+fn map_scale_channels(gltf_channels: Channels, data: &[Vec<u8>]) -> Vec<Channel<Vec3>> {
     gltf_channels
         .filter(|c| c.target().property() == Property::Scale)
         .filter_map(|c| map_scale_channel(&c, data))
         .collect::<Vec<_>>()
 }
 
-fn map_scale_channel(
-    gltf_channel: &GltfChannel,
-    data: &[Vec<u8>],
-) -> Option<Channel<Vector3<f32>>> {
+fn map_scale_channel(gltf_channel: &GltfChannel, data: &[Vec<u8>]) -> Option<Channel<Vec3>> {
     let gltf_sampler = gltf_channel.sampler();
     if let Property::Scale = gltf_channel.target().property() {
         map_interpolation(gltf_sampler.interpolation()).map(|i| {
@@ -514,26 +506,26 @@ where
     reader.read_inputs().map_or(vec![], |times| times.collect())
 }
 
-fn read_translations<'a, 's, F>(reader: &Reader<'a, 's, F>) -> Vec<Vector3<f32>>
+fn read_translations<'a, 's, F>(reader: &Reader<'a, 's, F>) -> Vec<Vec3>
 where
     F: Clone + Fn(Buffer<'a>) -> Option<&'s [u8]>,
 {
     reader
         .read_outputs()
         .map_or(vec![], |outputs| match outputs {
-            ReadOutputs::Translations(translations) => translations.map(Vector3::from).collect(),
+            ReadOutputs::Translations(translations) => translations.map(Vec3::from).collect(),
             _ => vec![],
         })
 }
 
-fn read_scales<'a, 's, F>(reader: &Reader<'a, 's, F>) -> Vec<Vector3<f32>>
+fn read_scales<'a, 's, F>(reader: &Reader<'a, 's, F>) -> Vec<Vec3>
 where
     F: Clone + Fn(Buffer<'a>) -> Option<&'s [u8]>,
 {
     reader
         .read_outputs()
         .map_or(vec![], |outputs| match outputs {
-            ReadOutputs::Scales(scales) => scales.map(Vector3::from).collect(),
+            ReadOutputs::Scales(scales) => scales.map(Vec3::from).collect(),
             _ => vec![],
         })
 }
