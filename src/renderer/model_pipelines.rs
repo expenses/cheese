@@ -3,7 +3,7 @@ use super::{
 };
 use crate::assets::{AnimatedModel, Assets, Model};
 use std::sync::Arc;
-use ultraviolet::{Mat4, Vec4};
+use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 
 pub struct ModelPipelines {
@@ -101,19 +101,22 @@ impl ModelPipelines {
     pub fn render_animated<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
+        instances: &'a wgpu::Buffer,
         texture: &'a wgpu::BindGroup,
         model: &'a AnimatedModel,
         joints: &'a wgpu::BindGroup,
     ) {
+        //if let Some((slice, num)) = instances.get() {
         render_pass.set_pipeline(&self.animated_pipeline);
         render_pass.set_bind_group(0, &self.main_bind_group, &[]);
         render_pass.set_bind_group(1, texture, &[]);
         render_pass.set_bind_group(2, joints, &[]);
 
         render_pass.set_vertex_buffer(0, model.vertices.slice(..));
-        render_pass.set_vertex_buffer(1, self.identity_instance_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, instances.slice(..));
         render_pass.set_index_buffer(model.indices.slice(..));
-        render_pass.draw_indexed(0..model.num_indices, 0, 0..1);
+        render_pass.draw_indexed(0..model.num_indices, 0, 0..2);
+        //}
     }
 
     pub fn render_single<'a>(
@@ -366,4 +369,15 @@ impl ModelBuffers {
 pub struct ModelInstance {
     pub flat_colour: Vec4,
     pub transform: Mat4,
+}
+
+impl ModelInstance {
+    pub fn from_parts(translation: Vec2, rotation: f32, flat_colour: Vec4) -> Self {
+        let translation = Mat4::from_translation(Vec3::new(translation.x, 0.0, translation.y));
+        let rotation = Mat4::from_rotation_y(rotation);
+        Self {
+            transform: translation * rotation,
+            flat_colour,
+        }
+    }
 }

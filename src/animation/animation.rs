@@ -213,7 +213,7 @@ struct NodesKeyFrame(
 
 #[derive(Debug)]
 pub struct Animations {
-    animations: Vec<Animation>,
+    pub animations: Vec<Animation>,
     playback_state: PlaybackState,
 }
 

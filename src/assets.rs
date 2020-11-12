@@ -255,9 +255,13 @@ pub struct AnimatedModel {
     pub vertices: wgpu::Buffer,
     pub indices: wgpu::Buffer,
     pub num_indices: u32,
-    //pub inverse_bind_matrices: Vec<Mat4>,
-    //pub joints: crate::animation::JointTree,
-    //pub animations: Vec<crate::animation::Animation>,
+    pub joint_uniforms: wgpu::Buffer,
+}
+
+#[derive(bytemuck::Pod, bytemuck::Zeroable, Copy, Clone)]
+#[repr(C)]
+struct JointUniforms {
+    num_joints: u32,
 }
 
 impl AnimatedModel {
@@ -334,6 +338,13 @@ impl AnimatedModel {
                     label: None,
                     contents: bytemuck::cast_slice(&indices),
                     usage: wgpu::BufferUsage::INDEX,
+                }),
+                joint_uniforms: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: bytemuck::bytes_of(&JointUniforms {
+                        num_joints: skin.joints().len() as u32,
+                    }),
+                    usage: wgpu::BufferUsage::UNIFORM,
                 }),
                 num_indices: indices.len() as u32,
             },

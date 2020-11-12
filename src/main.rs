@@ -58,6 +58,7 @@ async fn run() -> anyhow::Result<()> {
 
     let mut render_context = RenderContext::new(&event_loop).await?;
     let (assets, command_buffer, mut skin, mut animations) = Assets::new(&render_context.device())?;
+    let mut skin_2 = skin.clone();
     render_context.submit(command_buffer);
     let model_pipelines = ModelPipelines::new(&render_context, &assets);
     let torus_pipeline = TorusPipeline::new(&render_context);
@@ -222,15 +223,39 @@ async fn run() -> anyhow::Result<()> {
                 let mut line_buffers = resources.get_mut::<LineBuffers>().unwrap();
                 let mut text_buffer = resources.get_mut::<TextBuffer>().unwrap();
 
-                animations.update(&mut skin, 1.0 / 60.0);
-                skin.update();
+                animations.animations[0].animate(&mut skin, 1.0 / 60.0);
+                animations.animations[0].animate(&mut skin_2, 15.0 / 60.0);
                 use ultraviolet::Mat4;
-                let mut matrices = vec![Mat4::identity(); skin.joints().len()];
+                let mut matrices = vec![Mat4::identity(); skin.joints().len() * 2];
                 for (i, j) in skin.joints().iter().enumerate() {
                     matrices[i] = j.matrix();
                 }
 
+                for (i, j) in skin_2.joints().iter().enumerate() {
+                    matrices[i + skin.joints().len()] = j.matrix();
+                }
+
                 use wgpu::util::DeviceExt;
+
+                let instances =
+                    render_context
+                        .device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("Cheese whatever"),
+                            contents: bytemuck::cast_slice(&[
+                                crate::renderer::ModelInstance::from_parts(
+                                    Vec2::new(1.0, 0.0),
+                                    1.0,
+                                    ultraviolet::Vec4::one(),
+                                ),
+                                crate::renderer::ModelInstance::from_parts(
+                                    Vec2::new(-5.0, 0.0),
+                                    2.0,
+                                    ultraviolet::Vec4::one(),
+                                ),
+                            ]),
+                            usage: wgpu::BufferUsage::VERTEX,
+                        });
 
                 let buffer =
                     render_context
@@ -247,10 +272,18 @@ async fn run() -> anyhow::Result<()> {
                         .create_bind_group(&wgpu::BindGroupDescriptor {
                             label: Some("Cheese test joint bind group"),
                             layout: &render_context.joint_bind_group_layout,
-                            entries: &[wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: wgpu::BindingResource::Buffer(buffer.slice(..)),
-                            }],
+                            entries: &[
+                                wgpu::BindGroupEntry {
+                                    binding: 0,
+                                    resource: wgpu::BindingResource::Buffer(buffer.slice(..)),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 1,
+                                    resource: wgpu::BindingResource::Buffer(
+                                        assets.gltf_model.joint_uniforms.slice(..),
+                                    ),
+                                },
+                            ],
                         });
 
                 // Upload buffers to the gpu.
@@ -328,6 +361,7 @@ async fn run() -> anyhow::Result<()> {
                     );*/
                     model_pipelines.render_animated(
                         &mut render_pass,
+                        &instances,
                         &assets.character_texture,
                         &assets.gltf_model,
                         &joint_bind_group,

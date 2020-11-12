@@ -46,9 +46,7 @@ impl Skin {
 
         self.joints.iter_mut().for_each(|j| j.compute_matrix(nodes));
     }
-}
 
-impl Skin {
     pub fn joints(&self) -> &[Joint] {
         &self.joints
     }

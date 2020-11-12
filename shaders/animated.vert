@@ -24,16 +24,22 @@ layout(set = 2, binding = 0) readonly buffer Joints {
 	mat4 joints[];
 };
 
+layout(set = 2, binding = 1) uniform JointUniforms {
+    uint num_joints;
+};
+
 void main() {
     out_uv = uv;
     out_flat_colour = flat_colour;
 
+    uint joint_offset = gl_InstanceIndex * num_joints;
+
     // Calculate skinned matrix from weights and joint indices of the current vertex
 	mat4 skin = 
-		joint_weights.x * joints[int(joint_indices.x)] +
-		joint_weights.y * joints[int(joint_indices.y)] +
-		joint_weights.z * joints[int(joint_indices.z)] +
-		joint_weights.w * joints[int(joint_indices.w)];
+		joint_weights.x * joints[int(joint_indices.x) + joint_offset] +
+		joint_weights.y * joints[int(joint_indices.y) + joint_offset] +
+		joint_weights.z * joints[int(joint_indices.z) + joint_offset] +
+		joint_weights.w * joints[int(joint_indices.w) + joint_offset];
 
     mat4 modelview = view * transform;
     gl_Position = perspective * modelview * skin * vec4(position, 1.0);
