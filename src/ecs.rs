@@ -89,6 +89,11 @@ pub struct UnitStats {
     pub health_bar_height: f32,
 }
 
+enum MouseAnimation {
+    Idle = 0,
+    Walking = 1,
+}
+
 impl Unit {
     fn stats(self) -> UnitStats {
         match self {
@@ -112,7 +117,8 @@ impl Unit {
     pub fn add_to_world(
         self,
         world: &mut World,
-        assets: &Assets,
+        // This is only `None` when being run in a test
+        assets: Option<&Assets>,
         position: Vec2,
         facing: Facing,
         side: Side,
@@ -125,7 +131,7 @@ impl Unit {
             health_bar_height: _,
         } = self.stats();
 
-        world.push((
+        let entity = world.push((
             Position(position),
             facing,
             side,
@@ -139,13 +145,20 @@ impl Unit {
             FiringRange(firing_range),
             MoveSpeed(move_speed),
             Radius(radius),
-            assets.mouse_model.skin.clone(),
-            AnimationState {
-                animation: 1,
+        ));
+
+        if let Some(assets) = assets {
+            let mut entry = world.entry(entity).unwrap();
+        
+            entry.add_component(assets.mouse_model.skin.clone());
+            entry.add_component(AnimationState {
+                animation: MouseAnimation::Idle as usize,
                 time: 0.0,
-                total_time: assets.mouse_model.animations[1].total_time,
-            },
-        ))
+                total_time: assets.mouse_model.animations[MouseAnimation::Idle as usize].total_time,
+            });
+        }
+
+        entity
     }
 }
 

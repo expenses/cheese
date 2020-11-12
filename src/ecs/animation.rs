@@ -1,4 +1,4 @@
-use super::{AnimationState, Command, CommandQueue};
+use super::{AnimationState, MouseAnimation, Command, CommandQueue};
 use crate::animation::Skin;
 use crate::assets::Assets;
 use crate::resources::DeltaTime;
@@ -12,9 +12,9 @@ pub fn progress_animations(
     #[resource] delta_time: &DeltaTime,
 ) {
     let animation = match commands.0.front() {
-        Some(&Command::MoveTo(_)) | Some(&Command::AttackMove(_)) => 1,
-        _ => 0,
-    };
+        Some(&Command::MoveTo(_)) | Some(&Command::AttackMove(_)) => MouseAnimation::Walking,
+        _ => MouseAnimation::Idle,
+    } as usize;
 
     if animation != animation_state.animation {
         animation_state.animation = animation;

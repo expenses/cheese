@@ -91,7 +91,7 @@ async fn run() -> anyhow::Result<()> {
     for i in 0..10 {
         ecs::Unit::MouseMarine.add_to_world(
             &mut world,
-            &assets,
+            Some(&assets),
             Vec2::new(-10.0, i as f32 / 100.0),
             ecs::Facing(1.0),
             ecs::Side::Purple,
@@ -101,7 +101,7 @@ async fn run() -> anyhow::Result<()> {
     for i in 0..10 {
         ecs::Unit::MouseMarine.add_to_world(
             &mut world,
-            &assets,
+            Some(&assets),
             Vec2::new(10.0, i as f32 / 100.0),
             ecs::Facing(1.0),
             ecs::Side::Green,
