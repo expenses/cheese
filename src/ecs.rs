@@ -8,10 +8,12 @@ use legion::*;
 use std::collections::VecDeque;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
+mod animation;
 mod combat;
 mod controls;
 mod movement;
 mod rendering;
+pub use animation::*;
 pub use combat::*;
 pub use controls::*;
 pub use movement::*;
@@ -137,11 +139,11 @@ impl Unit {
             FiringRange(firing_range),
             MoveSpeed(move_speed),
             Radius(radius),
-            assets.gltf_model.skin.clone(),
+            assets.mouse_model.skin.clone(),
             AnimationState {
-                animation: 0,
+                animation: 1,
                 time: 0.0,
-                total_time: assets.gltf_model.animations[0].total_time,
+                total_time: assets.mouse_model.animations[1].total_time,
             },
         ))
     }

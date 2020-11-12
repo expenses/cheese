@@ -5,10 +5,9 @@ use wgpu::util::DeviceExt;
 pub struct Assets {
     pub surface_model: Model,
     pub bullet_model: Model,
-    pub mouse_model: Model,
+    pub mouse_model: AnimatedModel,
     pub mouse_helmet_model: Model,
     pub torus_model: Model,
-    pub gltf_model: AnimatedModel,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
@@ -16,7 +15,6 @@ pub struct Assets {
     pub colours_texture: wgpu::BindGroup,
     pub hud_texture: wgpu::BindGroup,
     pub mouse_texture: wgpu::BindGroup,
-    pub character_texture: wgpu::BindGroup,
 }
 
 impl Assets {
@@ -51,7 +49,7 @@ impl Assets {
                 "Cheese bullet model",
                 device,
             )?,
-            mouse_model: Model::load_gltf(
+            mouse_model: AnimatedModel::load_gltf(
                 include_bytes!("../models/mouse.gltf"),
                 "Cheese mouse model",
                 device,
@@ -64,11 +62,6 @@ impl Assets {
             torus_model: Model::load_gltf(
                 include_bytes!("../models/torus.gltf"),
                 "Cheese torus model",
-                device,
-            )?,
-            gltf_model: AnimatedModel::load_gltf(
-                include_bytes!("../animation/character.gltf"),
-                "X",
                 device,
             )?,
             surface_texture: load_texture(
@@ -94,13 +87,6 @@ impl Assets {
             )?,
             mouse_texture: load_texture(
                 include_bytes!("../textures/mouse.png"),
-                "Cheese mouse texture",
-                &texture_bind_group_layout,
-                device,
-                &mut init_encoder,
-            )?,
-            character_texture: load_texture(
-                include_bytes!("../animation/Character Texture.png"),
                 "Cheese mouse texture",
                 &texture_bind_group_layout,
                 device,
@@ -224,7 +210,7 @@ impl Model {
         }
 
         log::debug!(
-            "Gltf model {} loaded. Vertices: {}. Indices: {}",
+            "Gltf model {} loaded. Vertices: {}. Indices: {}.",
             label,
             vertices.len(),
             indices.len(),
@@ -318,6 +304,15 @@ impl AnimatedModel {
         );
 
         let animations = crate::animation::load_animations(gltf.animations(), &buffers);
+
+        log::debug!(
+            "Gltf model {} loaded. Vertices: {}. Indices: {}. Joints: {}, Animations: {}.",
+            label,
+            vertices.len(),
+            indices.len(),
+            skin.joints().len(),
+            animations.len(),
+        );
 
         Ok(Self {
             vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

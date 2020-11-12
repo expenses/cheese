@@ -267,8 +267,8 @@ async fn run() -> anyhow::Result<()> {
                     model_pipelines.render_animated(
                         &mut render_pass,
                         &model_buffers.mice,
-                        &assets.character_texture,
-                        &assets.gltf_model,
+                        &assets.mouse_texture,
+                        &assets.mouse_model,
                         &model_buffers.mice_joints_bind_group,
                     );
                     model_pipelines.render_instanced(

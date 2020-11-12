@@ -339,7 +339,7 @@ impl ModelBuffers {
     pub fn new(context: &RenderContext, assets: &Assets) -> Self {
         let mice_joints = DynamicBuffer::new(
             &context.device,
-            320,
+            400,
             "Cheese mice joints buffer",
             wgpu::BufferUsage::STORAGE,
         );
@@ -355,7 +355,7 @@ impl ModelBuffers {
                 context,
                 "Cheese mice joints bind group",
                 &mice_joints,
-                &assets.gltf_model,
+                &assets.mouse_model,
             ),
             mice_joints,
             bullets: DynamicBuffer::new(
@@ -385,7 +385,7 @@ impl ModelBuffers {
                 context,
                 "Cheese mice joints bind group",
                 &self.mice_joints,
-                &assets.gltf_model,
+                &assets.mouse_model,
             );
         }
     }

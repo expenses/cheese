@@ -3,7 +3,7 @@ use crate::animation::Skin;
 use crate::renderer::{
     LineBuffers, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance, Vertex,
 };
-use crate::resources::{CursorIcon, DeltaTime, DpiScaling, RayCastLocation};
+use crate::resources::{CursorIcon, DpiScaling, RayCastLocation};
 use ultraviolet::Vec4;
 
 const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
@@ -40,19 +40,6 @@ pub fn render_units(
     for joint in skin.joints() {
         model_buffers.mice_joints.push(joint.matrix());
     }
-}
-
-#[legion::system(for_each)]
-pub fn progress_animations(
-    skin: &mut Skin,
-    animation_state: &mut AnimationState,
-    #[resource] assets: &Assets,
-    #[resource] delta_time: &DeltaTime,
-) {
-    animation_state.time += delta_time.0;
-    animation_state.time = animation_state.time % animation_state.total_time;
-
-    assets.gltf_model.animations[animation_state.animation].animate(skin, animation_state.time);
 }
 
 #[legion::system(for_each)]
