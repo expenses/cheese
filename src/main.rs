@@ -14,7 +14,7 @@ use crate::resources::{
     RayCastLocation, RtsControls, ScreenDimensions,
 };
 use legion::*;
-use ultraviolet::{Vec2, Vec3};
+use ultraviolet::Vec2;
 use winit::{
     dpi::PhysicalPosition,
     event::{
@@ -30,25 +30,25 @@ fn main() -> anyhow::Result<()> {
 
 fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
     builder
-        //.add_system(ecs::cast_ray_system())
-        //.add_system(ecs::stop_attacks_on_dead_entities_system())
-        .add_system(ecs::control_camera_system());
-    /*.add_system(ecs::handle_left_click_system())
-    .add_system(ecs::handle_right_click_system())
-    .add_system(ecs::handle_stop_command_system())
-    .add_system(ecs::handle_drag_selection_system())
-    .add_system(ecs::set_move_to_system())
-    .add_system(ecs::set_move_to_for_bullets_system())
-    .add_system(ecs::avoidance_system())
-    .add_system(ecs::add_attack_commands_system())
-    .add_system(ecs::reduce_cooldowns_system())
-    .flush()
-    .add_system(ecs::move_units_system())
-    .add_system(ecs::apply_steering_system())
-    .add_system(ecs::firing_system())
-    .add_system(ecs::apply_bullets_system())
-    .flush()
-    .add_system(ecs::handle_damaged_system());*/
+        .add_system(ecs::cast_ray_system())
+        .add_system(ecs::stop_attacks_on_dead_entities_system())
+        .add_system(ecs::control_camera_system())
+        .add_system(ecs::handle_left_click_system())
+        .add_system(ecs::handle_right_click_system())
+        .add_system(ecs::handle_stop_command_system())
+        .add_system(ecs::handle_drag_selection_system())
+        .add_system(ecs::set_move_to_system())
+        .add_system(ecs::set_move_to_for_bullets_system())
+        .add_system(ecs::avoidance_system())
+        .add_system(ecs::add_attack_commands_system())
+        .add_system(ecs::reduce_cooldowns_system())
+        .flush()
+        .add_system(ecs::move_units_system())
+        .add_system(ecs::apply_steering_system())
+        .add_system(ecs::firing_system())
+        .add_system(ecs::apply_bullets_system())
+        .flush()
+        .add_system(ecs::handle_damaged_system());
 }
 
 async fn run() -> anyhow::Result<()> {
@@ -58,13 +58,11 @@ async fn run() -> anyhow::Result<()> {
 
     let mut render_context = RenderContext::new(&event_loop).await?;
     let (assets, command_buffer) = Assets::new(&render_context.device())?;
-    let mut skin = assets.gltf_model.skin.clone();
-    let mut skin_2 = assets.gltf_model.skin.clone();
     render_context.submit(command_buffer);
     let model_pipelines = ModelPipelines::new(&render_context, &assets);
     let torus_pipeline = TorusPipeline::new(&render_context);
     let lines_pipeline = LinesPipeline::new(&render_context, &assets);
-    let model_buffers = ModelBuffers::new(render_context.device());
+    let model_buffers = ModelBuffers::new(&render_context, &assets);
     let torus_buffer = TorusBuffer::new(render_context.device());
     let lines_buffers = LineBuffers::new(render_context.device());
     let text_buffer = TextBuffer::new(render_context.device())?;
@@ -77,10 +75,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(text_buffer);
     resources.insert(render_context.screen_dimensions());
     resources.insert(CameraControls::default());
-    resources.insert(Camera {
-        position: Vec3::new(0.0, 7.5, 10.0),
-        looking_at: Vec3::new(0.0, 0.0, -10.0),
-    });
+    resources.insert(Camera::default());
     resources.insert(MouseState::new(&render_context.screen_dimensions()));
     resources.insert(RtsControls::default());
     resources.insert(RayCastLocation::default());
@@ -96,6 +91,7 @@ async fn run() -> anyhow::Result<()> {
     for i in 0..10 {
         ecs::Unit::MouseMarine.add_to_world(
             &mut world,
+            &assets,
             Vec2::new(-10.0, i as f32 / 100.0),
             ecs::Facing(1.0),
             ecs::Side::Purple,
@@ -105,17 +101,20 @@ async fn run() -> anyhow::Result<()> {
     for i in 0..10 {
         ecs::Unit::MouseMarine.add_to_world(
             &mut world,
+            &assets,
             Vec2::new(10.0, i as f32 / 100.0),
             ecs::Facing(1.0),
             ecs::Side::Green,
         );
     }
 
+    resources.insert(assets);
+
     let mut builder = Schedule::builder();
     add_gameplay_systems(&mut builder);
 
     let mut schedule = builder
-        /*
+        .add_system(ecs::progress_animations_system())
         // Rendering
         .add_system(ecs::render_bullets_system())
         .add_system(ecs::render_units_system())
@@ -130,7 +129,6 @@ async fn run() -> anyhow::Result<()> {
         // Cleanup
         .flush()
         .add_system(ecs::update_mouse_buttons_system())
-        */
         .build();
 
     let mut time = std::time::Instant::now();
@@ -223,73 +221,11 @@ async fn run() -> anyhow::Result<()> {
                 let mut torus_buffer = resources.get_mut::<TorusBuffer>().unwrap();
                 let mut line_buffers = resources.get_mut::<LineBuffers>().unwrap();
                 let mut text_buffer = resources.get_mut::<TextBuffer>().unwrap();
-
-                assets.gltf_model.animations[0].animate(&mut skin, 1.0 / 60.0);
-                assets.gltf_model.animations[0].animate(&mut skin_2, 15.0 / 60.0);
-                use ultraviolet::Mat4;
-                let mut matrices = vec![Mat4::identity(); skin.joints().len() * 2];
-                for (i, j) in skin.joints().iter().enumerate() {
-                    matrices[i] = j.matrix();
-                }
-
-                for (i, j) in skin_2.joints().iter().enumerate() {
-                    matrices[i + skin.joints().len()] = j.matrix();
-                }
-
-                use wgpu::util::DeviceExt;
-
-                let instances =
-                    render_context
-                        .device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Cheese whatever"),
-                            contents: bytemuck::cast_slice(&[
-                                crate::renderer::ModelInstance::from_parts(
-                                    Vec2::new(1.0, 0.0),
-                                    1.0,
-                                    ultraviolet::Vec4::one(),
-                                ),
-                                crate::renderer::ModelInstance::from_parts(
-                                    Vec2::new(-5.0, 0.0),
-                                    2.0,
-                                    ultraviolet::Vec4::one(),
-                                ),
-                            ]),
-                            usage: wgpu::BufferUsage::VERTEX,
-                        });
-
-                let buffer =
-                    render_context
-                        .device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Cheese test joint buffer"),
-                            contents: bytemuck::cast_slice(&matrices),
-                            usage: wgpu::BufferUsage::STORAGE,
-                        });
-
-                let joint_bind_group =
-                    render_context
-                        .device
-                        .create_bind_group(&wgpu::BindGroupDescriptor {
-                            label: Some("Cheese test joint bind group"),
-                            layout: &render_context.joint_bind_group_layout,
-                            entries: &[
-                                wgpu::BindGroupEntry {
-                                    binding: 0,
-                                    resource: wgpu::BindingResource::Buffer(buffer.slice(..)),
-                                },
-                                wgpu::BindGroupEntry {
-                                    binding: 1,
-                                    resource: wgpu::BindingResource::Buffer(
-                                        assets.gltf_model.joint_uniforms.slice(..),
-                                    ),
-                                },
-                            ],
-                        });
+                let assets = resources.get::<Assets>().unwrap();
 
                 // Upload buffers to the gpu.
                 render_context.update_view(camera.to_matrix());
-                model_buffers.upload(&render_context);
+                model_buffers.upload(&render_context, &assets);
                 torus_buffer.upload(&render_context);
                 line_buffers.upload(&render_context);
 
@@ -328,11 +264,12 @@ async fn run() -> anyhow::Result<()> {
                     });
 
                     // Render a bunch of models.
-                    /*model_pipelines.render_instanced(
+                    model_pipelines.render_animated(
                         &mut render_pass,
                         &model_buffers.mice,
-                        &assets.mouse_texture,
-                        &assets.mouse_model,
+                        &assets.character_texture,
+                        &assets.gltf_model,
+                        &model_buffers.mice_joints_bind_group,
                     );
                     model_pipelines.render_instanced(
                         &mut render_pass,
@@ -349,27 +286,20 @@ async fn run() -> anyhow::Result<()> {
                         &mut render_pass,
                         &model_buffers.command_paths,
                         &assets.colours_texture,
-                    );*/
+                    );
                     model_pipelines.render_single(
                         &mut render_pass,
                         &assets.surface_texture,
                         &assets.surface_model,
                     );
-                    /*model_pipelines.render_transparent(
+                    model_pipelines.render_transparent(
                         &mut render_pass,
                         &model_buffers.mice,
                         &assets.mouse_helmet_model,
-                    );*/
-                    model_pipelines.render_animated(
-                        &mut render_pass,
-                        &instances,
-                        &assets.character_texture,
-                        &assets.gltf_model,
-                        &joint_bind_group,
                     );
 
                     // Render 2D items.
-                    //lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
+                    lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
 
                     // We're done with this pass.
                     drop(render_pass);

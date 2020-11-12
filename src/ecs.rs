@@ -1,6 +1,7 @@
 use crate::resources::{
     Camera, CameraControls, MouseState, PlayerSide, RtsControls, ScreenDimensions,
 };
+use crate::Assets;
 use legion::systems::CommandBuffer;
 use legion::world::SubWorld;
 use legion::*;
@@ -109,6 +110,7 @@ impl Unit {
     pub fn add_to_world(
         self,
         world: &mut World,
+        assets: &Assets,
         position: Vec2,
         facing: Facing,
         side: Side,
@@ -135,6 +137,12 @@ impl Unit {
             FiringRange(firing_range),
             MoveSpeed(move_speed),
             Radius(radius),
+            assets.gltf_model.skin.clone(),
+            AnimationState {
+                animation: 0,
+                time: 0.0,
+                total_time: assets.gltf_model.animations[0].total_time,
+            },
         ))
     }
 }

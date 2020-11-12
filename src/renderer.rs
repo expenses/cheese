@@ -314,10 +314,11 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
         self.waiting.push(item)
     }
 
-    fn upload(&mut self, context: &RenderContext) {
+    // Upload the waiting buffer to the gpu. Returns whether the gpu buffer was resized.
+    fn upload(&mut self, context: &RenderContext) -> bool {
         if self.waiting.is_empty() {
             self.len = 0;
-            return;
+            return false;
         }
 
         let bytes = bytemuck::cast_slice(&self.waiting);
@@ -325,6 +326,8 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
         if self.waiting.len() <= self.capacity {
             context.queue.write_buffer(&self.buffer, 0, bytes);
             self.len = self.waiting.len();
+            self.waiting.clear();
+            return false;
         } else {
             self.capacity = (self.capacity * 2).max(self.waiting.len());
             log::debug!("Resizing '{}' to {} items", self.label, self.capacity);
@@ -340,9 +343,9 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
                 .copy_from_slice(bytes);
             self.buffer.unmap();
             self.len = self.waiting.len();
+            self.waiting.clear();
+            return true;
         }
-
-        self.waiting.clear();
     }
 
     fn get(&self) -> Option<(wgpu::BufferSlice, u32)> {

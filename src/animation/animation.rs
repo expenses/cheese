@@ -218,7 +218,7 @@ pub struct Animations {
 
 #[derive(Debug)]
 pub struct Animation {
-    total_time: f32,
+    pub total_time: f32,
     translation_channels: Vec<Channel<Vec3>>,
     rotation_channels: Vec<Channel<Quaternion<f32>>>,
     scale_channels: Vec<Channel<Vec3>>,

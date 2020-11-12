@@ -3,7 +3,7 @@ use super::{
 };
 use crate::assets::{AnimatedModel, Assets, Model};
 use std::sync::Arc;
-use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
+use ultraviolet::{Mat4, Vec4};
 use wgpu::util::DeviceExt;
 
 pub struct ModelPipelines {
@@ -101,22 +101,22 @@ impl ModelPipelines {
     pub fn render_animated<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
-        instances: &'a wgpu::Buffer,
+        instances: &'a DynamicBuffer<ModelInstance>,
         texture: &'a wgpu::BindGroup,
         model: &'a AnimatedModel,
         joints: &'a wgpu::BindGroup,
     ) {
-        //if let Some((slice, num)) = instances.get() {
-        render_pass.set_pipeline(&self.animated_pipeline);
-        render_pass.set_bind_group(0, &self.main_bind_group, &[]);
-        render_pass.set_bind_group(1, texture, &[]);
-        render_pass.set_bind_group(2, joints, &[]);
+        if let Some((slice, num)) = instances.get() {
+            render_pass.set_pipeline(&self.animated_pipeline);
+            render_pass.set_bind_group(0, &self.main_bind_group, &[]);
+            render_pass.set_bind_group(1, texture, &[]);
+            render_pass.set_bind_group(2, joints, &[]);
 
-        render_pass.set_vertex_buffer(0, model.vertices.slice(..));
-        render_pass.set_vertex_buffer(1, instances.slice(..));
-        render_pass.set_index_buffer(model.indices.slice(..));
-        render_pass.draw_indexed(0..model.num_indices, 0, 0..2);
-        //}
+            render_pass.set_vertex_buffer(0, model.vertices.slice(..));
+            render_pass.set_vertex_buffer(1, slice);
+            render_pass.set_index_buffer(model.indices.slice(..));
+            render_pass.draw_indexed(0..model.num_indices, 0, 0..num);
+        }
     }
 
     pub fn render_single<'a>(
@@ -329,27 +329,55 @@ fn create_animated_pipeline(
 
 pub struct ModelBuffers {
     pub mice: DynamicBuffer<ModelInstance>,
+    pub mice_joints: DynamicBuffer<Mat4>,
+    pub mice_joints_bind_group: wgpu::BindGroup,
     pub command_paths: DynamicBuffer<Vertex>,
     pub bullets: DynamicBuffer<ModelInstance>,
 }
 
 impl ModelBuffers {
-    pub fn new(device: &wgpu::Device) -> Self {
+    pub fn new(context: &RenderContext, assets: &Assets) -> Self {
+        let mice_joints = DynamicBuffer::new(
+            &context.device,
+            1000,
+            "Cheese mice joints buffer",
+            wgpu::BufferUsage::STORAGE,
+        );
+
         Self {
             mice: DynamicBuffer::new(
-                device,
+                &context.device,
                 50,
                 "Cheese mice instance buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
+            mice_joints_bind_group: context
+                .device
+                .create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &context.joint_bind_group_layout,
+                    label: Some("Cheese mice joints bind group"),
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::Buffer(mice_joints.buffer.slice(..)),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Buffer(
+                                assets.gltf_model.joint_uniforms.slice(..),
+                            ),
+                        },
+                    ],
+                }),
+            mice_joints,
             bullets: DynamicBuffer::new(
-                device,
+                &context.device,
                 200,
                 "Cheese bullet buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
             command_paths: DynamicBuffer::new(
-                device,
+                &context.device,
                 50,
                 "Cheese command paths buffer",
                 wgpu::BufferUsage::VERTEX,
@@ -357,10 +385,36 @@ impl ModelBuffers {
         }
     }
 
-    pub fn upload(&mut self, context: &RenderContext) {
+    pub fn upload(&mut self, context: &RenderContext, assets: &Assets) {
         self.mice.upload(context);
         self.command_paths.upload(context);
         self.bullets.upload(context);
+        let mice_resized = self.mice_joints.upload(context);
+
+        // We need to recreate the bind group
+        if mice_resized {
+            self.mice_joints_bind_group =
+                context
+                    .device
+                    .create_bind_group(&wgpu::BindGroupDescriptor {
+                        layout: &context.joint_bind_group_layout,
+                        label: Some("Cheese mice joints bind group"),
+                        entries: &[
+                            wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::Buffer(
+                                    self.mice_joints.buffer.slice(..),
+                                ),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::Buffer(
+                                    assets.gltf_model.joint_uniforms.slice(..),
+                                ),
+                            },
+                        ],
+                    });
+        }
     }
 }
 
@@ -369,15 +423,4 @@ impl ModelBuffers {
 pub struct ModelInstance {
     pub flat_colour: Vec4,
     pub transform: Mat4,
-}
-
-impl ModelInstance {
-    pub fn from_parts(translation: Vec2, rotation: f32, flat_colour: Vec4) -> Self {
-        let translation = Mat4::from_translation(Vec3::new(translation.x, 0.0, translation.y));
-        let rotation = Mat4::from_rotation_y(rotation);
-        Self {
-            transform: translation * rotation,
-            flat_colour,
-        }
-    }
 }
