@@ -1,3 +1,4 @@
+mod animation;
 mod assets;
 mod ecs;
 mod renderer;
@@ -61,7 +62,7 @@ async fn run() -> anyhow::Result<()> {
     let model_pipelines = ModelPipelines::new(&render_context, &assets);
     let torus_pipeline = TorusPipeline::new(&render_context);
     let lines_pipeline = LinesPipeline::new(&render_context, &assets);
-    let model_buffers = ModelBuffers::new(render_context.device());
+    let model_buffers = ModelBuffers::new(&render_context, &assets);
     let torus_buffer = TorusBuffer::new(render_context.device());
     let lines_buffers = LineBuffers::new(render_context.device());
     let text_buffer = TextBuffer::new(render_context.device())?;
@@ -90,6 +91,7 @@ async fn run() -> anyhow::Result<()> {
     for i in 0..10 {
         ecs::Unit::MouseMarine.add_to_world(
             &mut world,
+            &assets,
             Vec2::new(-10.0, i as f32 / 100.0),
             ecs::Facing(1.0),
             ecs::Side::Purple,
@@ -99,16 +101,20 @@ async fn run() -> anyhow::Result<()> {
     for i in 0..10 {
         ecs::Unit::MouseMarine.add_to_world(
             &mut world,
+            &assets,
             Vec2::new(10.0, i as f32 / 100.0),
             ecs::Facing(1.0),
             ecs::Side::Green,
         );
     }
 
+    resources.insert(assets);
+
     let mut builder = Schedule::builder();
     add_gameplay_systems(&mut builder);
 
     let mut schedule = builder
+        .add_system(ecs::progress_animations_system())
         // Rendering
         .add_system(ecs::render_bullets_system())
         .add_system(ecs::render_units_system())
@@ -215,10 +221,11 @@ async fn run() -> anyhow::Result<()> {
                 let mut torus_buffer = resources.get_mut::<TorusBuffer>().unwrap();
                 let mut line_buffers = resources.get_mut::<LineBuffers>().unwrap();
                 let mut text_buffer = resources.get_mut::<TextBuffer>().unwrap();
+                let assets = resources.get::<Assets>().unwrap();
 
                 // Upload buffers to the gpu.
                 render_context.update_view(camera.to_matrix());
-                model_buffers.upload(&render_context);
+                model_buffers.upload(&render_context, &assets);
                 torus_buffer.upload(&render_context);
                 line_buffers.upload(&render_context);
 
@@ -257,11 +264,12 @@ async fn run() -> anyhow::Result<()> {
                     });
 
                     // Render a bunch of models.
-                    model_pipelines.render_instanced(
+                    model_pipelines.render_animated(
                         &mut render_pass,
                         &model_buffers.mice,
                         &assets.mouse_texture,
                         &assets.mouse_model,
+                        &model_buffers.mice_joints_bind_group,
                     );
                     model_pipelines.render_instanced(
                         &mut render_pass,

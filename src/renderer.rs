@@ -1,6 +1,6 @@
 use crate::resources::ScreenDimensions;
 use std::sync::Arc;
-use ultraviolet::{Mat4, Vec2, Vec3};
+use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 use winit::{
     event_loop::EventLoop,
@@ -34,12 +34,13 @@ pub struct RenderContext {
     view_buffer: wgpu::Buffer,
     main_bind_group_layout: wgpu::BindGroupLayout,
     main_bind_group: Arc<wgpu::BindGroup>,
+
+    pub joint_bind_group_layout: wgpu::BindGroupLayout,
 }
 
 impl RenderContext {
     pub async fn new(event_loop: &EventLoop<()>) -> anyhow::Result<Self> {
-        let window = WindowBuilder::new()
-            .build(event_loop)?;
+        let window = WindowBuilder::new().build(event_loop)?;
 
         let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
         let surface = unsafe { instance.create_surface(&window) };
@@ -160,6 +161,34 @@ impl RenderContext {
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
         let depth_texture = create_depth_texture(&device, window_size.width, window_size.height);
 
+        let joint_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Cheese joint bind group layout"),
+                entries: &[
+                    // Joint transforms.
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStage::VERTEX,
+                        ty: wgpu::BindingType::StorageBuffer {
+                            dynamic: false,
+                            min_binding_size: None,
+                            readonly: true,
+                        },
+                        count: None,
+                    },
+                    // Num joints - used for instances
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStage::VERTEX,
+                        ty: wgpu::BindingType::UniformBuffer {
+                            dynamic: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+
         Ok(Self {
             swap_chain,
             window,
@@ -172,6 +201,7 @@ impl RenderContext {
             view_buffer,
             main_bind_group_layout,
             sampler,
+            joint_bind_group_layout,
             main_bind_group: Arc::new(main_bind_group),
         })
     }
@@ -284,20 +314,28 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
         self.waiting.push(item)
     }
 
-    fn upload(&mut self, context: &RenderContext) {
+    // Upload the waiting buffer to the gpu. Returns whether the gpu buffer was resized.
+    fn upload(&mut self, context: &RenderContext) -> bool {
         if self.waiting.is_empty() {
             self.len = 0;
-            return;
+            return false;
         }
 
+        self.len = self.waiting.len();
         let bytes = bytemuck::cast_slice(&self.waiting);
 
         if self.waiting.len() <= self.capacity {
             context.queue.write_buffer(&self.buffer, 0, bytes);
-            self.len = self.waiting.len();
+            self.waiting.clear();
+            return false;
         } else {
             self.capacity = (self.capacity * 2).max(self.waiting.len());
-            log::debug!("Resizing '{}' to {} items", self.label, self.capacity);
+            log::debug!(
+                "Resizing '{}' to {} items to fit {} items",
+                self.label,
+                self.capacity,
+                self.len
+            );
             self.buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(self.label),
                 size: (self.capacity * std::mem::size_of::<T>()) as u64,
@@ -309,10 +347,9 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
                 .get_mapped_range_mut()
                 .copy_from_slice(bytes);
             self.buffer.unmap();
-            self.len = self.waiting.len();
+            self.waiting.clear();
+            return true;
         }
-
-        self.waiting.clear();
     }
 
     fn get(&self) -> Option<(wgpu::BufferSlice, u32)> {
@@ -324,14 +361,6 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
             None
         }
     }
-}
-
-#[repr(C)]
-#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
-pub struct Vertex {
-    pub position: Vec3,
-    pub normal: Vec3,
-    pub uv: Vec2,
 }
 
 pub struct TextBuffer {
@@ -375,4 +404,22 @@ pub fn draw_model<'a>(
     render_pass.set_vertex_buffer(1, instances);
     render_pass.set_index_buffer(model.indices.slice(..));
     render_pass.draw_indexed(0..model.num_indices, 0, 0..num_instances);
+}
+
+#[repr(C)]
+#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
+pub struct Vertex {
+    pub position: Vec3,
+    pub normal: Vec3,
+    pub uv: Vec2,
+}
+
+#[repr(C)]
+#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
+pub struct AnimatedVertex {
+    pub position: Vec3,
+    pub normal: Vec3,
+    pub uv: Vec2,
+    pub joints: Vec4,
+    pub joint_weights: Vec4,
 }

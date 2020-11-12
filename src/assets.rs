@@ -1,10 +1,11 @@
-use crate::renderer::{Vertex, TEXTURE_FORMAT};
+use crate::animation::{Animation, Skin};
+use crate::renderer::{AnimatedVertex, Vertex, TEXTURE_FORMAT};
 use wgpu::util::DeviceExt;
 
 pub struct Assets {
     pub surface_model: Model,
     pub bullet_model: Model,
-    pub mouse_model: Model,
+    pub mouse_model: AnimatedModel,
     pub mouse_helmet_model: Model,
     pub torus_model: Model,
 
@@ -48,7 +49,7 @@ impl Assets {
                 "Cheese bullet model",
                 device,
             )?,
-            mouse_model: Model::load_gltf(
+            mouse_model: AnimatedModel::load_gltf(
                 include_bytes!("../models/mouse.gltf"),
                 "Cheese mouse model",
                 device,
@@ -63,7 +64,6 @@ impl Assets {
                 "Cheese torus model",
                 device,
             )?,
-
             surface_texture: load_texture(
                 include_bytes!("../textures/surface.png"),
                 "Cheese surface texture",
@@ -97,113 +97,6 @@ impl Assets {
         };
 
         Ok((assets, init_encoder.finish()))
-    }
-}
-
-pub struct Model {
-    pub vertices: wgpu::Buffer,
-    pub indices: wgpu::Buffer,
-    pub num_indices: u32,
-}
-
-impl Model {
-    pub fn from_vertices(
-        vertices: Vec<Vertex>,
-        indices: Vec<u32>,
-        label: &str,
-        device: &wgpu::Device,
-    ) -> Self {
-        Self {
-            vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(label),
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsage::VERTEX,
-            }),
-            indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(&indices),
-                usage: wgpu::BufferUsage::INDEX,
-            }),
-            num_indices: indices.len() as u32,
-        }
-    }
-
-    pub fn load_gltf(
-        gltf_bytes: &[u8],
-        label: &str,
-        device: &wgpu::Device,
-    ) -> anyhow::Result<Self> {
-        const OCTET_STREAM_URI: &str = "data:application/octet-stream;base64,";
-
-        let gltf = gltf::Gltf::from_slice(gltf_bytes)?;
-
-        // Load the buffers into a vector of byte vectors.
-        // I mostly copied what bevy does for this because it's a little confusing at first.
-        // https://github.com/bevyengine/bevy/blob/master/crates/bevy_gltf/src/loader.rs
-
-        let mut buffer_data = Vec::new();
-        for buffer in gltf.buffers() {
-            match buffer.source() {
-                gltf::buffer::Source::Uri(uri) => {
-                    if uri.starts_with(OCTET_STREAM_URI) {
-                        buffer_data.push(base64::decode(&uri[OCTET_STREAM_URI.len()..])?);
-                    } else {
-                        return Err(anyhow::anyhow!(
-                            "Only octet streams are supported with data:"
-                        ));
-                    }
-                }
-                gltf::buffer::Source::Bin => {
-                    if let Some(blob) = gltf.blob.as_deref() {
-                        buffer_data.push(blob.into());
-                    } else {
-                        return Err(anyhow::anyhow!("Missing blob"));
-                    }
-                }
-            }
-        }
-
-        let mut vertices = Vec::new();
-        let mut indices = Vec::new();
-
-        for mesh in gltf.meshes() {
-            for primitive in mesh.primitives() {
-                if primitive.mode() != gltf::mesh::Mode::Triangles {
-                    return Err(anyhow::anyhow!(
-                        "Primitives with {:?} are not allowed. Triangles only.",
-                        primitive.mode()
-                    ));
-                }
-
-                let reader = primitive.reader(|buffer| Some(&buffer_data[buffer.index()]));
-
-                let positions = reader.read_positions().unwrap();
-                let tex_coordinates = reader.read_tex_coords(0).unwrap().into_f32();
-                let normals = reader.read_normals().unwrap();
-
-                positions
-                    .zip(tex_coordinates)
-                    .zip(normals)
-                    .for_each(|((p, uv), n)| {
-                        vertices.push(Vertex {
-                            position: p.into(),
-                            normal: n.into(),
-                            uv: uv.into(),
-                        });
-                    });
-
-                indices.extend(reader.read_indices().unwrap().into_u32());
-            }
-        }
-
-        log::debug!(
-            "Gltf model {} loaded. Vertices: {}. Indices: {}",
-            label,
-            vertices.len(),
-            indices.len(),
-        );
-
-        Ok(Self::from_vertices(vertices, indices, label, device))
     }
 }
 
@@ -265,4 +158,215 @@ fn load_texture(
             resource: wgpu::BindingResource::TextureView(&view),
         }],
     }))
+}
+
+pub struct Model {
+    pub vertices: wgpu::Buffer,
+    pub indices: wgpu::Buffer,
+    pub num_indices: u32,
+}
+
+impl Model {
+    pub fn load_gltf(
+        gltf_bytes: &[u8],
+        label: &str,
+        device: &wgpu::Device,
+    ) -> anyhow::Result<Self> {
+        let gltf = gltf::Gltf::from_slice(gltf_bytes)?;
+
+        let buffers = load_buffers(&gltf)?;
+
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+
+        for mesh in gltf.meshes() {
+            for primitive in mesh.primitives() {
+                if primitive.mode() != gltf::mesh::Mode::Triangles {
+                    return Err(anyhow::anyhow!(
+                        "Primitives with {:?} are not allowed. Triangles only.",
+                        primitive.mode()
+                    ));
+                }
+
+                let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
+
+                let positions = reader.read_positions().unwrap();
+                let tex_coordinates = reader.read_tex_coords(0).unwrap().into_f32();
+                let normals = reader.read_normals().unwrap();
+
+                positions
+                    .zip(tex_coordinates)
+                    .zip(normals)
+                    .for_each(|((p, uv), n)| {
+                        vertices.push(Vertex {
+                            position: p.into(),
+                            normal: n.into(),
+                            uv: uv.into(),
+                        });
+                    });
+
+                indices.extend(reader.read_indices().unwrap().into_u32());
+            }
+        }
+
+        log::debug!(
+            "Gltf model {} loaded. Vertices: {}. Indices: {}.",
+            label,
+            vertices.len(),
+            indices.len(),
+        );
+
+        Ok(Self {
+            vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(label),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsage::VERTEX,
+            }),
+            indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Cheese index buffer"),
+                contents: bytemuck::cast_slice(&indices),
+                usage: wgpu::BufferUsage::INDEX,
+            }),
+            num_indices: indices.len() as u32,
+        })
+    }
+}
+
+pub struct AnimatedModel {
+    pub vertices: wgpu::Buffer,
+    pub indices: wgpu::Buffer,
+    pub num_indices: u32,
+    pub joint_uniforms: wgpu::Buffer,
+    pub skin: Skin,
+    pub animations: Vec<Animation>,
+}
+
+#[derive(bytemuck::Pod, bytemuck::Zeroable, Copy, Clone)]
+#[repr(C)]
+struct JointUniforms {
+    num_joints: u32,
+}
+
+impl AnimatedModel {
+    pub fn load_gltf(
+        gltf_bytes: &'static [u8],
+        label: &str,
+        device: &wgpu::Device,
+    ) -> anyhow::Result<Self> {
+        let gltf = gltf::Gltf::from_slice(gltf_bytes)?;
+
+        let buffers = load_buffers(&gltf)?;
+
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+
+        for mesh in gltf.meshes() {
+            for primitive in mesh.primitives() {
+                if primitive.mode() != gltf::mesh::Mode::Triangles {
+                    return Err(anyhow::anyhow!(
+                        "Primitives with {:?} are not allowed. Triangles only.",
+                        primitive.mode()
+                    ));
+                }
+
+                let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
+
+                let positions = reader.read_positions().unwrap();
+                let tex_coordinates = reader.read_tex_coords(0).unwrap().into_f32();
+                let normals = reader.read_normals().unwrap();
+                let joints = reader.read_joints(0).unwrap().into_u16();
+                let weights = reader.read_weights(0).unwrap().into_f32();
+
+                positions
+                    .zip(tex_coordinates)
+                    .zip(normals)
+                    .zip(joints)
+                    .zip(weights)
+                    .for_each(|((((p, uv), n), j), w)| {
+                        vertices.push(AnimatedVertex {
+                            position: p.into(),
+                            normal: n.into(),
+                            uv: uv.into(),
+                            joints: [j[0] as f32, j[1] as f32, j[2] as f32, j[3] as f32].into(),
+                            joint_weights: w.into(),
+                        });
+                    });
+
+                indices.extend(reader.read_indices().unwrap().into_u32());
+            }
+        }
+
+        let skin = Skin::load(
+            &gltf.skins().next().unwrap(),
+            gltf.nodes(),
+            &gltf.scenes().next().unwrap(),
+            &buffers,
+        );
+
+        let animations = crate::animation::load_animations(gltf.animations(), &buffers);
+
+        log::debug!(
+            "Gltf model {} loaded. Vertices: {}. Indices: {}. Joints: {}, Animations: {}.",
+            label,
+            vertices.len(),
+            indices.len(),
+            skin.joints().len(),
+            animations.len(),
+        );
+
+        Ok(Self {
+            vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(label),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsage::VERTEX,
+            }),
+            indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Cheese index buffer"),
+                contents: bytemuck::cast_slice(&indices),
+                usage: wgpu::BufferUsage::INDEX,
+            }),
+            joint_uniforms: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Cheese joint uniform buffer"),
+                contents: bytemuck::bytes_of(&JointUniforms {
+                    num_joints: skin.joints().len() as u32,
+                }),
+                usage: wgpu::BufferUsage::UNIFORM,
+            }),
+            num_indices: indices.len() as u32,
+            animations,
+            skin,
+        })
+    }
+}
+
+// Load the buffers from a gltf document into a vector of byte vectors.
+// I mostly copied what bevy does for this because it's a little confusing at first.
+// https://github.com/bevyengine/bevy/blob/master/crates/bevy_gltf/src/loader.rs
+fn load_buffers(gltf: &gltf::Gltf) -> anyhow::Result<Vec<Vec<u8>>> {
+    const OCTET_STREAM_URI: &str = "data:application/octet-stream;base64,";
+
+    let mut buffers = Vec::new();
+
+    for buffer in gltf.buffers() {
+        match buffer.source() {
+            gltf::buffer::Source::Uri(uri) => {
+                if uri.starts_with(OCTET_STREAM_URI) {
+                    buffers.push(base64::decode(&uri[OCTET_STREAM_URI.len()..])?);
+                } else {
+                    return Err(anyhow::anyhow!(
+                        "Only octet streams are supported with data:"
+                    ));
+                }
+            }
+            gltf::buffer::Source::Bin => {
+                if let Some(blob) = gltf.blob.as_deref() {
+                    buffers.push(blob.into());
+                } else {
+                    return Err(anyhow::anyhow!("Missing blob"));
+                }
+            }
+        }
+    }
+
+    Ok(buffers)
 }

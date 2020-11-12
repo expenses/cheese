@@ -1,16 +1,19 @@
 use crate::resources::{
     Camera, CameraControls, MouseState, PlayerSide, RtsControls, ScreenDimensions,
 };
+use crate::Assets;
 use legion::systems::CommandBuffer;
 use legion::world::SubWorld;
 use legion::*;
 use std::collections::VecDeque;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
+mod animation;
 mod combat;
 mod controls;
 mod movement;
 mod rendering;
+pub use animation::*;
 pub use combat::*;
 pub use controls::*;
 pub use movement::*;
@@ -54,6 +57,12 @@ pub struct MoveSpeed(pub f32);
 pub struct Radius(pub f32);
 
 pub struct DamagedThisTick(pub Entity);
+
+pub struct AnimationState {
+    pub animation: usize,
+    pub time: f32,
+    pub total_time: f32,
+}
 
 #[derive(Debug)]
 pub struct Bullet {
@@ -103,6 +112,7 @@ impl Unit {
     pub fn add_to_world(
         self,
         world: &mut World,
+        assets: &Assets,
         position: Vec2,
         facing: Facing,
         side: Side,
@@ -129,6 +139,12 @@ impl Unit {
             FiringRange(firing_range),
             MoveSpeed(move_speed),
             Radius(radius),
+            assets.mouse_model.skin.clone(),
+            AnimationState {
+                animation: 1,
+                time: 0.0,
+                total_time: assets.mouse_model.animations[1].total_time,
+            },
         ))
     }
 }
