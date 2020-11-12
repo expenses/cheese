@@ -292,10 +292,12 @@ async fn run() -> anyhow::Result<()> {
                         &assets.surface_texture,
                         &assets.surface_model,
                     );
-                    model_pipelines.render_transparent(
+                    model_pipelines.render_transparent_animated(
                         &mut render_pass,
                         &model_buffers.mice,
+                        &assets.mouse_texture,
                         &assets.mouse_helmet_model,
+                        &model_buffers.mice_joints_bind_group,
                     );
 
                     // Render 2D items.

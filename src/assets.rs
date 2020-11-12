@@ -6,7 +6,7 @@ pub struct Assets {
     pub surface_model: Model,
     pub bullet_model: Model,
     pub mouse_model: AnimatedModel,
-    pub mouse_helmet_model: Model,
+    pub mouse_helmet_model: AnimatedModel,
     pub torus_model: Model,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
@@ -54,7 +54,7 @@ impl Assets {
                 "Cheese mouse model",
                 device,
             )?,
-            mouse_helmet_model: Model::load_gltf(
+            mouse_helmet_model: AnimatedModel::load_gltf(
                 include_bytes!("../models/mouse_helmet.gltf"),
                 "Cheese mouse helmet model",
                 device,
