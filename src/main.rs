@@ -324,11 +324,11 @@ async fn run() -> anyhow::Result<()> {
                         &model_buffers.command_paths,
                         &assets.colours_texture,
                     );*/
-                    /*model_pipelines.render_single(
+                    model_pipelines.render_single(
                         &mut render_pass,
                         &assets.surface_texture,
                         &assets.surface_model,
-                    );*/
+                    );
                     /*model_pipelines.render_transparent(
                         &mut render_pass,
                         &model_buffers.mice,

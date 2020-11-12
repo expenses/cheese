@@ -315,22 +315,8 @@ impl AnimatedModel {
 
         let mut nodes = crate::animation::node::Nodes::from_gltf_nodes(gltf.nodes(), &gltf.scenes().next().unwrap());
 
-        let meshes = crate::animation::mesh::create_meshes_from_gltf(&gltf, &buffers).unwrap();
-        let meshes = meshes.meshes;
-
-        let global_transform = {
-            let aabb = compute_aabb(&nodes, &meshes);
-            let transform = compute_unit_cube_at_origin_transform(aabb);
-            nodes.transform(Some(transform));
-            nodes
-                .get_skins_transform()
-                .iter()
-                .for_each(|(index, transform)| {
-                    //let skin = &mut skins[*index];
-                    skin.compute_joints_matrices(*transform, &nodes.nodes());
-                });
-            transform
-        };
+        use cgmath::SquareMatrix;
+        let global_transform = cgmath::Matrix4::identity();
 
         Ok((Self {
             vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -380,31 +366,4 @@ fn load_buffers(gltf: &gltf::Gltf) -> anyhow::Result<Vec<Vec<u8>>> {
     }
 
     Ok(buffers)
-}
-
-use crate::animation::math::AABB;
-
-fn compute_aabb(nodes: &crate::animation::node::Nodes, meshes: &[crate::animation::mesh::Mesh]) -> AABB<f32> {
-    let aabbs = nodes
-        .nodes()
-        .iter()
-        .filter(|n| n.mesh_index().is_some())
-        .map(|n| {
-            let mesh = &meshes[n.mesh_index().unwrap()];
-            mesh.aabb() * n.transform()
-        })
-        .collect::<Vec<_>>();
-    AABB::union(&aabbs).unwrap()
-}
-
-fn compute_unit_cube_at_origin_transform(aabb: AABB<f32>) -> cgmath::Matrix4<f32> {
-    let larger_side = aabb.get_larger_side_size();
-    let scale_factor = (1.0_f32 / larger_side) * 10.0;
-
-    let aabb = aabb * scale_factor;
-    let center = aabb.get_center();
-
-    let translation = cgmath::Matrix4::from_translation(-center);
-    let scale = cgmath::Matrix4::from_scale(scale_factor);
-    translation * scale
 }
