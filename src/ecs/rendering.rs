@@ -1,7 +1,7 @@
 use super::*;
 use crate::animation::Skin;
 use crate::renderer::{
-    LineBuffers, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance, Vertex,
+    LineBuffers, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance,
 };
 use crate::resources::{CursorIcon, DpiScaling, RayCastLocation};
 use ultraviolet::Vec4;
@@ -200,12 +200,7 @@ pub fn render_command_paths(
         return;
     }
 
-    let uv = match side {
-        Side::Green => Vec2::new(0.5 / 64.0, 0.5),
-        Side::Purple => Vec2::new(1.5 / 64.0, 0.5),
-    };
-
-    let mut prev = position_to_vertex(position.0, uv);
+    let mut prev = position.0;
 
     for command in queue.0.iter() {
         let position = match command {
@@ -229,7 +224,7 @@ pub fn render_command_paths(
 
         if let Some(position) = position {
             model_buffers.command_indicators.push(ModelInstance {
-                transform: Mat4::from_translation(Vec3::new(position.x, 0.1, position.y)),
+                transform: Mat4::from_translation(Vec3::new(position.x, 0.01, position.y)),
                 flat_colour: match command {
                     Command::MoveTo(_) => Vec4::new(0.25, 0.25, 1.0, 1.0),
                     Command::AttackMove(_) | Command::Attack { .. } => {
@@ -238,21 +233,25 @@ pub fn render_command_paths(
                 },
             });
 
-            let vertex = position_to_vertex(position, uv);
+            let center = (prev + position) / 2.0;
+            let vector = position - prev;
+            let rotation = vector.y.atan2(vector.x);
+            let scale = vector.mag();
 
-            model_buffers.command_paths.push(prev);
-            model_buffers.command_paths.push(vertex);
+            model_buffers.command_paths.push(ModelInstance {
+                transform: Mat4::from_translation(Vec3::new(center.x, 0.005, center.y))
+                    * Mat4::from_rotation_y(rotation)
+                    * Mat4::from_nonuniform_scale(Vec3::new(scale, 1.0, 1.0)),
+                flat_colour: match command {
+                    Command::MoveTo(_) => Vec4::new(0.25, 0.25, 1.0, 1.0),
+                    Command::AttackMove(_) | Command::Attack { .. } => {
+                        Vec4::new(1.0, 0.0, 0.0, 1.0)
+                    }
+                },
+            });
 
-            prev = vertex;
+            prev = position;
         }
-    }
-}
-
-fn position_to_vertex(pos: Vec2, uv: Vec2) -> Vertex {
-    Vertex {
-        position: Vec3::new(pos.x, 0.1, pos.y),
-        normal: Vec3::new(0.0, 0.0, 0.0),
-        uv,
     }
 }
 

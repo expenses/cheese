@@ -9,6 +9,7 @@ pub struct Assets {
     pub mouse_helmet_model: AnimatedModel,
     pub torus_model: Model,
     pub command_indicator_model: Model,
+    pub command_path_model: Model,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
@@ -67,6 +68,11 @@ impl Assets {
             command_indicator_model: Model::load_gltf(
                 include_bytes!("../models/command_indicator.gltf"),
                 "Cheese command indicator model",
+                device,
+            )?,
+            command_path_model: Model::load_gltf(
+                include_bytes!("../models/command_path.gltf"),
+                "Cheese command path model",
                 device,
             )?,
             surface_texture: load_texture(

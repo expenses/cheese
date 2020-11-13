@@ -1,5 +1,6 @@
 use super::{
-    draw_model, AnimatedVertex, DynamicBuffer, RenderContext, Vertex, DEPTH_FORMAT, DISPLAY_FORMAT,
+    alpha_blend_state, draw_model, AnimatedVertex, DynamicBuffer, RenderContext, Vertex,
+    DEPTH_FORMAT, DISPLAY_FORMAT,
 };
 use crate::assets::{AnimatedModel, Assets, Model};
 use std::sync::Arc;
@@ -9,7 +10,6 @@ use wgpu::util::DeviceExt;
 pub struct ModelPipelines {
     identity_instance_buffer: wgpu::Buffer,
     model_pipeline: wgpu::RenderPipeline,
-    line_pipeline: wgpu::RenderPipeline,
     animated_pipeline: wgpu::RenderPipeline,
     transparent_animated_pipeline: wgpu::RenderPipeline,
     transparent_textured_pipeline: wgpu::RenderPipeline,
@@ -27,9 +27,6 @@ impl ModelPipelines {
         let fs = wgpu::include_spirv!("../../shaders/compiled/shader.frag.spv");
         let fs_module = context.device.create_shader_module(fs);
 
-        let fs_transparent = wgpu::include_spirv!("../../shaders/compiled/transparent.frag.spv");
-        let fs_transparent_module = context.device.create_shader_module(fs_transparent);
-
         let fs_transparent_textured =
             wgpu::include_spirv!("../../shaders/compiled/transparent_textured.frag.spv");
         let fs_transparent_textured_module =
@@ -42,23 +39,10 @@ impl ModelPipelines {
                 &assets.texture_bind_group_layout,
             ],
             "Cheese model pipeline",
-            wgpu::PrimitiveTopology::TriangleList,
             &vs_module,
             &fs_module,
             false,
-        );
-
-        let line_pipeline = create_render_pipeline(
-            &context.device,
-            &[
-                &context.main_bind_group_layout,
-                &assets.texture_bind_group_layout,
-            ],
-            "Cheese line pipeline",
-            wgpu::PrimitiveTopology::LineList,
-            &vs_module,
-            &fs_module,
-            false,
+            true,
         );
 
         let animated_pipeline = create_animated_pipeline(
@@ -81,7 +65,7 @@ impl ModelPipelines {
                 &context.joint_bind_group_layout,
             ],
             &vs_animated_module,
-            &fs_transparent_module,
+            &context.fs_transparent_module,
             true,
         );
 
@@ -92,10 +76,10 @@ impl ModelPipelines {
                 &assets.texture_bind_group_layout,
             ],
             "Cheese transparent textured pipeline",
-            wgpu::PrimitiveTopology::TriangleList,
             &vs_module,
             &fs_transparent_textured_module,
             true,
+            false,
         );
 
         let identity_instance_buffer =
@@ -113,7 +97,6 @@ impl ModelPipelines {
         Self {
             identity_instance_buffer,
             model_pipeline,
-            line_pipeline,
             animated_pipeline,
             transparent_animated_pipeline,
             transparent_textured_pipeline,
@@ -211,32 +194,16 @@ impl ModelPipelines {
             draw_model(render_pass, model, slice, num);
         }
     }
-
-    pub fn render_lines<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        lines: &'a DynamicBuffer<Vertex>,
-        texture: &'a wgpu::BindGroup,
-    ) {
-        if let Some((slice, num)) = lines.get() {
-            render_pass.set_pipeline(&self.line_pipeline);
-            render_pass.set_bind_group(0, &self.main_bind_group, &[]);
-            render_pass.set_bind_group(1, texture, &[]);
-            render_pass.set_vertex_buffer(0, slice);
-            render_pass.set_vertex_buffer(1, self.identity_instance_buffer.slice(..));
-            render_pass.draw(0..num, 0..1);
-        }
-    }
 }
 
 fn create_render_pipeline(
     device: &wgpu::Device,
     bind_group_layouts: &[&wgpu::BindGroupLayout],
     label: &str,
-    primitives: wgpu::PrimitiveTopology,
     vs_module: &wgpu::ShaderModule,
     fs_module: &wgpu::ShaderModule,
     alpha_blend: bool,
+    write_depth: bool,
 ) -> wgpu::RenderPipeline {
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Cheese pipeline layout"),
@@ -259,11 +226,11 @@ fn create_render_pipeline(
 			cull_mode: wgpu::CullMode::Back,
 			..Default::default()
 		}),
-		primitive_topology: primitives,
+		primitive_topology: wgpu::PrimitiveTopology::TriangleList,
 		color_states: &[colour_state_descriptor(alpha_blend)],
 		depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
 			format: DEPTH_FORMAT,
-			depth_write_enabled: true,
+			depth_write_enabled: write_depth,
 			depth_compare: wgpu::CompareFunction::Less,
 			stencil: wgpu::StencilStateDescriptor::default(),
 		}),
@@ -347,20 +314,7 @@ fn create_animated_pipeline(
 
 fn colour_state_descriptor(alpha_blend: bool) -> wgpu::ColorStateDescriptor {
     if alpha_blend {
-        wgpu::ColorStateDescriptor {
-            format: DISPLAY_FORMAT,
-            color_blend: wgpu::BlendDescriptor {
-                src_factor: wgpu::BlendFactor::SrcAlpha,
-                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                operation: wgpu::BlendOperation::Add,
-            },
-            alpha_blend: wgpu::BlendDescriptor {
-                src_factor: wgpu::BlendFactor::SrcAlpha,
-                dst_factor: wgpu::BlendFactor::DstAlpha,
-                operation: wgpu::BlendOperation::Max,
-            },
-            write_mask: wgpu::ColorWrite::ALL,
-        }
+        alpha_blend_state()
     } else {
         wgpu::ColorStateDescriptor {
             format: DISPLAY_FORMAT,
@@ -375,9 +329,9 @@ pub struct ModelBuffers {
     pub mice: DynamicBuffer<ModelInstance>,
     pub mice_joints: DynamicBuffer<Mat4>,
     pub mice_joints_bind_group: wgpu::BindGroup,
-    pub command_paths: DynamicBuffer<Vertex>,
     pub bullets: DynamicBuffer<ModelInstance>,
     pub command_indicators: DynamicBuffer<ModelInstance>,
+    pub command_paths: DynamicBuffer<ModelInstance>,
 }
 
 impl ModelBuffers {
@@ -409,16 +363,16 @@ impl ModelBuffers {
                 "Cheese bullet buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
-            command_paths: DynamicBuffer::new(
-                &context.device,
-                50,
-                "Cheese command paths buffer",
-                wgpu::BufferUsage::VERTEX,
-            ),
             command_indicators: DynamicBuffer::new(
                 &context.device,
-                1,
+                20,
                 "Cheese command indicators buffer",
+                wgpu::BufferUsage::VERTEX,
+            ),
+            command_paths: DynamicBuffer::new(
+                &context.device,
+                20,
+                "Cheese command paths buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
         }
@@ -426,9 +380,9 @@ impl ModelBuffers {
 
     pub fn upload(&mut self, context: &RenderContext, assets: &Assets) {
         self.mice.upload(context);
-        self.command_paths.upload(context);
         self.bullets.upload(context);
         self.command_indicators.upload(context);
+        self.command_paths.upload(context);
         let mice_resized = self.mice_joints.upload(context);
 
         // We need to recreate the bind group

@@ -6,8 +6,8 @@ mod resources;
 
 use crate::assets::Assets;
 use crate::renderer::{
-    LineBuffers, LinesPipeline, ModelBuffers, ModelPipelines, RenderContext, TextBuffer,
-    TorusBuffer, TorusPipeline,
+    LineBuffers, Lines3dBuffer, Lines3dPipeline, LinesPipeline, ModelBuffers, ModelPipelines,
+    RenderContext, TextBuffer, TorusBuffer, TorusPipeline,
 };
 use crate::resources::{
     Camera, CameraControls, CommandMode, CursorIcon, DeltaTime, DpiScaling, MouseState, PlayerSide,
@@ -62,10 +62,12 @@ async fn run() -> anyhow::Result<()> {
     let model_pipelines = ModelPipelines::new(&render_context, &assets);
     let torus_pipeline = TorusPipeline::new(&render_context);
     let lines_pipeline = LinesPipeline::new(&render_context, &assets);
+    let lines_3d_pipeline = Lines3dPipeline::new(&render_context);
     let model_buffers = ModelBuffers::new(&render_context, &assets);
     let torus_buffer = TorusBuffer::new(render_context.device());
     let lines_buffers = LineBuffers::new(render_context.device());
     let text_buffer = TextBuffer::new(render_context.device())?;
+    let lines_3d_buffer = Lines3dBuffer::new(render_context.device());
 
     let mut world = World::default();
     let mut resources = Resources::default();
@@ -73,6 +75,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(torus_buffer);
     resources.insert(lines_buffers);
     resources.insert(text_buffer);
+    resources.insert(lines_3d_buffer);
     resources.insert(render_context.screen_dimensions());
     resources.insert(CameraControls::default());
     resources.insert(Camera::default());
@@ -221,6 +224,7 @@ async fn run() -> anyhow::Result<()> {
                 let mut torus_buffer = resources.get_mut::<TorusBuffer>().unwrap();
                 let mut line_buffers = resources.get_mut::<LineBuffers>().unwrap();
                 let mut text_buffer = resources.get_mut::<TextBuffer>().unwrap();
+                let mut lines_3d_buffer = resources.get_mut::<Lines3dBuffer>().unwrap();
                 let assets = resources.get::<Assets>().unwrap();
 
                 // Upload buffers to the gpu.
@@ -228,6 +232,7 @@ async fn run() -> anyhow::Result<()> {
                 model_buffers.upload(&render_context, &assets);
                 torus_buffer.upload(&render_context);
                 line_buffers.upload(&render_context);
+                lines_3d_buffer.upload(&render_context);
 
                 if let Ok(frame) = render_context.swap_chain.get_current_frame() {
                     let mut encoder = render_context.device.create_command_encoder(
@@ -282,15 +287,17 @@ async fn run() -> anyhow::Result<()> {
                         &torus_buffer.toruses,
                         &assets.torus_model,
                     );
-                    model_pipelines.render_lines(
-                        &mut render_pass,
-                        &model_buffers.command_paths,
-                        &assets.misc_texture,
-                    );
+                    lines_3d_pipeline.render(&mut render_pass, &lines_3d_buffer.lines);
                     model_pipelines.render_single(
                         &mut render_pass,
                         &assets.surface_texture,
                         &assets.surface_model,
+                    );
+                    model_pipelines.render_transparent_textured(
+                        &mut render_pass,
+                        &model_buffers.command_paths,
+                        &assets.misc_texture,
+                        &assets.command_path_model,
                     );
                     model_pipelines.render_transparent_textured(
                         &mut render_pass,

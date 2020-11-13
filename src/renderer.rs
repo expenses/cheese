@@ -7,10 +7,12 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
+mod lines_3d_pipeline;
 mod lines_pipeline;
 mod model_pipelines;
 mod torus_pipeline;
 
+pub use lines_3d_pipeline::{Lines3dBuffer, Lines3dPipeline, Lines3dVertex};
 pub use lines_pipeline::{LineBuffers, LinesPipeline};
 pub use model_pipelines::{ModelBuffers, ModelInstance, ModelPipelines};
 pub use torus_pipeline::{TorusBuffer, TorusInstance, TorusPipeline};
@@ -36,6 +38,8 @@ pub struct RenderContext {
     main_bind_group: Arc<wgpu::BindGroup>,
 
     pub joint_bind_group_layout: wgpu::BindGroupLayout,
+
+    pub fs_transparent_module: wgpu::ShaderModule,
 }
 
 impl RenderContext {
@@ -189,6 +193,9 @@ impl RenderContext {
                 ],
             });
 
+        let fs_transparent = wgpu::include_spirv!("../shaders/compiled/transparent.frag.spv");
+        let fs_transparent_module = device.create_shader_module(fs_transparent);
+
         Ok(Self {
             swap_chain,
             window,
@@ -203,6 +210,7 @@ impl RenderContext {
             sampler,
             joint_bind_group_layout,
             main_bind_group: Arc::new(main_bind_group),
+            fs_transparent_module,
         })
     }
 
@@ -277,6 +285,23 @@ fn create_depth_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu:
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         })
         .create_view(&wgpu::TextureViewDescriptor::default())
+}
+
+fn alpha_blend_state() -> wgpu::ColorStateDescriptor {
+    wgpu::ColorStateDescriptor {
+        format: DISPLAY_FORMAT,
+        color_blend: wgpu::BlendDescriptor {
+            src_factor: wgpu::BlendFactor::SrcAlpha,
+            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+            operation: wgpu::BlendOperation::Add,
+        },
+        alpha_blend: wgpu::BlendDescriptor {
+            src_factor: wgpu::BlendFactor::SrcAlpha,
+            dst_factor: wgpu::BlendFactor::DstAlpha,
+            operation: wgpu::BlendOperation::Max,
+        },
+        write_mask: wgpu::ColorWrite::ALL,
+    }
 }
 
 pub struct DynamicBuffer<T: bytemuck::Pod> {
