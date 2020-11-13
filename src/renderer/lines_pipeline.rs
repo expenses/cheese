@@ -172,7 +172,7 @@ impl LinesPipeline {
             render_pass.draw_indexed(0..num_indices, 0, 0..1);
         }
 
-        render_pass.set_bind_group(1, &assets.hud_texture, &[]);
+        render_pass.set_bind_group(1, &assets.misc_texture, &[]);
         render_pass.set_vertex_buffer(0, self.hud_buffer.slice(..));
         render_pass.draw(0..6, 0..1);
     }
@@ -322,7 +322,7 @@ struct Vertex {
 fn generate_hud_vertices(screen_width: u32, screen_height: u32) -> [Vertex; 6] {
     let vertex = |x, y, u, v| Vertex {
         position: Vec2::new(x as f32, y as f32),
-        uv: Vec2::new(u as f32, v as f32),
+        uv: Vec2::new(u as f32, v),
         colour: Vec3::new(0.0, 0.0, 0.0),
         textured: true as i32,
     };
@@ -332,10 +332,12 @@ fn generate_hud_vertices(screen_width: u32, screen_height: u32) -> [Vertex; 6] {
     let hud_height = screen_width as f32 / 8.0;
     let hud_top = screen_height - hud_height;
 
-    let top_left = vertex(0, hud_top, 0, 0);
-    let top_right = vertex(screen_width, hud_top, 1, 0);
-    let bottom_left = vertex(0, screen_height, 0, 1);
-    let bottom_right = vertex(screen_width, screen_height, 1, 1);
+    let offset = (64.0 - 8.0) / 64.0;
+
+    let top_left = vertex(0, hud_top, 0, offset);
+    let top_right = vertex(screen_width, hud_top, 1, offset);
+    let bottom_left = vertex(0, screen_height, 0, 1.0);
+    let bottom_right = vertex(screen_width, screen_height, 1, 1.0);
 
     [
         top_left,

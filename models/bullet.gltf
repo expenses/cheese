@@ -48,6 +48,25 @@
             ]
         }
     ],
+    "materials" : [
+        {
+            "doubleSided" : true,
+            "emissiveFactor" : [
+                0,
+                0,
+                0
+            ],
+            "name" : "Material",
+            "pbrMetallicRoughness" : {
+                "baseColorTexture" : {
+                    "index" : 0,
+                    "texCoord" : 0
+                },
+                "metallicFactor" : 0,
+                "roughnessFactor" : 0.4000000059604645
+            }
+        }
+    ],
     "meshes" : [
         {
             "name" : "Cube",
@@ -58,9 +77,22 @@
                         "NORMAL" : 1,
                         "TEXCOORD_0" : 2
                     },
-                    "indices" : 3
+                    "indices" : 3,
+                    "material" : 0
                 }
             ]
+        }
+    ],
+    "textures" : [
+        {
+            "source" : 0
+        }
+    ],
+    "images" : [
+        {
+            "bufferView" : 4,
+            "mimeType" : "image/png",
+            "name" : "misc"
         }
     ],
     "accessors" : [
@@ -119,12 +151,17 @@
             "buffer" : 0,
             "byteLength" : 36,
             "byteOffset" : 512
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 861,
+            "byteOffset" : 548
         }
     ],
     "buffers" : [
         {
-            "byteLength" : 548,
-            "uri" : "data:application/octet-stream;base64,AAAAAM/MTD3czEy9AACAvwAAAAAAAIAzAAAAAM/MTD28zEw9AAAAAM/MTL28zEw9AACAvwAAAAAAAIAzAAAAAM/MTL3czEy9AAAAAM/MTD28zEw9AACAvwAAAAAAAIAzAAAAAM/MTL28zEw9AAAAAM/MTD3czEy9AAAAAM/MTL28zEw9AAAAAM/MTL3czEy9AACAvwAAAAAAAIAzAAAAAM/MTD3czEy9AAAAAM/MTL3czEy9AAAAAM/MTD28zEw9ZotMvTyufz8AAACAZotMvTyufz8AAACAZotMvTyufz8AAACAZotMvTyuf78AAACAZotMvTyuf78AAACAZotMvTyuf78AAACAQotMvQAAAAA7rn8/QotMvQAAAAA7rn8/QotMvQAAAAA7rn8/AACAPwAAAIAAAACAAACAPwAAAIAAAACAAACAPwAAAIAAAACAgYtMvQAAAAA7rn+/gYtMvQAAAAA7rn+/gYtMvQAAAAA7rn+/AACAPwAAAAAAAACAAABAPgAAAAAAAAA9AAAAPwAAQD4AAIA/AABAPgAAAAAAAAA9AAAAPwAAQD4AAIA/AABAPgAAAAAAAAA9AAAAPwAAQD4AAIA/AABAPgAAAAAAADA+AACAPwAAQD4AAIA/AAAAPQAAAD8AAEA+AACAPwAAQD4AAAAAAAAwPgAAAAAAAAEAAgADAAQABQAGAAcACAAJAAoACwAMAA0ADgAJAA8ACgA="
+            "byteLength" : 1412,
+            "uri" : "data:application/octet-stream;base64,AAAAAM/MTD3czEy9AACAvwAAAAAAAIAzAAAAAM/MTD28zEw9AAAAAM/MTL28zEw9AACAvwAAAAAAAIAzAAAAAM/MTL3czEy9AAAAAM/MTD28zEw9AACAvwAAAAAAAIAzAAAAAM/MTL28zEw9AAAAAM/MTD3czEy9AAAAAM/MTL28zEw9AAAAAM/MTL3czEy9AACAvwAAAAAAAIAzAAAAAM/MTD3czEy9AAAAAM/MTL3czEy9AAAAAM/MTD28zEw9ZYtMvTyufz8AAACAZYtMvTyufz8AAACAZYtMvTyufz8AAACAZItMvTyuf78AAACAZItMvTyuf78AAACAZItMvTyuf78AAACAQotMvQAAAAA7rn8/QotMvQAAAAA7rn8/QotMvQAAAAA7rn8/AACAPwAAAAAAAACAAACAPwAAAAAAAACAAACAPwAAAAAAAACAgYtMvQAAAAA7rn+/gYtMvQAAAAA7rn+/gYtMvQAAAAA7rn+/AACAPwAAAAAAAACAAAAgPgAAAAAAAIA8AAAAPAAAID4AAIA8AAAgPgAAAAAAAIA8AAAAPAAAID4AAIA8AAAgPgAAAAAAAIA8AAAAPAAAID4AAIA8AAAgPgAAAAAAABA+AACAPAAAID4AAIA8AACAPAAAADwAACA+AACAPAAAID4AAAAAAAAQPgAAAAAAAAEAAgADAAQABQAGAAcACAAJAAoACwAMAA0ADgAJAA8ACgCJUE5HDQoaCgAAAA1JSERSAAAAQAAAAEAIBgAAAKppcd4AAAGEaUNDUElDQyBwcm9maWxlAAAokX2RPUjDQBzFX1NF0RZBO6goZKhOFkRFHLUKRagQaoVWHUwu/YImDUmKi6PgWnDwY7Hq4OKsq4OrIAh+gDg5Oim6SIn/awotYjw47se7e4+7d4BQLTLNahsHNN02E7GomEqvih2v6EYQvRjGgMwsY06S4vAcX/fw8fUuwrO8z/05gmrGYoBPJJ5lhmkTbxBPb9oG533iEMvLKvE58ZhJFyR+5Lri8hvnXJ0Fnhkyk4l54hCxmGthpYVZ3tSIp4jDqqZTvpByWeW8xVkrllnjnvyFgYy+ssx1mkOIYRFLkCBCQRkFFGEjQqtOioUE7Uc9/IN1v0QuhVwFMHIsoAQNct0P/ge/u7WykxNuUiAKtL84zscI0LEL1CqO833sOLUTwP8MXOlNf6kKzHySXmlq4SOgZxu4uG5qyh5wuQP0PxmyKdclP00hmwXez+ib0kDfLdC15vbW2MfpA5CkruI3wMEhMJqj7HWPd3e29vbvmUZ/P1oncp03KCuWAAAABmJLR0QAAAAAAAD5Q7t/AAAACXBIWXMAAC4jAAAuIwF4pT92AAAAB3RJTUUH5AsNFAgmxUAeoQAAABl0RVh0Q29tbWVudABDcmVhdGVkIHdpdGggR0lNUFeBDhcAAAE1SURBVHja7dpRbsIwDIBhe+JtErxxATgC90tyP45QLsAlshc6ZVmspmyC1v0/qVJoI4Rdx6EITSL5U0T2j+MgIntROUj+cU5FVFYk5xzHsapGa96qgpoTtIiEYpx6krH64B9HqfU6eg3+V6CN8fd1N0ugCCYUpR4aU1M9T1Xjh5MiCI1xKg5rjqvyjxNrvx5Hb2t/KhHN616WQGqUdaq3wEavEE89IBl9IXQkix7grQ+U+7953dMSSMZ+H6ptUYy+sN1vgpt/Ftj806CKU72/BwAAAAAAAAAAAAAAAAAAALjV9U/R2/WY1xjc6XLXpxPw70EPL47+3JcM7Q58KN50HFvnjA+xxKrYzbrjw8zs1wl6YwXUcY6J2M0q978Es7BquF2P+XS5q3YHP0zc2VZyzsvpAZYvXpDy/ztGmqkAAAAASUVORK5CYIIAAAA="
         }
     ]
 }

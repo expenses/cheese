@@ -8,13 +8,13 @@ pub struct Assets {
     pub mouse_model: AnimatedModel,
     pub mouse_helmet_model: AnimatedModel,
     pub torus_model: Model,
+    pub command_indicator_model: Model,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
     pub surface_texture: wgpu::BindGroup,
-    pub colours_texture: wgpu::BindGroup,
-    pub hud_texture: wgpu::BindGroup,
     pub mouse_texture: wgpu::BindGroup,
+    pub misc_texture: wgpu::BindGroup,
 }
 
 impl Assets {
@@ -64,6 +64,11 @@ impl Assets {
                 "Cheese torus model",
                 device,
             )?,
+            command_indicator_model: Model::load_gltf(
+                include_bytes!("../models/command_indicator.gltf"),
+                "Cheese command indicator model",
+                device,
+            )?,
             surface_texture: load_texture(
                 include_bytes!("../textures/surface.png"),
                 "Cheese surface texture",
@@ -71,16 +76,9 @@ impl Assets {
                 device,
                 &mut init_encoder,
             )?,
-            colours_texture: load_texture(
-                include_bytes!("../textures/colours.png"),
-                "Cheese colours texture",
-                &texture_bind_group_layout,
-                device,
-                &mut init_encoder,
-            )?,
-            hud_texture: load_texture(
-                include_bytes!("../textures/hud.png"),
-                "Cheese hud texture",
+            misc_texture: load_texture(
+                include_bytes!("../textures/misc.png"),
+                "Cheese misc texture",
                 &texture_bind_group_layout,
                 device,
                 &mut init_encoder,

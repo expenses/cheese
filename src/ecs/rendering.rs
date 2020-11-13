@@ -228,6 +228,16 @@ pub fn render_command_paths(
         };
 
         if let Some(position) = position {
+            model_buffers.command_indicators.push(ModelInstance {
+                transform: Mat4::from_translation(Vec3::new(position.x, 0.1, position.y)),
+                flat_colour: match command {
+                    Command::MoveTo(_) => Vec4::new(0.25, 0.25, 1.0, 1.0),
+                    Command::AttackMove(_) | Command::Attack { .. } => {
+                        Vec4::new(1.0, 0.0, 0.0, 1.0)
+                    }
+                },
+            });
+
             let vertex = position_to_vertex(position, uv);
 
             model_buffers.command_paths.push(prev);

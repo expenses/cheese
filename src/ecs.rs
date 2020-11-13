@@ -149,7 +149,7 @@ impl Unit {
 
         if let Some(assets) = assets {
             let mut entry = world.entry(entity).unwrap();
-        
+
             entry.add_component(assets.mouse_model.skin.clone());
             entry.add_component(AnimationState {
                 animation: MouseAnimation::Idle as usize,

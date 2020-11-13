@@ -274,7 +274,7 @@ async fn run() -> anyhow::Result<()> {
                     model_pipelines.render_instanced(
                         &mut render_pass,
                         &model_buffers.bullets,
-                        &assets.colours_texture,
+                        &assets.misc_texture,
                         &assets.bullet_model,
                     );
                     torus_pipeline.render(
@@ -285,12 +285,18 @@ async fn run() -> anyhow::Result<()> {
                     model_pipelines.render_lines(
                         &mut render_pass,
                         &model_buffers.command_paths,
-                        &assets.colours_texture,
+                        &assets.misc_texture,
                     );
                     model_pipelines.render_single(
                         &mut render_pass,
                         &assets.surface_texture,
                         &assets.surface_model,
+                    );
+                    model_pipelines.render_transparent_textured(
+                        &mut render_pass,
+                        &model_buffers.command_indicators,
+                        &assets.misc_texture,
+                        &assets.command_indicator_model,
                     );
                     model_pipelines.render_transparent_animated(
                         &mut render_pass,

@@ -1,4 +1,4 @@
-use super::{AnimationState, MouseAnimation, Command, CommandQueue};
+use super::{AnimationState, Command, CommandQueue, MouseAnimation};
 use crate::animation::Skin;
 use crate::assets::Assets;
 use crate::resources::DeltaTime;

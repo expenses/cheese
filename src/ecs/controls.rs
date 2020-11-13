@@ -277,8 +277,13 @@ fn selection_and_deselection() {
     let mut builder = Schedule::builder();
     crate::add_gameplay_systems(&mut builder);
     let mut schedule = builder.build();
-    let entity =
-        Unit::MouseMarine.add_to_world(&mut world, None, Vec2::new(0.0, 0.0), Facing(0.0), Side::Green);
+    let entity = Unit::MouseMarine.add_to_world(
+        &mut world,
+        None,
+        Vec2::new(0.0, 0.0),
+        Facing(0.0),
+        Side::Green,
+    );
     schedule.execute(&mut world, &mut resources);
 
     let mut query = <Option<&Selected>>::query();
