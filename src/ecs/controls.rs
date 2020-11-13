@@ -10,7 +10,7 @@ pub fn control_camera(
 ) {
     let speed = 0.5;
 
-    let edge_thickness = 0.0;
+    let edge_thickness = 50.0;
     let &ScreenDimensions {
         width: screen_width,
         height: screen_height,
