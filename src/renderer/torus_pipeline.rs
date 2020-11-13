@@ -24,10 +24,10 @@ impl TorusPipeline {
                     push_constant_ranges: &[],
                 });
 
-        let vs = wgpu::include_spirv!("../../shaders/torus.vert.spv");
+        let vs = wgpu::include_spirv!("../../shaders/compiled/torus.vert.spv");
         let vs_module = context.device.create_shader_module(vs);
 
-        let fs = wgpu::include_spirv!("../../shaders/torus.frag.spv");
+        let fs = wgpu::include_spirv!("../../shaders/compiled/torus.frag.spv");
         let fs_module = context.device.create_shader_module(fs);
 
         let pipeline = context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {

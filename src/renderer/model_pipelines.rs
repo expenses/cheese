@@ -17,16 +17,16 @@ pub struct ModelPipelines {
 
 impl ModelPipelines {
     pub fn new(context: &RenderContext, assets: &Assets) -> Self {
-        let vs = wgpu::include_spirv!("../../shaders/shader.vert.spv");
+        let vs = wgpu::include_spirv!("../../shaders/compiled/shader.vert.spv");
         let vs_module = context.device.create_shader_module(vs);
 
-        let fs = wgpu::include_spirv!("../../shaders/shader.frag.spv");
+        let fs = wgpu::include_spirv!("../../shaders/compiled/shader.frag.spv");
         let fs_module = context.device.create_shader_module(fs);
 
-        let fs_transparent = wgpu::include_spirv!("../../shaders/transparent.frag.spv");
+        let fs_transparent = wgpu::include_spirv!("../../shaders/compiled/transparent.frag.spv");
         let fs_transparent_module = context.device.create_shader_module(fs_transparent);
 
-        let vs_animated = wgpu::include_spirv!("../../shaders/animated.vert.spv");
+        let vs_animated = wgpu::include_spirv!("../../shaders/compiled/animated.vert.spv");
         let vs_animated_module = context.device.create_shader_module(vs_animated);
 
         let model_pipeline = create_render_pipeline(

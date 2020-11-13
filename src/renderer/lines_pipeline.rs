@@ -76,10 +76,10 @@ impl LinesPipeline {
                     push_constant_ranges: &[],
                 });
 
-        let vs = wgpu::include_spirv!("../../shaders/lines.vert.spv");
+        let vs = wgpu::include_spirv!("../../shaders/compiled/lines.vert.spv");
         let vs_module = context.device.create_shader_module(vs);
 
-        let fs = wgpu::include_spirv!("../../shaders/lines.frag.spv");
+        let fs = wgpu::include_spirv!("../../shaders/compiled/lines.frag.spv");
         let fs_module = context.device.create_shader_module(fs);
 
         let pipeline = context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
