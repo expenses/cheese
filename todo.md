@@ -1,2 +1,8 @@
-- Make command paths nicer.
+- Resources
+- Cheese wells on map
+- Buildings
+- delaunay triangulation for pathfinding around buildings
+- A kind of internal selection group system for tings like moving units as a group
+- Unit selection hotkeys
+- AI
 - Fill out HUD (medium)
