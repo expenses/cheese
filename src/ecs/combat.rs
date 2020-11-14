@@ -147,4 +147,3 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
 pub fn reduce_cooldowns(cooldown: &mut FiringCooldown) {
     cooldown.0 = cooldown.0.saturating_sub(1);
 }
-

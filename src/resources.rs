@@ -10,11 +10,13 @@ pub struct CameraControls {
     pub zoom_delta: f32,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RtsControls {
     pub shift_held: bool,
+    pub control_held: bool,
     pub stop_pressed: bool,
     pub mode: CommandMode,
+    pub control_group_key_pressed: [bool; 10],
 }
 
 #[derive(PartialEq, Debug)]
@@ -196,3 +198,6 @@ pub struct CursorIcon(pub winit::window::CursorIcon);
 #[derive(Default)]
 pub struct RayCastLocation(pub Vec2);
 pub struct DpiScaling(pub f32);
+
+#[derive(Default)]
+pub struct ControlGroups(pub [Vec<legion::Entity>; 10]);

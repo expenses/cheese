@@ -1,8 +1,6 @@
 - Resources
 - Cheese wells on map
 - Buildings
-- delaunay triangulation for pathfinding around buildings
-- A kind of internal selection group system for tings like moving units as a group
-- Unit selection hotkeys
+- A kind of internal selection group system for things like moving units as a group
 - AI
 - Fill out HUD (medium)
