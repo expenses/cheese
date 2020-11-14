@@ -1,6 +1,7 @@
 mod animation;
 mod assets;
 mod ecs;
+mod pathfinding;
 mod renderer;
 mod resources;
 
@@ -111,7 +112,22 @@ async fn run() -> anyhow::Result<()> {
         );
     }
 
+    let mut map = pathfinding::Map::new();
+
+    world.push((ecs::Building::new(
+        Vec2::new(-20.0, 10.0),
+        Vec2::new(6.0, 10.0),
+        &mut map,
+    ),));
+
+    world.push((ecs::Building::new(
+        Vec2::new(-30.0, 40.0),
+        Vec2::new(6.0, 10.0),
+        &mut map,
+    ),));
+
     resources.insert(assets);
+    resources.insert(map);
 
     let mut builder = Schedule::builder();
     add_gameplay_systems(&mut builder);
@@ -129,6 +145,9 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::render_ui_system())
         .add_system(ecs::render_health_bars_system())
         .add_system(ecs::render_unit_under_cursor_system())
+        //.add_system(ecs::render_building_grid_system())
+        .add_system(ecs::render_pathfinding_map_system())
+        .add_system(ecs::render_buildings_system())
         // Cleanup
         .flush()
         .add_system(ecs::update_mouse_buttons_system())
@@ -269,6 +288,12 @@ async fn run() -> anyhow::Result<()> {
                     });
 
                     // Render a bunch of models.
+                    model_pipelines.render_instanced(
+                        &mut render_pass,
+                        &model_buffers.armouries,
+                        &assets.armoury_texture,
+                        &assets.armoury_model,
+                    );
                     model_pipelines.render_animated(
                         &mut render_pass,
                         &model_buffers.mice,

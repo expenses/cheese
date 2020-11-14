@@ -10,12 +10,14 @@ pub struct Assets {
     pub torus_model: Model,
     pub command_indicator_model: Model,
     pub command_path_model: Model,
+    pub armoury_model: Model,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
     pub surface_texture: wgpu::BindGroup,
     pub mouse_texture: wgpu::BindGroup,
     pub misc_texture: wgpu::BindGroup,
+    pub armoury_texture: wgpu::BindGroup,
 }
 
 impl Assets {
@@ -75,6 +77,11 @@ impl Assets {
                 "Cheese command path model",
                 device,
             )?,
+            armoury_model: Model::load_gltf(
+                include_bytes!("../models/armoury.gltf"),
+                "Cheese armoury model",
+                device,
+            )?,
             surface_texture: load_texture(
                 include_bytes!("../textures/surface.png"),
                 "Cheese surface texture",
@@ -92,6 +99,13 @@ impl Assets {
             mouse_texture: load_texture(
                 include_bytes!("../textures/mouse.png"),
                 "Cheese mouse texture",
+                &texture_bind_group_layout,
+                device,
+                &mut init_encoder,
+            )?,
+            armoury_texture: load_texture(
+                include_bytes!("../textures/armoury.png"),
+                "Cheese armoury texture",
                 &texture_bind_group_layout,
                 device,
                 &mut init_encoder,

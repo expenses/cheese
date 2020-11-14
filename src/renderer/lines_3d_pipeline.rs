@@ -1,6 +1,6 @@
 use super::{alpha_blend_state, DynamicBuffer, RenderContext, DEPTH_FORMAT};
 use std::sync::Arc;
-use ultraviolet::{Vec3, Vec4};
+use ultraviolet::{Vec2, Vec3, Vec4};
 
 // A pipeline for drawing 3d lines using `wgpu::PrimitiveTopology::LineList`. This primitive type
 // is honestly pretty useless as it doesn't scale with dpi. It's used here for debugging.
@@ -101,11 +101,22 @@ impl Lines3dBuffer {
     pub fn upload(&mut self, context: &RenderContext) {
         self.lines.upload(context);
     }
+
+    pub fn draw_line(&mut self, a: Vec2, b: Vec2, height: f32, colour: Vec4) {
+        self.lines.push(Lines3dVertex {
+            position: Vec3::new(a.x, height, a.y),
+            colour,
+        });
+        self.lines.push(Lines3dVertex {
+            position: Vec3::new(b.x, height, b.y),
+            colour,
+        });
+    }
 }
 
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
 pub struct Lines3dVertex {
-    pub position: Vec3,
-    pub colour: Vec4,
+    position: Vec3,
+    colour: Vec4,
 }

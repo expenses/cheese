@@ -1,7 +1,7 @@
 use super::*;
 use crate::animation::Skin;
 use crate::renderer::{
-    LineBuffers, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance,
+    LineBuffers, Lines3dBuffer, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance,
 };
 use crate::resources::{CursorIcon, DpiScaling, RayCastLocation};
 use ultraviolet::Vec4;
@@ -252,6 +252,83 @@ pub fn render_command_paths(
 
             prev = position;
         }
+    }
+}
+
+#[legion::system(for_each)]
+pub fn render_buildings(building: &Building, #[resource] model_buffers: &mut ModelBuffers) {
+    model_buffers.armouries.push(ModelInstance {
+        transform: Mat4::from_translation(Vec3::new(building.position.x, 0.0, building.position.y)),
+        flat_colour: Vec4::new(1.0, 1.0, 1.0, 1.0),
+    })
+}
+
+#[legion::system]
+pub fn render_building_grid(#[resource] lines_3d_buffer: &mut Lines3dBuffer) {
+    let size = 100;
+    let colour = Vec4::new(1.0, 1.0, 1.0, 1.0);
+
+    for n in -size..=size {
+        let n = n as f32;
+        let size = size as f32;
+
+        lines_3d_buffer.draw_line(Vec2::new(n, -size), Vec2::new(n, size), 0.09, colour);
+        lines_3d_buffer.draw_line(Vec2::new(-size, n), Vec2::new(size, n), 0.09, colour);
+    }
+}
+
+#[legion::system]
+pub fn render_pathfinding_map(
+    #[resource] map: &Map,
+    #[resource] ray_cast_location: &RayCastLocation,
+    #[resource] lines_3d_buffer: &mut Lines3dBuffer,
+) {
+    for (a, b, constraint) in map.edges() {
+        let colour = if constraint {
+            Vec4::new(1.0, 0.0, 0.0, 1.0)
+        } else {
+            Vec4::new(1.0, 1.0, 1.0, 1.0)
+        };
+
+        lines_3d_buffer.draw_line(a, b, 0.1, colour);
+    }
+
+    let mut debug_triangles = Vec::new();
+    let mut debug_funnel_points = Vec::new();
+
+    if let Some(path) = map.pathfind(
+        Vec2::new(0.0, 0.0),
+        ray_cast_location.0,
+        1.0,
+        Some(&mut debug_triangles),
+        Some(&mut debug_funnel_points),
+    ) {
+        let mut prev = Vec2::new(0.0, 0.0);
+
+        for point in path {
+            lines_3d_buffer.draw_line(prev, point, 0.2, Vec4::new(0.0, 1.0, 0.0, 1.0));
+            prev = point;
+        }
+    }
+
+    let mut prev = None;
+    for (a, b, c) in debug_triangles {
+        let pos = (a + b + c) / 3.0;
+        if let Some(prev) = prev {
+            lines_3d_buffer.draw_line(prev, pos, 0.3, Vec4::new(0.0, 0.0, 0.0, 1.0));
+        }
+        prev = Some(pos);
+    }
+
+    let mut prev = None;
+
+    for (left, right) in debug_funnel_points {
+        if let Some((prev_left, prev_right)) = prev {
+            lines_3d_buffer.draw_line(prev_left, left, 1.0, Vec4::new(1.0, 1.0, 0.0, 1.0));
+            lines_3d_buffer.draw_line(prev_right, right, 1.0, Vec4::new(0.0, 1.0, 1.0, 1.0));
+        }
+
+        prev = Some((left, right));
     }
 }
 

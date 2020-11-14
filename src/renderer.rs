@@ -12,7 +12,7 @@ mod lines_pipeline;
 mod model_pipelines;
 mod torus_pipeline;
 
-pub use lines_3d_pipeline::{Lines3dBuffer, Lines3dPipeline, Lines3dVertex};
+pub use lines_3d_pipeline::{Lines3dBuffer, Lines3dPipeline};
 pub use lines_pipeline::{LineBuffers, LinesPipeline};
 pub use model_pipelines::{ModelBuffers, ModelInstance, ModelPipelines};
 pub use torus_pipeline::{TorusBuffer, TorusInstance, TorusPipeline};

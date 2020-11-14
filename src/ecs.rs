@@ -1,3 +1,4 @@
+use crate::pathfinding::{Map, MapHandle};
 use crate::resources::{
     Camera, CameraControls, MouseState, PlayerSide, RtsControls, ScreenDimensions,
 };
@@ -74,6 +75,24 @@ pub struct Bullet {
 pub struct MoveTo(pub Vec2);
 
 pub struct FiringCooldown(pub u8);
+
+pub struct CommandGroup {
+    entities: Vec<Entity>,
+}
+
+pub struct Building {
+    pub handle: MapHandle,
+    position: Vec2,
+}
+
+impl Building {
+    pub fn new(center: Vec2, dimensions: Vec2, map: &mut Map) -> Self {
+        Self {
+            handle: map.insert(center, dimensions),
+            position: center,
+        }
+    }
+}
 
 #[derive(Copy, Clone)]
 pub enum Unit {

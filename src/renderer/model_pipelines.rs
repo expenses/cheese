@@ -332,6 +332,7 @@ pub struct ModelBuffers {
     pub bullets: DynamicBuffer<ModelInstance>,
     pub command_indicators: DynamicBuffer<ModelInstance>,
     pub command_paths: DynamicBuffer<ModelInstance>,
+    pub armouries: DynamicBuffer<ModelInstance>,
 }
 
 impl ModelBuffers {
@@ -375,6 +376,12 @@ impl ModelBuffers {
                 "Cheese command paths buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
+            armouries: DynamicBuffer::new(
+                &context.device,
+                1,
+                "Cheese armoury buffer",
+                wgpu::BufferUsage::VERTEX,
+            ),
         }
     }
 
@@ -383,6 +390,7 @@ impl ModelBuffers {
         self.bullets.upload(context);
         self.command_indicators.upload(context);
         self.command_paths.upload(context);
+        self.armouries.upload(context);
         let mice_resized = self.mice_joints.upload(context);
 
         // We need to recreate the bind group
