@@ -165,6 +165,7 @@ fn issue_command(
             target: *entity,
             explicit: true,
             first_out_of_range: true,
+            out_of_range: true,
         },
         None => match rts_controls.mode {
             CommandMode::Normal => Command::MoveTo(position),

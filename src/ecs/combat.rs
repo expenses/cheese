@@ -52,9 +52,9 @@ pub fn firing(
                 Bullet {
                     target: *target,
                     source: *entity,
+                    target_position: target_position.0,
                 },
                 Facing(0.0),
-                MoveTo(target_position.0),
                 MoveSpeed(10.0),
             ));
             cooldown.0 = 10;
@@ -69,11 +69,10 @@ pub fn apply_bullets(
     entity: &Entity,
     bullet: &Bullet,
     position: &Position,
-    move_to: &MoveTo,
     world: &SubWorld,
     buffer: &mut CommandBuffer,
 ) {
-    if position.0 == move_to.0 {
+    if position.0 == bullet.target_position {
         if world.entry_ref(bullet.target).is_ok() {
             buffer.add_component(bullet.target, DamagedThisTick(bullet.source));
         }
@@ -102,6 +101,7 @@ pub fn handle_damaged(
             target: damaged.0,
             explicit: false,
             first_out_of_range: true,
+            out_of_range: true,
         });
     }
 
@@ -137,6 +137,7 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
                 target: *target,
                 explicit: false,
                 first_out_of_range: true,
+                out_of_range: true,
             })
         }
     }
@@ -146,3 +147,4 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
 pub fn reduce_cooldowns(cooldown: &mut FiringCooldown) {
     cooldown.0 = cooldown.0.saturating_sub(1);
 }
+
