@@ -10,6 +10,7 @@ pub struct Assets {
     pub torus_model: Model,
     pub command_indicator_model: Model,
     pub command_path_model: Model,
+    pub cheese_moon_model: Model,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
@@ -73,6 +74,11 @@ impl Assets {
             command_path_model: Model::load_gltf(
                 include_bytes!("../models/command_path.gltf"),
                 "Cheese command path model",
+                device,
+            )?,
+            cheese_moon_model: Model::load_gltf(
+                include_bytes!("../models/cheese_moon.gltf"),
+                "Cheese cheese moon model",
                 device,
             )?,
             surface_texture: load_texture(

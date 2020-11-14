@@ -214,6 +214,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "cheese"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
+ "bytemuck",
+ "cgmath",
+ "env_logger",
+ "futures",
+ "gltf",
+ "image",
+ "legion",
+ "log",
+ "lyon_tessellation",
+ "ncollide3d",
+ "ordered-float 2.0.0",
+ "ultraviolet",
+ "wgpu",
+ "wgpu_glyph",
+ "winit",
+]
+
+[[package]]
 name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1292,29 +1315,6 @@ dependencies = [
  "net2",
  "winapi 0.2.8",
  "ws2_32-sys",
-]
-
-[[package]]
-name = "moonshot"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64",
- "bytemuck",
- "cgmath",
- "env_logger",
- "futures",
- "gltf",
- "image",
- "legion",
- "log",
- "lyon_tessellation",
- "ncollide3d",
- "ordered-float 2.0.0",
- "ultraviolet",
- "wgpu",
- "wgpu_glyph",
- "winit",
 ]
 
 [[package]]

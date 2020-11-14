@@ -1,6 +1,6 @@
 use super::{
-    alpha_blend_state, draw_model, AnimatedVertex, DynamicBuffer, RenderContext, Vertex,
-    DEPTH_FORMAT, DISPLAY_FORMAT,
+    alpha_blend_state, draw_model, AnimatedVertex, DynamicBuffer, RenderContext, StaticBuffer,
+    Vertex, DEPTH_FORMAT, DISPLAY_FORMAT,
 };
 use crate::assets::{AnimatedModel, Assets, Model};
 use std::sync::Arc;
@@ -163,6 +163,19 @@ impl ModelPipelines {
             self.identity_instance_buffer.slice(..),
             1,
         );
+    }
+
+    pub fn render_single_with_transform<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        model: &'a Model,
+        texture: &'a wgpu::BindGroup,
+        transform: &'a StaticBuffer<ModelInstance>,
+    ) {
+        render_pass.set_pipeline(&self.model_pipeline);
+        render_pass.set_bind_group(0, &self.main_bind_group, &[]);
+        render_pass.set_bind_group(1, texture, &[]);
+        draw_model(render_pass, model, transform.buffer.slice(..), 1);
     }
 
     pub fn render_instanced<'a>(
@@ -394,6 +407,30 @@ impl ModelBuffers {
                 &assets.mouse_model,
             );
         }
+    }
+}
+
+pub struct TitlescreenBuffer {
+    pub moon: StaticBuffer<ModelInstance>,
+}
+
+impl TitlescreenBuffer {
+    pub fn new(device: &wgpu::Device) -> Self {
+        Self {
+            moon: StaticBuffer::new(
+                device,
+                ModelInstance {
+                    flat_colour: Vec4::new(1.0, 1.0, 1.0, 1.0),
+                    transform: Mat4::identity(),
+                },
+                "Cheese titlescreen moon buffer",
+                wgpu::BufferUsage::VERTEX,
+            ),
+        }
+    }
+
+    pub fn upload(&self, context: &RenderContext) {
+        self.moon.upload(context);
     }
 }
 

@@ -14,7 +14,7 @@ mod torus_pipeline;
 
 pub use lines_3d_pipeline::{Lines3dBuffer, Lines3dPipeline, Lines3dVertex};
 pub use lines_pipeline::{LineBuffers, LinesPipeline};
-pub use model_pipelines::{ModelBuffers, ModelInstance, ModelPipelines};
+pub use model_pipelines::{ModelBuffers, ModelInstance, ModelPipelines, TitlescreenBuffer};
 pub use torus_pipeline::{TorusBuffer, TorusInstance, TorusPipeline};
 
 const DISPLAY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
@@ -44,7 +44,9 @@ pub struct RenderContext {
 
 impl RenderContext {
     pub async fn new(event_loop: &EventLoop<()>) -> anyhow::Result<Self> {
-        let window = WindowBuilder::new().build(event_loop)?;
+        let window = WindowBuilder::new()
+            .with_title("Cheese (working title)")
+            .build(event_loop)?;
 
         let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
         let surface = unsafe { instance.create_surface(&window) };
@@ -301,6 +303,34 @@ fn alpha_blend_state() -> wgpu::ColorStateDescriptor {
             operation: wgpu::BlendOperation::Max,
         },
         write_mask: wgpu::ColorWrite::ALL,
+    }
+}
+
+pub struct StaticBuffer<T: bytemuck::Pod> {
+    buffer: wgpu::Buffer,
+    contents: T,
+}
+
+impl<T: bytemuck::Pod> StaticBuffer<T> {
+    fn new(device: &wgpu::Device, contents: T, label: &str, usage: wgpu::BufferUsage) -> Self {
+        Self {
+            buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(label),
+                contents: bytemuck::bytes_of(&contents),
+                usage: usage | wgpu::BufferUsage::COPY_DST,
+            }),
+            contents,
+        }
+    }
+
+    pub fn write(&mut self, contents: T) {
+        self.contents = contents;
+    }
+
+    fn upload(&self, context: &RenderContext) {
+        context
+            .queue
+            .write_buffer(&self.buffer, 0, bytemuck::bytes_of(&self.contents));
     }
 }
 
