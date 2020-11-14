@@ -80,12 +80,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arenatree"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12c20cb16fbd74700a684fc9ccf46601663cde5b769784a0e883a87a948d77aa"
-
-[[package]]
 name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1340,7 +1334,6 @@ name = "moonshot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arenatree",
  "arrayvec",
  "base64",
  "bytemuck",

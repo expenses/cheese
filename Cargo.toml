@@ -8,7 +8,6 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.34"
-arenatree = "0.1.3"
 arrayvec = "0.5.2"
 base64 = "0.13.0"
 bytemuck = { version = "1.4.1", features = ["derive"] }
