@@ -1,5 +1,5 @@
 use super::*;
-use crate::resources::{CommandMode, RayCastLocation};
+use crate::resources::{CommandMode, ControlGroups, RayCastLocation};
 
 #[legion::system]
 pub fn control_camera(
@@ -190,7 +190,7 @@ fn issue_command(
 #[read_component(Side)]
 #[write_component(CommandQueue)]
 pub fn handle_stop_command(
-    #[resource] rts_controls: &mut RtsControls,
+    #[resource] rts_controls: &RtsControls,
     #[resource] player_side: &PlayerSide,
     world: &mut SubWorld,
 ) {
@@ -205,8 +205,6 @@ pub fn handle_stop_command(
         .for_each(|(commands, _)| {
             commands.0.clear();
         });
-
-    rts_controls.stop_pressed = false;
 }
 
 #[legion::system]
@@ -242,10 +240,66 @@ pub fn handle_drag_selection(
 }
 
 #[legion::system]
-pub fn update_mouse_buttons(#[resource] mouse_state: &mut MouseState) {
+#[read_component(Entity)]
+pub fn remove_dead_entities_from_control_groups(
+    #[resource] control_groups: &mut ControlGroups,
+    world: &SubWorld,
+) {
+    for i in 0..10 {
+        control_groups.0[i].retain(|entity| world.entry_ref(*entity).is_ok());
+    }
+}
+
+#[legion::system]
+#[read_component(Entity)]
+pub fn handle_control_groups(
+    #[resource] control_groups: &mut ControlGroups,
+    #[resource] rts_controls: &RtsControls,
+    command_buffer: &mut CommandBuffer,
+    world: &SubWorld,
+) {
+    for i in 0..10 {
+        if rts_controls.control_group_key_pressed[i] {
+            if rts_controls.control_held {
+                control_groups.0[i].clear();
+                <Entity>::query()
+                    .filter(component::<Selected>())
+                    .for_each(world, |entity| {
+                        control_groups.0[i].push(*entity);
+                    });
+            } else if rts_controls.shift_held {
+                <Entity>::query()
+                    .filter(component::<Selected>())
+                    .for_each(world, |entity| {
+                        control_groups.0[i].push(*entity);
+                    });
+            } else {
+                if !control_groups.0[i].is_empty() {
+                    deselect_all(world, command_buffer);
+                }
+
+                for entity in control_groups.0[i].iter() {
+                    command_buffer.add_component(*entity, Selected);
+                }
+            }
+        }
+    }
+}
+
+#[legion::system]
+pub fn cleanup_controls(
+    #[resource] mouse_state: &mut MouseState,
+    #[resource] rts_controls: &mut RtsControls,
+) {
     let position = mouse_state.position;
     mouse_state.left_state.update(position);
     mouse_state.right_state.update(position);
+
+    rts_controls.stop_pressed = false;
+
+    for i in 0..10 {
+        rts_controls.control_group_key_pressed[i] = false;
+    }
 }
 
 fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {

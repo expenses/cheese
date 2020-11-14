@@ -10,8 +10,8 @@ use crate::renderer::{
     RenderContext, TextBuffer, TorusBuffer, TorusPipeline,
 };
 use crate::resources::{
-    Camera, CameraControls, CommandMode, CursorIcon, DeltaTime, DpiScaling, MouseState, PlayerSide,
-    RayCastLocation, RtsControls, ScreenDimensions,
+    Camera, CameraControls, CommandMode, ControlGroups, CursorIcon, DeltaTime, DpiScaling,
+    MouseState, PlayerSide, RayCastLocation, RtsControls, ScreenDimensions,
 };
 use legion::*;
 use ultraviolet::Vec2;
@@ -31,12 +31,14 @@ fn main() -> anyhow::Result<()> {
 fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
     builder
         .add_system(ecs::cast_ray_system())
+        .add_system(ecs::remove_dead_entities_from_control_groups_system())
         .add_system(ecs::stop_attacks_on_dead_entities_system())
         .add_system(ecs::control_camera_system())
         .add_system(ecs::handle_left_click_system())
         .add_system(ecs::handle_right_click_system())
         .add_system(ecs::handle_stop_command_system())
         .add_system(ecs::handle_drag_selection_system())
+        .add_system(ecs::handle_control_groups_system())
         .add_system(ecs::set_move_to_system())
         .add_system(ecs::avoidance_system())
         .add_system(ecs::add_attack_commands_system())
@@ -83,6 +85,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(RtsControls::default());
     resources.insert(RayCastLocation::default());
     resources.insert(PlayerSide(ecs::Side::Green));
+    resources.insert(ControlGroups::default());
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
@@ -131,7 +134,7 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::render_unit_under_cursor_system())
         // Cleanup
         .flush()
-        .add_system(ecs::update_mouse_buttons_system())
+        .add_system(ecs::cleanup_controls_system())
         .build();
 
     let mut time = std::time::Instant::now();
@@ -157,7 +160,8 @@ async fn run() -> anyhow::Result<()> {
                         input:
                             KeyboardInput {
                                 state,
-                                virtual_keycode: Some(code),
+                                virtual_keycode,
+                                scancode,
                                 ..
                             },
                         ..
@@ -172,7 +176,8 @@ async fn run() -> anyhow::Result<()> {
                         let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
 
                         handle_key(
-                            code,
+                            *virtual_keycode,
+                            *scancode,
                             pressed,
                             &mut camera_controls,
                             &mut rts_controls,
@@ -349,23 +354,54 @@ async fn run() -> anyhow::Result<()> {
 }
 
 fn handle_key(
-    code: &VirtualKeyCode,
+    code: Option<VirtualKeyCode>,
+    scancode: u32,
     pressed: bool,
     camera_controls: &mut CameraControls,
     rts_controls: &mut RtsControls,
     control_flow: &mut ControlFlow,
 ) {
-    log::debug!("{:?} pressed: {}", code, pressed);
+    log::debug!("{:?} (scancode: {}) pressed: {}", code, scancode, pressed);
 
-    match code {
-        VirtualKeyCode::Up => camera_controls.up = pressed,
-        VirtualKeyCode::Down => camera_controls.down = pressed,
-        VirtualKeyCode::Left => camera_controls.left = pressed,
-        VirtualKeyCode::Right => camera_controls.right = pressed,
-        VirtualKeyCode::LShift => rts_controls.shift_held = pressed,
-        VirtualKeyCode::S if pressed => rts_controls.stop_pressed = true,
-        VirtualKeyCode::A if pressed => rts_controls.mode = CommandMode::AttackMove,
-        VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
+    if let Some(code) = code {
+        match code {
+            VirtualKeyCode::Up => camera_controls.up = pressed,
+            VirtualKeyCode::Down => camera_controls.down = pressed,
+            VirtualKeyCode::Left => camera_controls.left = pressed,
+            VirtualKeyCode::Right => camera_controls.right = pressed,
+            VirtualKeyCode::LShift => rts_controls.shift_held = pressed,
+            VirtualKeyCode::LControl => rts_controls.control_held = pressed,
+            VirtualKeyCode::S if pressed => rts_controls.stop_pressed = true,
+            VirtualKeyCode::A if pressed => rts_controls.mode = CommandMode::AttackMove,
+            VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
+
+            VirtualKeyCode::Key0 if pressed => rts_controls.control_group_key_pressed[0] = true,
+            VirtualKeyCode::Key1 if pressed => rts_controls.control_group_key_pressed[1] = true,
+            VirtualKeyCode::Key2 if pressed => rts_controls.control_group_key_pressed[2] = true,
+            VirtualKeyCode::Key3 if pressed => rts_controls.control_group_key_pressed[3] = true,
+            VirtualKeyCode::Key4 if pressed => rts_controls.control_group_key_pressed[4] = true,
+            VirtualKeyCode::Key5 if pressed => rts_controls.control_group_key_pressed[5] = true,
+            VirtualKeyCode::Key6 if pressed => rts_controls.control_group_key_pressed[6] = true,
+            VirtualKeyCode::Key7 if pressed => rts_controls.control_group_key_pressed[7] = true,
+            VirtualKeyCode::Key8 if pressed => rts_controls.control_group_key_pressed[8] = true,
+            VirtualKeyCode::Key9 if pressed => rts_controls.control_group_key_pressed[9] = true,
+
+            _ => {}
+        }
+    }
+
+    // Pressing shift + a number key doesn't output a virtualkeycode so we have to use scancodes instead.
+    match scancode {
+        2 if pressed => rts_controls.control_group_key_pressed[0] = true,
+        3 if pressed => rts_controls.control_group_key_pressed[1] = true,
+        4 if pressed => rts_controls.control_group_key_pressed[2] = true,
+        5 if pressed => rts_controls.control_group_key_pressed[3] = true,
+        6 if pressed => rts_controls.control_group_key_pressed[4] = true,
+        7 if pressed => rts_controls.control_group_key_pressed[5] = true,
+        8 if pressed => rts_controls.control_group_key_pressed[6] = true,
+        9 if pressed => rts_controls.control_group_key_pressed[7] = true,
+        10 if pressed => rts_controls.control_group_key_pressed[8] = true,
+        11 if pressed => rts_controls.control_group_key_pressed[9] = true,
         _ => {}
     }
 }

@@ -72,7 +72,13 @@ pub fn move_units(
     commands: &mut CommandQueue,
     #[resource] delta_time: &DeltaTime,
 ) {
-    move_towards(&mut position.0, &mut facing.0, move_to.0, move_speed.0, delta_time.0);
+    move_towards(
+        &mut position.0,
+        &mut facing.0,
+        move_to.0,
+        move_speed.0,
+        delta_time.0,
+    );
 
     if position.0 == move_to.0 {
         if commands
@@ -153,7 +159,13 @@ pub fn move_bullets(
 
     let bullet_position = <&mut Position>::query().get_mut(world, *entity).unwrap();
 
-    move_towards(&mut bullet_position.0, &mut facing.0, bullet.target_position, 10.0, delta_time.0);
+    move_towards(
+        &mut bullet_position.0,
+        &mut facing.0,
+        bullet.target_position,
+        10.0,
+        delta_time.0,
+    );
 }
 
 fn move_towards(pos: &mut Vec2, facing: &mut f32, target: Vec2, speed: f32, delta_time: f32) {
@@ -161,7 +173,7 @@ fn move_towards(pos: &mut Vec2, facing: &mut f32, target: Vec2, speed: f32, delt
     if direction.mag_sq() > 0.0 {
         *facing = direction.y.atan2(direction.x);
     }
-    
+
     if direction.mag_sq() <= (speed * delta_time).powi(2) {
         *pos = target;
     } else {
