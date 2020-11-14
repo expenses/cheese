@@ -43,6 +43,7 @@ pub enum Command {
         // better to just switch targets than to chase. We set this to true initially and just 'and'
         // it with whether the unit is out of range.
         first_out_of_range: bool,
+        out_of_range: bool,
     },
     AttackMove(Vec2),
 }
@@ -68,6 +69,7 @@ pub struct AnimationState {
 pub struct Bullet {
     source: Entity,
     target: Entity,
+    target_position: Vec2,
 }
 
 #[derive(Debug)]

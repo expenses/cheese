@@ -28,6 +28,7 @@ pub fn set_move_to(
         Some(Command::Attack {
             target,
             first_out_of_range,
+            out_of_range,
             ..
         }) => {
             let target_pos = <&Position>::query()
@@ -36,16 +37,16 @@ pub fn set_move_to(
 
             let vector = target_pos.0 - position.0;
 
-            let out_of_range = vector.mag_sq() > (firing_range.0 - fudge_factor).powi(2);
+            *out_of_range = vector.mag_sq() > (firing_range.0 - fudge_factor).powi(2);
 
             // We check first_out_of_range here to make sure that units only chase when out of range
             // once.
-            if out_of_range && *first_out_of_range {
+            if *out_of_range && *first_out_of_range {
                 let mag = vector.mag();
                 let distance_to_go = mag - (firing_range.0 - fudge_factor);
                 let target = position.0 + vector.normalized() * distance_to_go;
                 buffer.add_component(*entity, MoveTo(target));
-            } else if out_of_range && !*first_out_of_range {
+            } else if *out_of_range && !*first_out_of_range {
                 // Remove the attack command so the unit can retarget.
                 pop_front = true;
                 buffer.remove_component::<MoveTo>(*entity);
@@ -68,34 +69,23 @@ pub fn move_units(
     facing: &mut Facing,
     move_to: &MoveTo,
     move_speed: &MoveSpeed,
-    // `None` if we're moving a bullet
-    commands: Option<&mut CommandQueue>,
+    commands: &mut CommandQueue,
     #[resource] delta_time: &DeltaTime,
 ) {
-    let direction = move_to.0 - position.0;
-    if direction.mag_sq() > 0.0 {
-        facing.0 = direction.y.atan2(direction.x);
-    }
+    move_towards(&mut position.0, &mut facing.0, move_to.0, move_speed.0, delta_time.0);
 
-    let speed = move_speed.0 * delta_time.0;
-
-    if direction.mag_sq() <= speed.powi(2) {
-        position.0 = move_to.0;
-        if let Some(commands) = commands {
-            if commands
-                .0
-                .front()
-                .map(|command| match command {
-                    Command::MoveTo(_) | Command::AttackMove(_) => true,
-                    Command::Attack { .. } => false,
-                })
-                .unwrap_or(false)
-            {
-                commands.0.pop_front();
-            }
+    if position.0 == move_to.0 {
+        if commands
+            .0
+            .front()
+            .map(|command| match command {
+                Command::MoveTo(_) | Command::AttackMove(_) => true,
+                Command::Attack { .. } => false,
+            })
+            .unwrap_or(false)
+        {
+            commands.0.pop_front();
         }
-    } else {
-        position.0 += direction.normalized() * speed;
     }
 }
 
@@ -149,14 +139,32 @@ pub fn apply_steering(
 }
 
 #[legion::system(for_each)]
-#[read_component(Position)]
-pub fn set_move_to_for_bullets(
+#[write_component(Position)]
+pub fn move_bullets(
     entity: &Entity,
-    bullet: &Bullet,
-    world: &SubWorld,
-    buffer: &mut CommandBuffer,
+    facing: &mut Facing,
+    bullet: &mut Bullet,
+    #[resource] delta_time: &DeltaTime,
+    world: &mut SubWorld,
 ) {
     if let Ok(target_position) = <&Position>::query().get(world, bullet.target) {
-        buffer.add_component(*entity, MoveTo(target_position.0));
+        bullet.target_position = target_position.0;
+    }
+
+    let bullet_position = <&mut Position>::query().get_mut(world, *entity).unwrap();
+
+    move_towards(&mut bullet_position.0, &mut facing.0, bullet.target_position, 10.0, delta_time.0);
+}
+
+fn move_towards(pos: &mut Vec2, facing: &mut f32, target: Vec2, speed: f32, delta_time: f32) {
+    let direction = target - *pos;
+    if direction.mag_sq() > 0.0 {
+        *facing = direction.y.atan2(direction.x);
+    }
+    
+    if direction.mag_sq() <= (speed * delta_time).powi(2) {
+        *pos = target;
+    } else {
+        *pos += direction.normalized() * speed * delta_time;
     }
 }
