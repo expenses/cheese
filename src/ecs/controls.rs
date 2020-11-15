@@ -328,6 +328,7 @@ fn selection_and_deselection() {
     resources.insert(PlayerSide(Side::Green));
     resources.insert(DeltaTime(1.0 / 60.0));
     resources.insert(RayCastLocation::default());
+    resources.insert(ControlGroups::default());
 
     let mut builder = Schedule::builder();
     crate::add_gameplay_systems(&mut builder);
