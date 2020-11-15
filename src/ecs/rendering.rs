@@ -1,7 +1,7 @@
 use super::*;
 use crate::animation::Skin;
 use crate::renderer::{
-    LineBuffers, Lines3dBuffer, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance,
+    Font, LineBuffers, Lines3dBuffer, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance,
 };
 use crate::resources::{CursorIcon, DpiScaling, RayCastLocation};
 use ultraviolet::Vec4;
@@ -177,7 +177,15 @@ pub fn render_ui(
 
     let text: String = mode.chain(unit_info).collect();
 
-    text_buffer.render_text((10.0, 10.0), &text, dpi_scaling.0);
+    text_buffer.render_text(
+        Vec2::new(10.0, 10.0),
+        &text,
+        Font::Ui,
+        1.0,
+        dpi_scaling.0,
+        false,
+        Vec4::one(),
+    );
 }
 
 #[legion::system(for_each)]

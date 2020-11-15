@@ -1,6 +1,6 @@
 use super::{
-    alpha_blend_state, draw_model, AnimatedVertex, DynamicBuffer, RenderContext, Vertex,
-    DEPTH_FORMAT, DISPLAY_FORMAT,
+    alpha_blend_state, draw_model, AnimatedVertex, DynamicBuffer, RenderContext, StaticBuffer,
+    Vertex, DEPTH_FORMAT, DISPLAY_FORMAT,
 };
 use crate::assets::{AnimatedModel, Assets, Model};
 use std::sync::Arc;
@@ -13,6 +13,7 @@ pub struct ModelPipelines {
     animated_pipeline: wgpu::RenderPipeline,
     transparent_animated_pipeline: wgpu::RenderPipeline,
     transparent_textured_pipeline: wgpu::RenderPipeline,
+    transparent_pipeline: wgpu::RenderPipeline,
     main_bind_group: Arc<wgpu::BindGroup>,
 }
 
@@ -82,6 +83,16 @@ impl ModelPipelines {
             false,
         );
 
+        let transparent_pipeline = create_render_pipeline(
+            &context.device,
+            &[&context.main_bind_group_layout],
+            "Cheese transparent pipeline",
+            &vs_module,
+            &context.fs_transparent_module,
+            true,
+            true,
+        );
+
         let identity_instance_buffer =
             context
                 .device
@@ -100,6 +111,7 @@ impl ModelPipelines {
             animated_pipeline,
             transparent_animated_pipeline,
             transparent_textured_pipeline,
+            transparent_pipeline,
             main_bind_group: context.main_bind_group.clone(),
         }
     }
@@ -165,6 +177,19 @@ impl ModelPipelines {
         );
     }
 
+    pub fn render_single_with_transform<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        model: &'a Model,
+        texture: &'a wgpu::BindGroup,
+        transform: &'a StaticBuffer<ModelInstance>,
+    ) {
+        render_pass.set_pipeline(&self.model_pipeline);
+        render_pass.set_bind_group(0, &self.main_bind_group, &[]);
+        render_pass.set_bind_group(1, texture, &[]);
+        draw_model(render_pass, model, transform.buffer.slice(..), 1);
+    }
+
     pub fn render_instanced<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
@@ -192,6 +217,20 @@ impl ModelPipelines {
             render_pass.set_bind_group(0, &self.main_bind_group, &[]);
             render_pass.set_bind_group(1, texture, &[]);
             draw_model(render_pass, model, slice, num);
+        }
+    }
+
+    pub fn render_transparent_buffer<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        model: &'a Model,
+        instances: &'a wgpu::Buffer,
+        num_instances: u32,
+    ) {
+        if num_instances > 0 {
+            render_pass.set_pipeline(&self.transparent_pipeline);
+            render_pass.set_bind_group(0, &self.main_bind_group, &[]);
+            draw_model(render_pass, model, instances.slice(..), num_instances)
         }
     }
 }
@@ -402,6 +441,40 @@ impl ModelBuffers {
                 &assets.mouse_model,
             );
         }
+    }
+}
+
+pub struct TitlescreenBuffer {
+    pub moon: StaticBuffer<ModelInstance>,
+    pub stars: wgpu::Buffer,
+    pub num_stars: u32,
+}
+
+impl TitlescreenBuffer {
+    pub fn new<R: rand::Rng>(device: &wgpu::Device, rng: &mut R) -> Self {
+        let stars = crate::titlescreen::create_stars(rng);
+
+        Self {
+            moon: StaticBuffer::new(
+                device,
+                ModelInstance {
+                    flat_colour: Vec4::new(1.0, 1.0, 1.0, 1.0),
+                    transform: Mat4::identity(),
+                },
+                "Cheese titlescreen moon buffer",
+                wgpu::BufferUsage::VERTEX,
+            ),
+            stars: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Cheese titlescreen stars buffer"),
+                contents: bytemuck::cast_slice(&stars),
+                usage: wgpu::BufferUsage::VERTEX,
+            }),
+            num_stars: stars.len() as u32,
+        }
+    }
+
+    pub fn upload(&self, context: &RenderContext) {
+        self.moon.upload(context);
     }
 }
 

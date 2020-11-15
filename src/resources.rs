@@ -90,6 +90,12 @@ pub struct ScreenDimensions {
     pub height: u32,
 }
 
+impl ScreenDimensions {
+    pub fn as_vec(&self) -> Vec2 {
+        Vec2::new(self.width as f32, self.height as f32)
+    }
+}
+
 #[derive(Debug)]
 pub struct MouseState {
     pub position: Vec2,
@@ -201,3 +207,12 @@ pub struct DpiScaling(pub f32);
 
 #[derive(Default)]
 pub struct ControlGroups(pub [Vec<legion::Entity>; 10]);
+
+#[derive(Default)]
+pub struct ShouldQuit(pub bool);
+
+#[derive(Clone, Copy)]
+pub enum Mode {
+    Titlescreen,
+    Playing,
+}

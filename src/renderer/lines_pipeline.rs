@@ -157,24 +157,26 @@ impl LinesPipeline {
         );
     }
 
+    pub fn render_hud<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, assets: &'a Assets) {
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_bind_group(1, &assets.misc_texture, &[]);
+        render_pass.set_vertex_buffer(0, self.hud_buffer.slice(..));
+        render_pass.draw(0..6, 0..1);
+    }
+
     pub fn render<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         line_buffers: &'a LineBuffers,
-        assets: &'a Assets,
     ) {
-        render_pass.set_pipeline(&self.pipeline);
-        render_pass.set_bind_group(0, &self.bind_group, &[]);
-
         if let Some((vertices, indices, num_indices)) = line_buffers.get() {
+            render_pass.set_pipeline(&self.pipeline);
+            render_pass.set_bind_group(0, &self.bind_group, &[]);
             render_pass.set_vertex_buffer(0, vertices);
             render_pass.set_index_buffer(indices);
             render_pass.draw_indexed(0..num_indices, 0, 0..1);
         }
-
-        render_pass.set_bind_group(1, &assets.misc_texture, &[]);
-        render_pass.set_vertex_buffer(0, self.hud_buffer.slice(..));
-        render_pass.draw(0..6, 0..1);
     }
 }
 

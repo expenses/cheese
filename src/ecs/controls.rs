@@ -271,7 +271,6 @@ pub fn handle_control_groups(
                 <Entity>::query()
                     .filter(component::<Selected>())
                     .for_each(world, |entity| {
-                        println!("appending {:?} to {}", *entity, i);
                         control_groups.0[i].push(*entity);
                     });
             } else {
@@ -329,6 +328,7 @@ fn selection_and_deselection() {
     resources.insert(PlayerSide(Side::Green));
     resources.insert(DeltaTime(1.0 / 60.0));
     resources.insert(RayCastLocation::default());
+    resources.insert(ControlGroups::default());
 
     let mut builder = Schedule::builder();
     crate::add_gameplay_systems(&mut builder);
