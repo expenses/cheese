@@ -2,6 +2,11 @@ use super::*;
 use crate::pathfinding::Map;
 use crate::resources::DeltaTime;
 
+#[legion::system]
+pub fn reset_map_updated(#[resource] map: &mut Map) {
+    map.updated_this_tick = false;
+}
+
 #[legion::system(for_each)]
 pub fn set_movement_paths(
     position: &Position,
@@ -17,7 +22,7 @@ pub fn set_movement_paths(
         ..
     }) = command_queue.0.front_mut()
     {
-        if path.is_empty() {
+        if path.is_empty() || map.updated_this_tick {
             match map.pathfind(position.0, target, radius.0, None, None) {
                 Some(pathing) => *path = pathing,
                 None => pop_front = true,

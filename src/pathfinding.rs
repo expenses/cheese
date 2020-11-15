@@ -19,12 +19,14 @@ pub struct MapHandle {
 
 pub struct Map {
     dlt: ConstrainedDelaunayTriangulation<Point2<f32>, FloatKernel>,
+    pub updated_this_tick: bool,
 }
 
 impl Map {
     pub fn new() -> Self {
         let mut this = Self {
             dlt: ConstrainedDelaunayTriangulation::with_tree_locate(),
+            updated_this_tick: false,
         };
 
         this.insert(Vec2::new(0.0, 0.0), Vec2::new(200.0, 200.0));
@@ -85,6 +87,8 @@ impl Map {
         self.dlt.add_constraint(bottom_left, bottom_right);
         self.dlt.add_constraint(top_left, bottom_left);
         self.dlt.add_constraint(top_right, bottom_right);
+
+        self.updated_this_tick = true;
 
         Some(MapHandle {
             top_left,

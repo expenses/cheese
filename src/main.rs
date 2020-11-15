@@ -33,6 +33,7 @@ fn main() -> anyhow::Result<()> {
 
 fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
     builder
+        .add_system(ecs::reset_map_updated_system())
         .add_system(ecs::cast_ray_system())
         .add_system(ecs::remove_dead_entities_from_control_groups_system())
         .add_system(ecs::stop_attacks_on_dead_entities_system())
@@ -42,12 +43,12 @@ fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(ecs::handle_stop_command_system())
         .add_system(ecs::handle_drag_selection_system())
         .add_system(ecs::handle_control_groups_system())
+        .add_system(ecs::spawn_debug_building_system())
         .add_system(ecs::set_movement_paths_system())
         .add_system(ecs::set_move_to_system())
         .add_system(ecs::avoidance_system())
         .add_system(ecs::add_attack_commands_system())
         .add_system(ecs::reduce_cooldowns_system())
-        .add_system(ecs::spawn_debug_building_system())
         .add_system(ecs::set_debug_pathfinding_start_system())
         .flush()
         .add_system(ecs::move_units_system())
