@@ -12,7 +12,7 @@ pub fn progress_animations(
     #[resource] delta_time: &DeltaTime,
 ) {
     let animation = match commands.0.front() {
-        Some(&Command::MoveTo(_)) | Some(&Command::AttackMove(_)) => MouseAnimation::Walking,
+        Some(&Command::MoveTo { .. }) => MouseAnimation::Walking,
         Some(&Command::Attack { out_of_range, .. }) => {
             if out_of_range {
                 MouseAnimation::Walking

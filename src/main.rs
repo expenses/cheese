@@ -321,7 +321,7 @@ async fn run() -> anyhow::Result<()> {
                                 titlescreen_buffer.num_stars,
                             );
                             lines_pipeline.render(&mut render_pass, &line_buffers);
-                        },
+                        }
                         Mode::Quit => {}
                     }
 

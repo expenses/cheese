@@ -212,8 +212,7 @@ pub fn render_command_paths(
 
     for command in queue.0.iter() {
         let position = match command {
-            Command::MoveTo(position) => Some(*position),
-            Command::AttackMove(position) => Some(*position),
+            Command::MoveTo { target, .. } => Some(*target),
             Command::Attack {
                 target,
                 explicit: true,
@@ -230,15 +229,24 @@ pub fn render_command_paths(
             } => None,
         };
 
+        let move_colour = Vec4::new(0.25, 0.25, 1.0, 1.0);
+        let attack_colour = Vec4::new(1.0, 0.0, 0.0, 1.0);
+
+        let colour = match command {
+            Command::MoveTo { attack_move, .. } => {
+                if *attack_move {
+                    attack_colour
+                } else {
+                    move_colour
+                }
+            }
+            Command::Attack { .. } => attack_colour,
+        };
+
         if let Some(position) = position {
             model_buffers.command_indicators.push(ModelInstance {
                 transform: Mat4::from_translation(Vec3::new(position.x, 0.01, position.y)),
-                flat_colour: match command {
-                    Command::MoveTo(_) => Vec4::new(0.25, 0.25, 1.0, 1.0),
-                    Command::AttackMove(_) | Command::Attack { .. } => {
-                        Vec4::new(1.0, 0.0, 0.0, 1.0)
-                    }
-                },
+                flat_colour: colour,
             });
 
             let center = (prev + position) / 2.0;
@@ -250,12 +258,7 @@ pub fn render_command_paths(
                 transform: Mat4::from_translation(Vec3::new(center.x, 0.005, center.y))
                     * Mat4::from_rotation_y(rotation)
                     * Mat4::from_nonuniform_scale(Vec3::new(scale, 1.0, 1.0)),
-                flat_colour: match command {
-                    Command::MoveTo(_) => Vec4::new(0.25, 0.25, 1.0, 1.0),
-                    Command::AttackMove(_) | Command::Attack { .. } => {
-                        Vec4::new(1.0, 0.0, 0.0, 1.0)
-                    }
-                },
+                flat_colour: colour,
             });
 
             prev = position;

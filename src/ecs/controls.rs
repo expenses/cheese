@@ -168,8 +168,14 @@ fn issue_command(
             out_of_range: true,
         },
         None => match rts_controls.mode {
-            CommandMode::Normal => Command::MoveTo(position),
-            CommandMode::AttackMove => Command::AttackMove(position),
+            CommandMode::Normal => Command::MoveTo {
+                target: position,
+                attack_move: false,
+            },
+            CommandMode::AttackMove => Command::MoveTo {
+                target: position,
+                attack_move: true,
+            },
         },
     };
 
