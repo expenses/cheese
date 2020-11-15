@@ -14,7 +14,7 @@ mod torus_pipeline;
 
 pub use lines_3d_pipeline::{Lines3dBuffer, Lines3dPipeline, Lines3dVertex};
 pub use lines_pipeline::{LineBuffers, LinesPipeline};
-pub use model_pipelines::{ModelBuffers, ModelInstance, ModelPipelines};
+pub use model_pipelines::{ModelBuffers, ModelInstance, ModelPipelines, TitlescreenBuffer};
 pub use torus_pipeline::{TorusBuffer, TorusInstance, TorusPipeline};
 
 const DISPLAY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
@@ -44,7 +44,9 @@ pub struct RenderContext {
 
 impl RenderContext {
     pub async fn new(event_loop: &EventLoop<()>) -> anyhow::Result<Self> {
-        let window = WindowBuilder::new().build(event_loop)?;
+        let window = WindowBuilder::new()
+            .with_title("Cheese (working title)")
+            .build(event_loop)?;
 
         let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
         let surface = unsafe { instance.create_surface(&window) };
@@ -229,7 +231,6 @@ impl RenderContext {
             .device
             .create_swap_chain(&self.surface, &self.swap_chain_desc);
         self.depth_texture = create_depth_texture(&self.device, width, height);
-        //self.line_renderer.resize(&self.queue, width, height);
 
         self.queue.write_buffer(
             &self.perspective_buffer,
@@ -301,6 +302,34 @@ fn alpha_blend_state() -> wgpu::ColorStateDescriptor {
             operation: wgpu::BlendOperation::Max,
         },
         write_mask: wgpu::ColorWrite::ALL,
+    }
+}
+
+pub struct StaticBuffer<T: bytemuck::Pod> {
+    buffer: wgpu::Buffer,
+    contents: T,
+}
+
+impl<T: bytemuck::Pod> StaticBuffer<T> {
+    fn new(device: &wgpu::Device, contents: T, label: &str, usage: wgpu::BufferUsage) -> Self {
+        Self {
+            buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(label),
+                contents: bytemuck::bytes_of(&contents),
+                usage: usage | wgpu::BufferUsage::COPY_DST,
+            }),
+            contents,
+        }
+    }
+
+    pub fn write(&mut self, contents: T) {
+        self.contents = contents;
+    }
+
+    fn upload(&self, context: &RenderContext) {
+        context
+            .queue
+            .write_buffer(&self.buffer, 0, bytemuck::bytes_of(&self.contents));
     }
 }
 
@@ -392,26 +421,68 @@ pub struct TextBuffer {
     pub glyph_brush: wgpu_glyph::GlyphBrush<(), wgpu_glyph::ab_glyph::FontRef<'static>>,
 }
 
+pub enum Font {
+    Ui = 0,
+    Title = 1,
+}
+
+impl Font {
+    pub fn scale(&self) -> f32 {
+        match self {
+            Self::Ui => 24.0,
+            Self::Title => 48.0,
+        }
+    }
+}
+
 impl TextBuffer {
     pub fn new(device: &wgpu::Device) -> anyhow::Result<Self> {
-        let font = wgpu_glyph::ab_glyph::FontRef::try_from_slice(include_bytes!(
-            "../fonts/Roboto_Mono/RobotoMono-Bold.ttf"
-        ))?;
+        let fonts = vec![
+            wgpu_glyph::ab_glyph::FontRef::try_from_slice(include_bytes!(
+                "../fonts/Roboto_Mono/RobotoMono-Bold.ttf"
+            ))?,
+            wgpu_glyph::ab_glyph::FontRef::try_from_slice(include_bytes!(
+                "../fonts/Chewy/Chewy-Regular.ttf"
+            ))?,
+        ];
 
         let glyph_brush =
-            wgpu_glyph::GlyphBrushBuilder::using_font(font).build(&device, DISPLAY_FORMAT);
+            wgpu_glyph::GlyphBrushBuilder::using_fonts(fonts).build(&device, DISPLAY_FORMAT);
 
         Ok(Self { glyph_brush })
     }
 
-    pub fn render_text(&mut self, screen_position: (f32, f32), text: &str, dpi_scaling: f32) {
+    pub fn render_text(
+        &mut self,
+        screen_position: Vec2,
+        text: &str,
+        font: Font,
+        scale_multiplier: f32,
+        dpi_scaling: f32,
+        center: bool,
+        colour: Vec4,
+    ) {
+        let layout = if center {
+            wgpu_glyph::Layout::default()
+                .h_align(wgpu_glyph::HorizontalAlign::Center)
+                .v_align(wgpu_glyph::VerticalAlign::Center)
+        } else {
+            wgpu_glyph::Layout::default()
+        };
+
+        let scale = font.scale();
+        let id = font as usize;
+        let colour: [f32; 4] = colour.into();
+
         self.glyph_brush.queue(
             wgpu_glyph::Section::new()
-                .with_screen_position(screen_position)
+                .with_screen_position((screen_position.x, screen_position.y))
+                .with_layout(layout)
                 .add_text(
                     wgpu_glyph::Text::new(text)
-                        .with_color([1.0; 4])
-                        .with_scale(24.0 * dpi_scaling),
+                        .with_color(colour)
+                        .with_font_id(wgpu_glyph::FontId(id))
+                        .with_scale(scale * scale_multiplier * dpi_scaling),
                 ),
         );
     }

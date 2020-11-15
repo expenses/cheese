@@ -3,17 +3,19 @@ mod assets;
 mod ecs;
 mod renderer;
 mod resources;
+mod titlescreen;
 
 use crate::assets::Assets;
 use crate::renderer::{
     LineBuffers, Lines3dBuffer, Lines3dPipeline, LinesPipeline, ModelBuffers, ModelPipelines,
-    RenderContext, TextBuffer, TorusBuffer, TorusPipeline,
+    RenderContext, TextBuffer, TitlescreenBuffer, TorusBuffer, TorusPipeline,
 };
 use crate::resources::{
-    Camera, CameraControls, CommandMode, ControlGroups, CursorIcon, DeltaTime, DpiScaling,
-    MouseState, PlayerSide, RayCastLocation, RtsControls, ScreenDimensions,
+    Camera, CameraControls, CommandMode, ControlGroups, CursorIcon, DeltaTime, DpiScaling, Mode,
+    MouseState, PlayerSide, RayCastLocation, RtsControls, ScreenDimensions, ShouldQuit,
 };
 use legion::*;
+use rand::SeedableRng;
 use ultraviolet::Vec2;
 use winit::{
     dpi::PhysicalPosition,
@@ -58,6 +60,8 @@ async fn run() -> anyhow::Result<()> {
 
     let event_loop = EventLoop::new();
 
+    let mut rng = rand::rngs::SmallRng::from_entropy();
+
     let mut render_context = RenderContext::new(&event_loop).await?;
     let (assets, command_buffer) = Assets::new(&render_context.device())?;
     render_context.submit(command_buffer);
@@ -70,6 +74,7 @@ async fn run() -> anyhow::Result<()> {
     let lines_buffers = LineBuffers::new(render_context.device());
     let text_buffer = TextBuffer::new(render_context.device())?;
     let lines_3d_buffer = Lines3dBuffer::new(render_context.device());
+    let titlescreen_buffer = TitlescreenBuffer::new(render_context.device(), &mut rng);
 
     let mut world = World::default();
     let mut resources = Resources::default();
@@ -78,6 +83,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(lines_buffers);
     resources.insert(text_buffer);
     resources.insert(lines_3d_buffer);
+    resources.insert(titlescreen_buffer);
     resources.insert(render_context.screen_dimensions());
     resources.insert(CameraControls::default());
     resources.insert(Camera::default());
@@ -86,6 +92,9 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(RayCastLocation::default());
     resources.insert(PlayerSide(ecs::Side::Green));
     resources.insert(ControlGroups::default());
+    resources.insert(titlescreen::TitlescreenMoon::default());
+    resources.insert(ShouldQuit::default());
+    resources.insert(Mode::Playing);
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
@@ -115,6 +124,8 @@ async fn run() -> anyhow::Result<()> {
     }
 
     resources.insert(assets);
+
+    let mut titlescreen_schedule = titlescreen::titlescreen_schedule();
 
     let mut builder = Schedule::builder();
     add_gameplay_systems(&mut builder);
@@ -217,7 +228,18 @@ async fn run() -> anyhow::Result<()> {
                 resources.insert(DeltaTime(elapsed));
                 resources.insert(CursorIcon(winit::window::CursorIcon::default()));
 
-                schedule.execute(&mut world, &mut resources);
+                let mode = *resources.get::<Mode>().unwrap();
+
+                match mode {
+                    Mode::Playing => schedule.execute(&mut world, &mut resources),
+                    Mode::Titlescreen => titlescreen_schedule.execute(&mut world, &mut resources),
+                }
+
+                let should_quit = resources.get::<ShouldQuit>().unwrap();
+
+                if should_quit.0 {
+                    *control_flow = ControlFlow::Exit;
+                }
 
                 let cursor_icon = resources.get::<CursorIcon>().unwrap();
                 render_context.set_cursor_icon(cursor_icon.0);
@@ -230,7 +252,9 @@ async fn run() -> anyhow::Result<()> {
                 let mut line_buffers = resources.get_mut::<LineBuffers>().unwrap();
                 let mut text_buffer = resources.get_mut::<TextBuffer>().unwrap();
                 let mut lines_3d_buffer = resources.get_mut::<Lines3dBuffer>().unwrap();
+                let titlescreen_buffer = resources.get::<TitlescreenBuffer>().unwrap();
                 let assets = resources.get::<Assets>().unwrap();
+                let mode = *resources.get::<Mode>().unwrap();
 
                 // Upload buffers to the gpu.
                 render_context.update_view(camera.to_matrix());
@@ -238,6 +262,7 @@ async fn run() -> anyhow::Result<()> {
                 torus_buffer.upload(&render_context);
                 line_buffers.upload(&render_context);
                 lines_3d_buffer.upload(&render_context);
+                titlescreen_buffer.upload(&render_context);
 
                 if let Ok(frame) = render_context.swap_chain.get_current_frame() {
                     let mut encoder = render_context.device.create_command_encoder(
@@ -254,8 +279,8 @@ async fn run() -> anyhow::Result<()> {
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color {
                                     r: 0.0,
-                                    g: 0.125,
-                                    b: 0.125,
+                                    g: 0.0,
+                                    b: 0.0,
                                     a: 1.0,
                                 }),
                                 store: true,
@@ -273,53 +298,37 @@ async fn run() -> anyhow::Result<()> {
                         ),
                     });
 
-                    // Render a bunch of models.
-                    model_pipelines.render_animated(
-                        &mut render_pass,
-                        &model_buffers.mice,
-                        &assets.mouse_texture,
-                        &assets.mouse_model,
-                        &model_buffers.mice_joints_bind_group,
-                    );
-                    model_pipelines.render_instanced(
-                        &mut render_pass,
-                        &model_buffers.bullets,
-                        &assets.misc_texture,
-                        &assets.bullet_model,
-                    );
-                    torus_pipeline.render(
-                        &mut render_pass,
-                        &torus_buffer.toruses,
-                        &assets.torus_model,
-                    );
-                    lines_3d_pipeline.render(&mut render_pass, &lines_3d_buffer.lines);
-                    model_pipelines.render_single(
-                        &mut render_pass,
-                        &assets.surface_texture,
-                        &assets.surface_model,
-                    );
-                    model_pipelines.render_transparent_textured(
-                        &mut render_pass,
-                        &model_buffers.command_paths,
-                        &assets.misc_texture,
-                        &assets.command_path_model,
-                    );
-                    model_pipelines.render_transparent_textured(
-                        &mut render_pass,
-                        &model_buffers.command_indicators,
-                        &assets.misc_texture,
-                        &assets.command_indicator_model,
-                    );
-                    model_pipelines.render_transparent_animated(
-                        &mut render_pass,
-                        &model_buffers.mice,
-                        &assets.mouse_texture,
-                        &assets.mouse_helmet_model,
-                        &model_buffers.mice_joints_bind_group,
-                    );
-
-                    // Render 2D items.
-                    lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
+                    match mode {
+                        Mode::Playing => {
+                            render_playing(
+                                &mut render_pass,
+                                &model_pipelines,
+                                &model_buffers,
+                                &torus_pipeline,
+                                &torus_buffer,
+                                &lines_pipeline,
+                                &line_buffers,
+                                &lines_3d_pipeline,
+                                &lines_3d_buffer,
+                                &assets,
+                            );
+                        }
+                        Mode::Titlescreen => {
+                            model_pipelines.render_single_with_transform(
+                                &mut render_pass,
+                                &assets.cheese_moon_model,
+                                &assets.surface_texture,
+                                &titlescreen_buffer.moon,
+                            );
+                            model_pipelines.render_transparent_buffer(
+                                &mut render_pass,
+                                &assets.billboard_model,
+                                &titlescreen_buffer.stars,
+                                titlescreen_buffer.num_stars,
+                            );
+                            lines_pipeline.render(&mut render_pass, &line_buffers);
+                        }
+                    }
 
                     // We're done with this pass.
                     drop(render_pass);
@@ -351,6 +360,64 @@ async fn run() -> anyhow::Result<()> {
             _ => {}
         }
     });
+}
+
+fn render_playing<'a>(
+    mut render_pass: &mut wgpu::RenderPass<'a>,
+    model_pipelines: &'a ModelPipelines,
+    model_buffers: &'a ModelBuffers,
+    torus_pipeline: &'a TorusPipeline,
+    torus_buffer: &'a TorusBuffer,
+    lines_pipeline: &'a LinesPipeline,
+    line_buffers: &'a LineBuffers,
+    lines_3d_pipeline: &'a Lines3dPipeline,
+    lines_3d_buffer: &'a Lines3dBuffer,
+    assets: &'a Assets,
+) {
+    // Render a bunch of models.
+    model_pipelines.render_animated(
+        &mut render_pass,
+        &model_buffers.mice,
+        &assets.mouse_texture,
+        &assets.mouse_model,
+        &model_buffers.mice_joints_bind_group,
+    );
+    model_pipelines.render_instanced(
+        &mut render_pass,
+        &model_buffers.bullets,
+        &assets.misc_texture,
+        &assets.bullet_model,
+    );
+    torus_pipeline.render(&mut render_pass, &torus_buffer.toruses, &assets.torus_model);
+    lines_3d_pipeline.render(&mut render_pass, &lines_3d_buffer.lines);
+    model_pipelines.render_single(
+        &mut render_pass,
+        &assets.surface_texture,
+        &assets.surface_model,
+    );
+    model_pipelines.render_transparent_textured(
+        &mut render_pass,
+        &model_buffers.command_paths,
+        &assets.misc_texture,
+        &assets.command_path_model,
+    );
+    model_pipelines.render_transparent_textured(
+        &mut render_pass,
+        &model_buffers.command_indicators,
+        &assets.misc_texture,
+        &assets.command_indicator_model,
+    );
+    model_pipelines.render_transparent_animated(
+        &mut render_pass,
+        &model_buffers.mice,
+        &assets.mouse_texture,
+        &assets.mouse_helmet_model,
+        &model_buffers.mice_joints_bind_group,
+    );
+
+    // Render 2D items.
+    lines_pipeline.render(&mut render_pass, &line_buffers);
+    lines_pipeline.render_hud(&mut render_pass, &assets);
 }
 
 fn handle_key(

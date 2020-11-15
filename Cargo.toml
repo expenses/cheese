@@ -1,5 +1,5 @@
 [package]
-name = "moonshot"
+name = "cheese"
 version = "0.1.0"
 authors = ["Ashley Ruglys <ashley.ruglys@gmail.com>"]
 edition = "2018"
@@ -20,6 +20,7 @@ log = "0.4.11"
 lyon_tessellation = "0.16.2"
 ncollide3d = "0.26.1"
 ordered-float = "2.0.0"
+rand = { version = "0.7.3", default-features = false, features = ["small_rng"] }
 ultraviolet = { version = "0.7.5", features = ["bytemuck"] }
 wgpu = "0.6.0"
 wgpu_glyph = "0.10.0"
