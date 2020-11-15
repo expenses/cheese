@@ -42,6 +42,7 @@ fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(ecs::handle_stop_command_system())
         .add_system(ecs::handle_drag_selection_system())
         .add_system(ecs::handle_control_groups_system())
+        .add_system(ecs::set_movement_paths_system())
         .add_system(ecs::set_move_to_system())
         .add_system(ecs::avoidance_system())
         .add_system(ecs::add_attack_commands_system())

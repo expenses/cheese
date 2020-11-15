@@ -355,51 +355,53 @@ impl<'a> TriangleRef<'a> {
         let this = *self;
 
         arrayvec::ArrayVec::from([(this.a, this.b), (this.b, this.c), (this.c, this.a)])
-        .into_iter()
-        .filter_map(move |(a, b)| {
-            // Flipped here because we want the edge facing outside.
-            let edge = map.dlt.get_edge_from_neighbors(b.fix(), a.fix()).unwrap();
+            .into_iter()
+            .filter_map(move |(a, b)| {
+                // Flipped here because we want the edge facing outside.
+                let edge = map.dlt.get_edge_from_neighbors(b.fix(), a.fix()).unwrap();
 
-            let a = point_to_vec2(*a);
-            let b = point_to_vec2(*b);
+                let a = point_to_vec2(*a);
+                let b = point_to_vec2(*b);
 
-            let face = edge.face();
+                let face = edge.face();
 
-            if !map.dlt.is_constraint_edge(edge.fix())
-                && gap.powi(2) <= (a - b).mag_sq()
-                && face != map.dlt.infinite_face()
-            {
-                // Return a triangle with the 'focus point' set to zero.
-                Some(TriangleRef::new(face, Vec2::zero()))
-            } else {
-                None
-            }
-        })
-        // Iterate over all 3 corners and the center and return triangles set with that as the focus point.
-        .flat_map(move |triangle| {
-            let center = triangle.center();
-            arrayvec::ArrayVec::from(triangle.points())
-                .into_iter()
-                .chain(std::iter::once(center))
-                .map(move |point| {
-                    let mut tri = triangle;
-                    tri.point = point;
-                    let dist = (this.point - tri.point).mag();
-                    (tri, OrderedFloat(dist))
-                })
-                // If the triangle is the end triangle, add that.
-                .chain({
-                    std::iter::once(())
-                        .filter_map(move |_| {
-                            if triangle.a == end_tri.a && triangle.b == end_tri.b && triangle.c == end_tri.c {
+                if !map.dlt.is_constraint_edge(edge.fix())
+                    && gap.powi(2) <= (a - b).mag_sq()
+                    && face != map.dlt.infinite_face()
+                {
+                    // Return a triangle with the 'focus point' set to zero.
+                    Some(TriangleRef::new(face, Vec2::zero()))
+                } else {
+                    None
+                }
+            })
+            // Iterate over all 3 corners and the center and return triangles set with that as the focus point.
+            .flat_map(move |triangle| {
+                let center = triangle.center();
+                arrayvec::ArrayVec::from(triangle.points())
+                    .into_iter()
+                    .chain(std::iter::once(center))
+                    .map(move |point| {
+                        let mut tri = triangle;
+                        tri.point = point;
+                        let dist = (this.point - tri.point).mag();
+                        (tri, OrderedFloat(dist))
+                    })
+                    // If the triangle is the end triangle, add that.
+                    .chain({
+                        std::iter::once(()).filter_map(move |_| {
+                            if triangle.a == end_tri.a
+                                && triangle.b == end_tri.b
+                                && triangle.c == end_tri.c
+                            {
                                 let distance = (this.point - end_tri.point).mag();
                                 Some((*end_tri, OrderedFloat(distance)))
                             } else {
                                 None
                             }
                         })
-                })
-        })
+                    })
+            })
     }
 
     fn contains(&self, point: Vertex) -> bool {

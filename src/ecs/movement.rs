@@ -1,5 +1,34 @@
 use super::*;
+use crate::pathfinding::Map;
 use crate::resources::DeltaTime;
+
+#[legion::system(for_each)]
+pub fn set_movement_paths(
+    position: &Position,
+    radius: &Radius,
+    command_queue: &mut CommandQueue,
+    #[resource] map: &Map,
+) {
+    let mut pop_front = false;
+
+    if let Some(&mut Command::MoveTo {
+        target,
+        ref mut path,
+        ..
+    }) = command_queue.0.front_mut()
+    {
+        if path.is_empty() {
+            match map.pathfind(position.0, target, radius.0, None, None) {
+                Some(pathing) => *path = pathing,
+                None => pop_front = true,
+            }
+        }
+    }
+
+    if pop_front {
+        command_queue.0.pop_front();
+    }
+}
 
 #[legion::system(for_each)]
 #[filter(component::<Position>())]

@@ -119,8 +119,7 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
         .get(world, *entity)
         .expect("We've applied a filter for these components");
 
-    if matches!(commands.0.front().cloned(), None | Some(Command::MoveTo { attack_move: true, .. }))
-    {
+    if matches!(commands.0.front(), None | Some(&Command::MoveTo { attack_move: true, .. })) {
         let target = <(Entity, &Position, &Side)>::query()
             .iter(world)
             .filter(|(.., entity_side)| *entity_side != side)

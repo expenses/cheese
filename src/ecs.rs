@@ -33,12 +33,13 @@ pub enum Side {
 pub struct Selected;
 pub struct Selectable;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum Command {
     MoveTo {
         target: Vec2,
         // Should we stop and attack things on the way?
         attack_move: bool,
+        path: Vec<Vec2>,
     },
     Attack {
         target: Entity,

@@ -170,10 +170,12 @@ fn issue_command(
         None => match rts_controls.mode {
             CommandMode::Normal => Command::MoveTo {
                 target: position,
+                path: Vec::new(),
                 attack_move: false,
             },
             CommandMode::AttackMove => Command::MoveTo {
                 target: position,
+                path: Vec::new(),
                 attack_move: true,
             },
         },
@@ -188,7 +190,7 @@ fn issue_command(
                 commands.0.clear();
             }
 
-            commands.0.push_back(command);
+            commands.0.push_back(command.clone());
         });
 }
 
