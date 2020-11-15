@@ -1,4 +1,4 @@
-use cgmath::{MetricSpace, Point2};
+use cgmath::Point2;
 use ordered_float::OrderedFloat;
 use spade::{
     delaunay::{
@@ -135,9 +135,9 @@ impl Map {
 
         let (triangles, _length) = pathfinding::directed::astar::astar(
             &start_tri,
-            |&tri| tri.neighbours(self, unit_radius * 2.0),
+            |&tri| tri.neighbours(self, unit_radius * 2.0, &end_tri),
             |&tri| OrderedFloat((tri.point - end).mag()),
-            |&tri| tri.a == end_tri.a && tri.b == end_tri.b && tri.c == end_tri.c,
+            |&tri| tri == end_tri,
         )?;
 
         if let Some(debug_triangles) = debug_triangles {
@@ -346,32 +346,27 @@ impl<'a> TriangleRef<'a> {
         ) / 3.0
     }
 
-    fn distance(&self, other: &Self) -> OrderedFloat<f32> {
-        let vector = self.center() - other.center();
-        OrderedFloat(vector.mag())
-    }
-
     fn neighbours<'b>(
         &self,
         map: &'b Map,
         gap: f32,
-    ) -> impl Iterator<Item = (TriangleRef<'b>, OrderedFloat<f32>)> {
-        let self_point = self.point;
+        end_tri: &'b Self,
+    ) -> impl Iterator<Item = (TriangleRef<'b>, OrderedFloat<f32>)> + 'b {
+        let this = *self;
 
-        arrayvec::ArrayVec::from([
-            edge_tuple(self.a, self.b),
-            edge_tuple(self.b, self.c),
-            edge_tuple(self.c, self.a),
-        ])
+        arrayvec::ArrayVec::from([(this.a, this.b), (this.b, this.c), (this.c, this.a)])
         .into_iter()
-        .filter_map(move |(a, b, distance_sq)| {
+        .filter_map(move |(a, b)| {
             // Flipped here because we want the edge facing outside.
-            let edge = map.dlt.get_edge_from_neighbors(b, a).unwrap();
+            let edge = map.dlt.get_edge_from_neighbors(b.fix(), a.fix()).unwrap();
+
+            let a = point_to_vec2(*a);
+            let b = point_to_vec2(*b);
 
             let face = edge.face();
 
             if !map.dlt.is_constraint_edge(edge.fix())
-                && gap.powi(2) <= distance_sq
+                && gap.powi(2) <= (a - b).mag_sq()
                 && face != map.dlt.infinite_face()
             {
                 // Return a triangle with the 'focus point' set to zero.
@@ -389,8 +384,20 @@ impl<'a> TriangleRef<'a> {
                 .map(move |point| {
                     let mut tri = triangle;
                     tri.point = point;
-                    let dist = (self_point - tri.point).mag();
+                    let dist = (this.point - tri.point).mag();
                     (tri, OrderedFloat(dist))
+                })
+                // If the triangle is the end triangle, add that.
+                .chain({
+                    std::iter::once(())
+                        .filter_map(move |_| {
+                            if triangle.a == end_tri.a && triangle.b == end_tri.b && triangle.c == end_tri.c {
+                                let distance = (this.point - end_tri.point).mag();
+                                Some((*end_tri, OrderedFloat(distance)))
+                            } else {
+                                None
+                            }
+                        })
                 })
         })
     }
@@ -418,10 +425,6 @@ impl<'a> TriangleRef<'a> {
 
         None
     }
-}
-
-fn edge_tuple(a: Vertex, b: Vertex) -> (FixedVertexHandle, FixedVertexHandle, f32) {
-    (a.fix(), b.fix(), a.distance2(*b))
 }
 
 impl<'a> Eq for TriangleRef<'a> {}
