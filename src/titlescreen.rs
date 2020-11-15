@@ -1,6 +1,6 @@
 use crate::renderer::{Font, LineBuffers, ModelInstance, TextBuffer, TitlescreenBuffer};
 use crate::resources::{
-    Camera, CursorIcon, DeltaTime, DpiScaling, Mode, MouseState, ScreenDimensions, ShouldQuit,
+    Camera, CursorIcon, DeltaTime, DpiScaling, Mode, MouseState, ScreenDimensions,
 };
 use legion::*;
 use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
@@ -110,7 +110,6 @@ fn handle_clicks(
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] dpi_scaling: &DpiScaling,
     #[resource] mouse_state: &MouseState,
-    #[resource] should_quit: &mut ShouldQuit,
     #[resource] mode: &mut Mode,
     #[resource] camera: &mut Camera,
 ) {
@@ -131,7 +130,7 @@ fn handle_clicks(
     let center = QUIT_POSITION * screen_dimensions;
     let (top_left, bottom_right) = text_selection_area(center, "Quit", dpi_scaling.0);
     if point_in_area(mouse_state.position, top_left, bottom_right) {
-        should_quit.0 = true;
+        *mode = Mode::Quit;
     }
 }
 

@@ -208,11 +208,9 @@ pub struct DpiScaling(pub f32);
 #[derive(Default)]
 pub struct ControlGroups(pub [Vec<legion::Entity>; 10]);
 
-#[derive(Default)]
-pub struct ShouldQuit(pub bool);
-
 #[derive(Clone, Copy)]
 pub enum Mode {
     Titlescreen,
     Playing,
+    Quit,
 }
