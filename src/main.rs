@@ -15,6 +15,7 @@ use crate::resources::{
     MouseState, PlayerSide, RayCastLocation, RtsControls, ScreenDimensions,
 };
 use legion::*;
+use rand::SeedableRng;
 use ultraviolet::Vec2;
 use winit::{
     dpi::PhysicalPosition,
@@ -65,6 +66,7 @@ async fn run() -> anyhow::Result<()> {
     let event_loop = EventLoop::new();
 
     let mode = Mode::Titlescreen;
+    let mut rng = rand::rngs::SmallRng::from_entropy();
 
     let mut render_context = RenderContext::new(&event_loop).await?;
     let (assets, command_buffer) = Assets::new(&render_context.device())?;
@@ -78,7 +80,7 @@ async fn run() -> anyhow::Result<()> {
     let lines_buffers = LineBuffers::new(render_context.device());
     let text_buffer = TextBuffer::new(render_context.device())?;
     let lines_3d_buffer = Lines3dBuffer::new(render_context.device());
-    let titlescreen_buffer = TitlescreenBuffer::new(render_context.device());
+    let titlescreen_buffer = TitlescreenBuffer::new(render_context.device(), &mut rng);
 
     let mut world = World::default();
     let mut resources = Resources::default();
@@ -313,6 +315,13 @@ async fn run() -> anyhow::Result<()> {
                                 &assets.surface_texture,
                                 &titlescreen_buffer.moon,
                             );
+                            model_pipelines.render_transparent_buffer(
+                                &mut render_pass,
+                                &assets.billboard_model,
+                                &titlescreen_buffer.stars,
+                                titlescreen_buffer.num_stars,
+                            );
+                            lines_pipeline.render(&mut render_pass, &line_buffers);
                         }
                     }
 
@@ -374,11 +383,7 @@ fn render_playing<'a>(
         &assets.misc_texture,
         &assets.bullet_model,
     );
-    torus_pipeline.render(
-        &mut render_pass,
-        &torus_buffer.toruses,
-        &assets.torus_model,
-    );
+    torus_pipeline.render(&mut render_pass, &torus_buffer.toruses, &assets.torus_model);
     lines_3d_pipeline.render(&mut render_pass, &lines_3d_buffer.lines);
     model_pipelines.render_single(
         &mut render_pass,
@@ -406,7 +411,8 @@ fn render_playing<'a>(
     );
 
     // Render 2D items.
-    lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
+    lines_pipeline.render(&mut render_pass, &line_buffers);
+    lines_pipeline.render_hud(&mut render_pass, &assets);
 }
 
 fn handle_key(

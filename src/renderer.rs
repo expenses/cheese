@@ -231,7 +231,6 @@ impl RenderContext {
             .device
             .create_swap_chain(&self.surface, &self.swap_chain_desc);
         self.depth_texture = create_depth_texture(&self.device, width, height);
-        //self.line_renderer.resize(&self.queue, width, height);
 
         self.queue.write_buffer(
             &self.perspective_buffer,
@@ -422,26 +421,67 @@ pub struct TextBuffer {
     pub glyph_brush: wgpu_glyph::GlyphBrush<(), wgpu_glyph::ab_glyph::FontRef<'static>>,
 }
 
+pub enum Font {
+    Ui = 0,
+    Title = 1,
+}
+
+impl Font {
+    pub fn scale(&self) -> f32 {
+        match self {
+            Self::Ui => 24.0,
+            Self::Title => 48.0,
+        }
+    }
+}
+
 impl TextBuffer {
     pub fn new(device: &wgpu::Device) -> anyhow::Result<Self> {
-        let font = wgpu_glyph::ab_glyph::FontRef::try_from_slice(include_bytes!(
-            "../fonts/Roboto_Mono/RobotoMono-Bold.ttf"
-        ))?;
+        let fonts = vec![
+            wgpu_glyph::ab_glyph::FontRef::try_from_slice(include_bytes!(
+                "../fonts/Roboto_Mono/RobotoMono-Bold.ttf"
+            ))?,
+            wgpu_glyph::ab_glyph::FontRef::try_from_slice(include_bytes!(
+                "../fonts/Chewy/Chewy-Regular.ttf"
+            ))?,
+        ];
 
         let glyph_brush =
-            wgpu_glyph::GlyphBrushBuilder::using_font(font).build(&device, DISPLAY_FORMAT);
+            wgpu_glyph::GlyphBrushBuilder::using_fonts(fonts).build(&device, DISPLAY_FORMAT);
 
         Ok(Self { glyph_brush })
     }
 
-    pub fn render_text(&mut self, screen_position: (f32, f32), text: &str, dpi_scaling: f32) {
+    pub fn render_text(
+        &mut self,
+        screen_position: (f32, f32),
+        text: &str,
+        font: Font,
+        scale_multiplier: f32,
+        dpi_scaling: f32,
+        center: bool,
+        colour: [f32; 4],
+    ) {
+        let layout = if center {
+            wgpu_glyph::Layout::default()
+                .h_align(wgpu_glyph::HorizontalAlign::Center)
+                .v_align(wgpu_glyph::VerticalAlign::Center)
+        } else {
+            wgpu_glyph::Layout::default()
+        };
+
+        let scale = font.scale();
+        let id = font as usize;
+
         self.glyph_brush.queue(
             wgpu_glyph::Section::new()
                 .with_screen_position(screen_position)
+                .with_layout(layout)
                 .add_text(
                     wgpu_glyph::Text::new(text)
-                        .with_color([1.0; 4])
-                        .with_scale(24.0 * dpi_scaling),
+                        .with_color(colour)
+                        .with_font_id(wgpu_glyph::FontId(id))
+                        .with_scale(scale * scale_multiplier * dpi_scaling),
                 ),
         );
     }
