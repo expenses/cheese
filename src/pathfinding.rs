@@ -28,6 +28,11 @@ impl Map {
         };
 
         this.insert(Vec2::new(0.0, 0.0), Vec2::new(200.0, 200.0));
+        let a = this.dlt.insert(Point2::new(-25.0, 50.0));
+        let b = this.dlt.insert(Point2::new(-25.0, 100.0));
+        let c = this.dlt.insert(Point2::new(-22.5, 100.0));
+        this.dlt.add_constraint(a, b);
+        this.dlt.add_constraint(a, c);
 
         this
     }
@@ -43,7 +48,9 @@ impl Map {
 
     fn locate(&self, point: Vec2) -> Option<TriangleRef> {
         match self.dlt.locate(&Point2::new(point.x, point.y)) {
-            PositionInTriangulation::InTriangle(triangle) => Some(TriangleRef::new(triangle)),
+            PositionInTriangulation::InTriangle(triangle) => {
+                Some(TriangleRef::new(triangle, point))
+            }
             // These two seem very unlikely.
             PositionInTriangulation::OnPoint(_) => None,
             PositionInTriangulation::OnEdge(_) => None,
@@ -52,26 +59,39 @@ impl Map {
         }
     }
 
-    pub fn insert(&mut self, center: Vec2, dimensions: Vec2) -> MapHandle {
+    pub fn insert(&mut self, center: Vec2, dimensions: Vec2) -> Option<MapHandle> {
         let tl = center - dimensions / 2.0;
         let br = center + dimensions / 2.0;
 
-        let top_left = self.dlt.insert(Point2::new(tl.x, tl.y));
-        let top_right = self.dlt.insert(Point2::new(br.x, tl.y));
-        let bottom_left = self.dlt.insert(Point2::new(tl.x, br.y));
-        let bottom_right = self.dlt.insert(Point2::new(br.x, br.y));
+        let top_left = Point2::new(tl.x, tl.y);
+        let top_right = Point2::new(br.x, tl.y);
+        let bottom_left = Point2::new(tl.x, br.y);
+        let bottom_right = Point2::new(br.x, br.y);
+
+        if self.dlt.intersects_constraint(&top_left, &top_right)
+            || self.dlt.intersects_constraint(&top_right, &bottom_right)
+            || self.dlt.intersects_constraint(&bottom_right, &bottom_left)
+            || self.dlt.intersects_constraint(&bottom_left, &top_left)
+        {
+            return None;
+        }
+
+        let top_left = self.dlt.insert(top_left);
+        let top_right = self.dlt.insert(top_right);
+        let bottom_left = self.dlt.insert(bottom_left);
+        let bottom_right = self.dlt.insert(bottom_right);
 
         self.dlt.add_constraint(top_left, top_right);
         self.dlt.add_constraint(bottom_left, bottom_right);
         self.dlt.add_constraint(top_left, bottom_left);
         self.dlt.add_constraint(top_right, bottom_right);
 
-        MapHandle {
+        Some(MapHandle {
             top_left,
             top_right,
             bottom_left,
             bottom_right,
-        }
+        })
     }
 
     pub fn remove(&mut self, handle: &MapHandle) {
@@ -86,9 +106,21 @@ impl Map {
         start: Vec2,
         end: Vec2,
         unit_radius: f32,
-        debug_triangle_centers: Option<&mut Vec<Vec2>>,
+        debug_triangles: Option<&mut Vec<(Vec2, Vec2)>>,
         debug_funnel_portals: Option<&mut Vec<(Vec2, Vec2)>>,
     ) -> Option<Vec<Vec2>> {
+        // If there's nothing between the points then just go straight to the end.
+        // This assumes that the unit can fit through all the gaps (all the edges that the line crosses)
+        // in between.
+        // It'd be better to iterate over all edges that intersect the line and check them against
+        // the unit radius.
+        if !self
+            .dlt
+            .intersects_constraint(&Point2::new(start.x, start.y), &Point2::new(end.x, end.y))
+        {
+            return Some(vec![end]);
+        }
+
         let start_tri = self.locate(start)?;
         let end_tri = self.locate(end)?;
 
@@ -104,18 +136,13 @@ impl Map {
         let (triangles, _length) = pathfinding::directed::astar::astar(
             &start_tri,
             |&tri| tri.neighbours(self, unit_radius * 2.0),
-            |&tri| tri.distance(&end_tri),
-            |&tri| tri == end_tri,
+            |&tri| OrderedFloat((tri.point - end).mag()),
+            |&tri| tri.a == end_tri.a && tri.b == end_tri.b && tri.c == end_tri.c,
         )?;
 
-        if let Some(debug_triangle_centers) = debug_triangle_centers {
-            debug_triangle_centers.clear();
-            debug_triangle_centers.extend(triangles.iter().map(|tri| tri.center()))
-        }
-
-        // If the two points are in the same triangle, just go right to the end.
-        if triangles.len() == 1 {
-            return Some(vec![end]);
+        if let Some(debug_triangles) = debug_triangles {
+            debug_triangles.clear();
+            debug_triangles.extend(triangles.iter().map(|tri| (tri.center(), tri.point)))
         }
 
         let funnel_portals = funnel_portals(start, end, unit_radius, &triangles, self);
@@ -295,20 +322,21 @@ struct TriangleRef<'a> {
     a: Vertex<'a>,
     b: Vertex<'a>,
     c: Vertex<'a>,
+    point: Vec2,
 }
 
 impl<'a> TriangleRef<'a> {
-    fn new(face: FaceHandle<'a, Point2<f32>, CdtEdge>) -> Self {
+    fn new(face: FaceHandle<'a, Point2<f32>, CdtEdge>, point: Vec2) -> Self {
         let [a, b, c] = face.as_triangle();
-        Self { a, b, c }
+        Self { a, b, c, point }
     }
 
-    fn points(&self) -> (Vec2, Vec2, Vec2) {
-        (
+    fn points(&self) -> [Vec2; 3] {
+        [
             point_to_vec2(*self.a),
             point_to_vec2(*self.b),
             point_to_vec2(*self.c),
-        )
+        ]
     }
 
     fn center(&self) -> Vec2 {
@@ -328,7 +356,7 @@ impl<'a> TriangleRef<'a> {
         map: &'b Map,
         gap: f32,
     ) -> impl Iterator<Item = (TriangleRef<'b>, OrderedFloat<f32>)> {
-        let center = self.center();
+        let self_point = self.point;
 
         arrayvec::ArrayVec::from([
             edge_tuple(self.a, self.b),
@@ -346,12 +374,24 @@ impl<'a> TriangleRef<'a> {
                 && gap.powi(2) <= distance_sq
                 && face != map.dlt.infinite_face()
             {
-                let triangle = TriangleRef::new(face);
-                let distance = (center - triangle.center()).mag();
-                Some((triangle, OrderedFloat(distance)))
+                // Return a triangle with the 'focus point' set to zero.
+                Some(TriangleRef::new(face, Vec2::zero()))
             } else {
                 None
             }
+        })
+        // Iterate over all 3 corners and the center and return triangles set with that as the focus point.
+        .flat_map(move |triangle| {
+            let center = triangle.center();
+            arrayvec::ArrayVec::from(triangle.points())
+                .into_iter()
+                .chain(std::iter::once(center))
+                .map(move |point| {
+                    let mut tri = triangle;
+                    tri.point = point;
+                    let dist = (self_point - tri.point).mag();
+                    (tri, OrderedFloat(dist))
+                })
         })
     }
 
@@ -391,6 +431,8 @@ impl<'a> Hash for TriangleRef<'a> {
         hash_point(*self.a, hasher);
         hash_point(*self.b, hasher);
         hash_point(*self.c, hasher);
+        ordered_float::OrderedFloat(self.point.x).hash(hasher);
+        ordered_float::OrderedFloat(self.point.y).hash(hasher);
     }
 }
 

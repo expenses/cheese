@@ -12,11 +12,13 @@ use ultraviolet::{Mat4, Vec2, Vec3};
 mod animation;
 mod combat;
 mod controls;
+mod debugging;
 mod movement;
 mod rendering;
 pub use animation::*;
 pub use combat::*;
 pub use controls::*;
+pub use debugging::*;
 pub use movement::*;
 pub use rendering::*;
 
@@ -88,11 +90,11 @@ pub struct Building {
 }
 
 impl Building {
-    pub fn new(center: Vec2, dimensions: Vec2, map: &mut Map) -> Self {
-        Self {
-            handle: map.insert(center, dimensions),
+    pub fn new(center: Vec2, dimensions: Vec2, map: &mut Map) -> Option<Self> {
+        Some(Self {
+            handle: map.insert(center, dimensions)?,
             position: center,
-        }
+        })
     }
 }
 

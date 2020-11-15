@@ -19,6 +19,13 @@ pub struct RtsControls {
     pub control_group_key_pressed: [bool; 10],
 }
 
+#[derive(Default, Debug)]
+pub struct DebugControls {
+    pub spawn_building_pressed: bool,
+    pub pathfinding_start: Vec2,
+    pub set_pathfinding_start_pressed: bool,
+}
+
 #[derive(PartialEq, Debug)]
 pub enum CommandMode {
     Normal,

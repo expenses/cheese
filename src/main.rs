@@ -12,8 +12,8 @@ use crate::renderer::{
     RenderContext, TextBuffer, TitlescreenBuffer, TorusBuffer, TorusPipeline,
 };
 use crate::resources::{
-    Camera, CameraControls, CommandMode, ControlGroups, CursorIcon, DeltaTime, DpiScaling, Mode,
-    MouseState, PlayerSide, RayCastLocation, RtsControls, ScreenDimensions,
+    Camera, CameraControls, CommandMode, ControlGroups, CursorIcon, DebugControls, DeltaTime,
+    DpiScaling, Mode, MouseState, PlayerSide, RayCastLocation, RtsControls, ScreenDimensions,
 };
 use legion::*;
 use rand::SeedableRng;
@@ -46,6 +46,8 @@ fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(ecs::avoidance_system())
         .add_system(ecs::add_attack_commands_system())
         .add_system(ecs::reduce_cooldowns_system())
+        .add_system(ecs::spawn_debug_building_system())
+        .add_system(ecs::set_debug_pathfinding_start_system())
         .flush()
         .add_system(ecs::move_units_system())
         .add_system(ecs::move_bullets_system())
@@ -95,6 +97,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(ControlGroups::default());
     resources.insert(titlescreen::TitlescreenMoon::default());
     resources.insert(Mode::Playing);
+    resources.insert(DebugControls::default());
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
@@ -125,23 +128,16 @@ async fn run() -> anyhow::Result<()> {
 
     let mut map = pathfinding::Map::new();
 
-    world.push((ecs::Building::new(
-        Vec2::new(-20.0, 10.0),
-        Vec2::new(6.0, 10.0),
-        &mut map,
-    ),));
+    world.push((
+        ecs::Building::new(Vec2::new(-20.0, 10.0), Vec2::new(6.0, 10.0), &mut map).unwrap(),
+    ));
 
-    world.push((ecs::Building::new(
-        Vec2::new(-30.0, 40.0),
-        Vec2::new(6.0, 10.0),
-        &mut map,
-    ),));
+    world.push((
+        ecs::Building::new(Vec2::new(-30.0, 40.0), Vec2::new(6.0, 10.0), &mut map).unwrap(),
+    ));
 
-    world.push((ecs::Building::new(
-        Vec2::new(0.0, 50.0),
-        Vec2::new(6.0, 10.0),
-        &mut map,
-    ),));
+    world
+        .push((ecs::Building::new(Vec2::new(0.0, 50.0), Vec2::new(6.0, 10.0), &mut map).unwrap(),));
 
     resources.insert(assets);
     resources.insert(map);
@@ -209,6 +205,7 @@ async fn run() -> anyhow::Result<()> {
 
                         let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
                         let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
+                        let mut debug_controls = resources.get_mut::<DebugControls>().unwrap();
 
                         handle_key(
                             *virtual_keycode,
@@ -216,6 +213,7 @@ async fn run() -> anyhow::Result<()> {
                             pressed,
                             &mut camera_controls,
                             &mut rts_controls,
+                            &mut debug_controls,
                             control_flow,
                         );
                     }
@@ -452,6 +450,7 @@ fn handle_key(
     pressed: bool,
     camera_controls: &mut CameraControls,
     rts_controls: &mut RtsControls,
+    debug_controls: &mut DebugControls,
     control_flow: &mut ControlFlow,
 ) {
     log::debug!("{:?} (scancode: {}) pressed: {}", code, scancode, pressed);
@@ -466,6 +465,8 @@ fn handle_key(
             VirtualKeyCode::LControl => rts_controls.control_held = pressed,
             VirtualKeyCode::S if pressed => rts_controls.stop_pressed = true,
             VirtualKeyCode::A if pressed => rts_controls.mode = CommandMode::AttackMove,
+            VirtualKeyCode::B if pressed => debug_controls.spawn_building_pressed = true,
+            VirtualKeyCode::T if pressed => debug_controls.set_pathfinding_start_pressed = true,
             VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
 
             VirtualKeyCode::Key0 if pressed => rts_controls.control_group_key_pressed[0] = true,
