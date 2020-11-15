@@ -86,11 +86,20 @@ impl Map {
         start: Vec2,
         end: Vec2,
         unit_radius: f32,
-        debug_triangles: Option<&mut Vec<(Vec2, Vec2, Vec2)>>,
+        debug_triangle_centers: Option<&mut Vec<Vec2>>,
         debug_funnel_portals: Option<&mut Vec<(Vec2, Vec2)>>,
     ) -> Option<Vec<Vec2>> {
         let start_tri = self.locate(start)?;
         let end_tri = self.locate(end)?;
+
+        // What we do here is we pathfind across the triangulation using each triangles neighbours,
+        // and a distance metric that just uses the distance from the triangle centers.
+        // Then using this path, we use a funneling algorithm to try and cut across triangles.
+
+        // This doesn't neccessarily give the shortest path though, as the a path with a long
+        // triangle center to triangle center distance could have a short funneled distance.
+        // A better system would be to iterate over all paths and select the one with the shortest
+        // funnel distance.
 
         let (triangles, _length) = pathfinding::directed::astar::astar(
             &start_tri,
@@ -99,9 +108,9 @@ impl Map {
             |&tri| tri == end_tri,
         )?;
 
-        if let Some(debug_triangles) = debug_triangles {
-            debug_triangles.clear();
-            debug_triangles.extend(triangles.iter().map(|tri| tri.points()))
+        if let Some(debug_triangle_centers) = debug_triangle_centers {
+            debug_triangle_centers.clear();
+            debug_triangle_centers.extend(triangles.iter().map(|tri| tri.center()))
         }
 
         // If the two points are in the same triangle, just go right to the end.

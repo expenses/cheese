@@ -94,7 +94,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(PlayerSide(ecs::Side::Green));
     resources.insert(ControlGroups::default());
     resources.insert(titlescreen::TitlescreenMoon::default());
-    resources.insert(Mode::Titlescreen);
+    resources.insert(Mode::Playing);
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
@@ -133,6 +133,12 @@ async fn run() -> anyhow::Result<()> {
 
     world.push((ecs::Building::new(
         Vec2::new(-30.0, 40.0),
+        Vec2::new(6.0, 10.0),
+        &mut map,
+    ),));
+
+    world.push((ecs::Building::new(
+        Vec2::new(0.0, 50.0),
         Vec2::new(6.0, 10.0),
         &mut map,
     ),));
@@ -340,7 +346,7 @@ async fn run() -> anyhow::Result<()> {
                                 titlescreen_buffer.num_stars,
                             );
                             lines_pipeline.render(&mut render_pass, &line_buffers);
-                        },
+                        }
                         Mode::Quit => {}
                     }
 

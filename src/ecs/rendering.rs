@@ -1,7 +1,8 @@
 use super::*;
 use crate::animation::Skin;
 use crate::renderer::{
-    Font, LineBuffers, Lines3dBuffer, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance,
+    Font, LineBuffers, Lines3dBuffer, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer,
+    TorusInstance,
 };
 use crate::resources::{CursorIcon, DpiScaling, RayCastLocation};
 use ultraviolet::Vec4;
@@ -301,14 +302,14 @@ pub fn render_pathfinding_map(
         lines_3d_buffer.draw_line(a, b, 0.1, colour);
     }
 
-    let mut debug_triangles = Vec::new();
+    let mut debug_triangle_centers = Vec::new();
     let mut debug_funnel_points = Vec::new();
 
     if let Some(path) = map.pathfind(
         Vec2::new(0.0, 0.0),
         ray_cast_location.0,
         1.0,
-        Some(&mut debug_triangles),
+        Some(&mut debug_triangle_centers),
         Some(&mut debug_funnel_points),
     ) {
         let mut prev = Vec2::new(0.0, 0.0);
@@ -320,12 +321,11 @@ pub fn render_pathfinding_map(
     }
 
     let mut prev = None;
-    for (a, b, c) in debug_triangles {
-        let pos = (a + b + c) / 3.0;
+    for center in debug_triangle_centers {
         if let Some(prev) = prev {
-            lines_3d_buffer.draw_line(prev, pos, 0.3, Vec4::new(0.0, 0.0, 0.0, 1.0));
+            lines_3d_buffer.draw_line(prev, center, 0.3, Vec4::new(0.0, 0.0, 0.0, 1.0));
         }
-        prev = Some(pos);
+        prev = Some(center);
     }
 
     let mut prev = None;
