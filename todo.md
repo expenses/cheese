@@ -4,3 +4,7 @@
 - A kind of internal selection group system for things like moving units as a group
 - AI
 - Fill out HUD (medium)
+- Pyschic units
+- Engineer units
+- Helmets should increase opacity when in combat
+- Map crevasses
