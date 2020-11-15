@@ -454,13 +454,13 @@ impl TextBuffer {
 
     pub fn render_text(
         &mut self,
-        screen_position: (f32, f32),
+        screen_position: Vec2,
         text: &str,
         font: Font,
         scale_multiplier: f32,
         dpi_scaling: f32,
         center: bool,
-        colour: [f32; 4],
+        colour: Vec4,
     ) {
         let layout = if center {
             wgpu_glyph::Layout::default()
@@ -472,10 +472,11 @@ impl TextBuffer {
 
         let scale = font.scale();
         let id = font as usize;
+        let colour: [f32; 4] = colour.into();
 
         self.glyph_brush.queue(
             wgpu_glyph::Section::new()
-                .with_screen_position(screen_position)
+                .with_screen_position((screen_position.x, screen_position.y))
                 .with_layout(layout)
                 .add_text(
                     wgpu_glyph::Text::new(text)

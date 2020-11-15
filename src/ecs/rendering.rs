@@ -178,13 +178,13 @@ pub fn render_ui(
     let text: String = mode.chain(unit_info).collect();
 
     text_buffer.render_text(
-        (10.0, 10.0),
+        Vec2::new(10.0, 10.0),
         &text,
         Font::Ui,
         1.0,
         dpi_scaling.0,
         false,
-        [1.0; 4],
+        Vec4::one(),
     );
 }
 

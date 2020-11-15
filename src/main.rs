@@ -11,8 +11,8 @@ use crate::renderer::{
     RenderContext, TextBuffer, TitlescreenBuffer, TorusBuffer, TorusPipeline,
 };
 use crate::resources::{
-    Camera, CameraControls, CommandMode, ControlGroups, CursorIcon, DeltaTime, DpiScaling,
-    MouseState, PlayerSide, RayCastLocation, RtsControls, ScreenDimensions,
+    Camera, CameraControls, CommandMode, ControlGroups, CursorIcon, DeltaTime, DpiScaling, Mode,
+    MouseState, PlayerSide, RayCastLocation, RtsControls, ScreenDimensions, ShouldQuit,
 };
 use legion::*;
 use rand::SeedableRng;
@@ -55,17 +55,11 @@ fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(ecs::handle_damaged_system());
 }
 
-enum Mode {
-    Titlescreen,
-    Playing,
-}
-
 async fn run() -> anyhow::Result<()> {
     env_logger::init();
 
     let event_loop = EventLoop::new();
 
-    let mode = Mode::Titlescreen;
     let mut rng = rand::rngs::SmallRng::from_entropy();
 
     let mut render_context = RenderContext::new(&event_loop).await?;
@@ -99,6 +93,8 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(PlayerSide(ecs::Side::Green));
     resources.insert(ControlGroups::default());
     resources.insert(titlescreen::TitlescreenMoon::default());
+    resources.insert(ShouldQuit::default());
+    resources.insert(Mode::Titlescreen);
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
@@ -232,9 +228,17 @@ async fn run() -> anyhow::Result<()> {
                 resources.insert(DeltaTime(elapsed));
                 resources.insert(CursorIcon(winit::window::CursorIcon::default()));
 
+                let mode = *resources.get::<Mode>().unwrap();
+
                 match mode {
                     Mode::Playing => schedule.execute(&mut world, &mut resources),
                     Mode::Titlescreen => titlescreen_schedule.execute(&mut world, &mut resources),
+                }
+
+                let should_quit = resources.get::<ShouldQuit>().unwrap();
+
+                if should_quit.0 {
+                    *control_flow = ControlFlow::Exit;
                 }
 
                 let cursor_icon = resources.get::<CursorIcon>().unwrap();
@@ -250,6 +254,7 @@ async fn run() -> anyhow::Result<()> {
                 let mut lines_3d_buffer = resources.get_mut::<Lines3dBuffer>().unwrap();
                 let titlescreen_buffer = resources.get::<TitlescreenBuffer>().unwrap();
                 let assets = resources.get::<Assets>().unwrap();
+                let mode = *resources.get::<Mode>().unwrap();
 
                 // Upload buffers to the gpu.
                 render_context.update_view(camera.to_matrix());

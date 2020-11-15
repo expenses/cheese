@@ -1,13 +1,21 @@
 use crate::renderer::{Font, LineBuffers, ModelInstance, TextBuffer, TitlescreenBuffer};
-use crate::resources::{Camera, DeltaTime, DpiScaling, ScreenDimensions};
+use crate::resources::{
+    Camera, CursorIcon, DeltaTime, DpiScaling, Mode, MouseState, ScreenDimensions, ShouldQuit,
+};
 use legion::*;
 use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
+
+const TITLE_POSITION: Vec2 = Vec2::new(0.5, 1.0 / 6.0);
+const SKIRMISH_POSITION: Vec2 = Vec2::new(0.5, 3.0 / 4.0);
+const QUIT_POSITION: Vec2 = Vec2::new(0.5, 3.25 / 4.0);
 
 pub fn titlescreen_schedule() -> Schedule {
     Schedule::builder()
         .add_system(update_system())
+        .add_system(handle_clicks_system())
         .add_system(render_text_system())
-        .add_system(render_click_regions_system())
+        //.add_system(render_click_regions_system())
+        .add_system(crate::ecs::cleanup_controls_system())
         .build()
 }
 
@@ -41,14 +49,16 @@ fn render_text(
     #[resource] text_buffer: &mut TextBuffer,
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] dpi_scaling: &DpiScaling,
+    #[resource] mouse_state: &MouseState,
+    #[resource] cursor_icon: &mut CursorIcon,
 ) {
-    let x = screen_dimensions.width as f32 / 2.0;
-    let y = screen_dimensions.height as f32 / 6.0;
+    let screen_dimensions = screen_dimensions.as_vec();
 
-    let colour = [0.867, 0.675, 0.086, 1.0];
+    let colour = Vec4::new(0.867, 0.675, 0.086, 1.0);
+    let selected_colour = colour * 0.5 + Vec4::one() * 0.5;
 
     text_buffer.render_text(
-        (x, y),
+        TITLE_POSITION * screen_dimensions,
         "Cheese (working title :^))",
         Font::Title,
         1.5,
@@ -57,29 +67,26 @@ fn render_text(
         colour,
     );
 
-    let y = screen_dimensions.height as f32 * 3.0 / 4.0;
+    for (text, position) in [("Skirmish", SKIRMISH_POSITION), ("Quit", QUIT_POSITION)].iter() {
+        let center = *position * screen_dimensions;
 
-    text_buffer.render_text(
-        (x, y),
-        "Skirmish",
-        Font::Title,
-        1.0,
-        dpi_scaling.0,
-        true,
-        colour,
-    );
+        let (top_left, bottom_right) = text_selection_area(center, text, dpi_scaling.0);
+        let selected = point_in_area(mouse_state.position, top_left, bottom_right);
 
-    let y = screen_dimensions.height as f32 * 3.25 / 4.0;
+        if selected {
+            cursor_icon.0 = winit::window::CursorIcon::Hand;
+        }
 
-    text_buffer.render_text(
-        (x, y),
-        "Quit",
-        Font::Title,
-        dpi_scaling.0,
-        1.0,
-        true,
-        colour,
-    );
+        text_buffer.render_text(
+            center,
+            text,
+            Font::Title,
+            1.0,
+            dpi_scaling.0,
+            true,
+            if selected { selected_colour } else { colour },
+        );
+    }
 }
 
 #[legion::system]
@@ -88,37 +95,61 @@ fn render_click_regions(
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] dpi_scaling: &DpiScaling,
 ) {
-    let center = Vec2::new(
-        screen_dimensions.width as f32 / 2.0,
-        screen_dimensions.height as f32 * 3.0 / 4.0,
-    );
+    let screen_dimensions = screen_dimensions.as_vec();
 
+    for (text, position) in [("Skirmish", SKIRMISH_POSITION), ("Quit", QUIT_POSITION)].iter() {
+        let center = *position * screen_dimensions;
+
+        let (top_left, bottom_right) = text_selection_area(center, text, dpi_scaling.0);
+        line_buffers.draw_rect(top_left, bottom_right, dpi_scaling.0);
+    }
+}
+
+#[legion::system]
+fn handle_clicks(
+    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] dpi_scaling: &DpiScaling,
+    #[resource] mouse_state: &MouseState,
+    #[resource] should_quit: &mut ShouldQuit,
+    #[resource] mode: &mut Mode,
+    #[resource] camera: &mut Camera,
+) {
+    if !mouse_state.left_state.was_clicked() {
+        return;
+    }
+
+    let screen_dimensions = screen_dimensions.as_vec();
+
+    let center = SKIRMISH_POSITION * screen_dimensions;
+    let (top_left, bottom_right) = text_selection_area(center, "Skirmish", dpi_scaling.0);
+    if point_in_area(mouse_state.position, top_left, bottom_right) {
+        *mode = Mode::Playing;
+        *camera = Camera::default();
+        return;
+    }
+
+    let center = QUIT_POSITION * screen_dimensions;
+    let (top_left, bottom_right) = text_selection_area(center, "Quit", dpi_scaling.0);
+    if point_in_area(mouse_state.position, top_left, bottom_right) {
+        should_quit.0 = true;
+    }
+}
+
+// Kinda hacky code to get a selection box around some text. Works well enough though.
+fn text_selection_area(center: Vec2, text: &str, dpi_scaling: f32) -> (Vec2, Vec2) {
     let dimensions = Vec2::new(
-        "Skirmish".len() as f32 / 2.0 * Font::Title.scale() * dpi_scaling.0,
-        Font::Title.scale() * dpi_scaling.0,
+        text.len() as f32 / 2.0 * Font::Title.scale() * dpi_scaling,
+        Font::Title.scale() * dpi_scaling,
     );
 
-    line_buffers.draw_rect(
-        center - dimensions / 2.0,
-        center + dimensions / 2.0,
-        dpi_scaling.0,
-    );
+    (center - dimensions / 2.0, center + dimensions / 2.0)
+}
 
-    let center = Vec2::new(
-        screen_dimensions.width as f32 / 2.0,
-        screen_dimensions.height as f32 * 3.25 / 4.0,
-    );
-
-    let dimensions = Vec2::new(
-        "Quit".len() as f32 / 2.0 * Font::Title.scale() * dpi_scaling.0,
-        Font::Title.scale() * dpi_scaling.0,
-    );
-
-    line_buffers.draw_rect(
-        center - dimensions / 2.0,
-        center + dimensions / 2.0,
-        dpi_scaling.0,
-    );
+fn point_in_area(point: Vec2, top_left: Vec2, bottom_right: Vec2) -> bool {
+    point.x >= top_left.x
+        && point.y >= top_left.y
+        && point.x <= bottom_right.x
+        && point.y <= bottom_right.y
 }
 
 pub fn create_stars<R: rand::Rng>(rng: &mut R) -> Vec<ModelInstance> {
