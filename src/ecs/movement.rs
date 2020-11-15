@@ -23,8 +23,7 @@ pub fn set_move_to(
     let mut pop_front = false;
 
     match commands.0.front_mut() {
-        Some(Command::MoveTo(target)) => buffer.add_component(*entity, MoveTo(*target)),
-        Some(Command::AttackMove(target)) => buffer.add_component(*entity, MoveTo(*target)),
+        Some(Command::MoveTo { target, .. }) => buffer.add_component(*entity, MoveTo(*target)),
         Some(Command::Attack {
             target,
             first_out_of_range,
@@ -85,7 +84,7 @@ pub fn move_units(
             .0
             .front()
             .map(|command| match command {
-                Command::MoveTo(_) | Command::AttackMove(_) => true,
+                Command::MoveTo { .. } => true,
                 Command::Attack { .. } => false,
             })
             .unwrap_or(false)

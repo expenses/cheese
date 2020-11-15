@@ -35,7 +35,11 @@ pub struct Selectable;
 
 #[derive(Clone, Copy)]
 pub enum Command {
-    MoveTo(Vec2),
+    MoveTo {
+        target: Vec2,
+        // Should we stop and attack things on the way?
+        attack_move: bool,
+    },
     Attack {
         target: Entity,
         // Was the unit explicitly commanded to attack, or was this caused by attack moving or agro?
@@ -48,7 +52,6 @@ pub enum Command {
         first_out_of_range: bool,
         out_of_range: bool,
     },
-    AttackMove(Vec2),
 }
 
 #[derive(Default)]
