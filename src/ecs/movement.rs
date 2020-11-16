@@ -88,13 +88,11 @@ pub fn set_move_to(
             } else if *out_of_range && !*first_out_of_range {
                 // Remove the attack command so the unit can retarget.
                 pop_front = true;
-                buffer.remove_component::<MoveTo>(*entity);
             } else {
                 *first_out_of_range = false;
-                buffer.remove_component::<MoveTo>(*entity);
             }
         }
-        None => buffer.remove_component::<MoveTo>(*entity),
+        None => {},
     }
 
     if pop_front {
@@ -104,11 +102,13 @@ pub fn set_move_to(
 
 #[legion::system(for_each)]
 pub fn move_units(
+    entity: &Entity,
     position: &mut Position,
     facing: &mut Facing,
     move_to: &MoveTo,
     move_speed: &MoveSpeed,
     commands: &mut CommandQueue,
+    buffer: &mut CommandBuffer,
     #[resource] delta_time: &DeltaTime,
 ) {
     move_towards(
@@ -131,6 +131,8 @@ pub fn move_units(
             commands.0.pop_front();
         }
     }
+
+    buffer.remove_component::<MoveTo>(*entity);
 }
 
 pub struct Avoidance(pub Vec2);
