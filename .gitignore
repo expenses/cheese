@@ -5,3 +5,4 @@ target
 animation/*.gltf
 animation/*.png
 animation/*.blend
+perf.data*

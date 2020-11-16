@@ -2,7 +2,7 @@
 // https://github.com/adrien-ben/gltf-viewer-rs/blob/master/model/src/animation.rs
 
 use super::skin::Skin;
-use cgmath::Quaternion;
+use cgmath::{Quaternion, InnerSpace};
 use gltf::{
     animation::{
         iter::Channels,
@@ -54,17 +54,65 @@ pub fn slerp(left: Quaternion<f32>, right: Quaternion<f32>, amount: f32) -> Quat
 
 trait Interpolate: Copy {
     fn linear(self, other: Self, amount: f32) -> Self;
+
+    fn cubic_spline(
+        source: [Self; 3],
+        source_time: f32,
+        target: [Self; 3],
+        target_time: f32,
+        current_time: f32,
+    ) -> Self;
 }
 
 impl Interpolate for Vec3 {
     fn linear(self, other: Self, amount: f32) -> Self {
         self.lerp(other, amount)
     }
+
+    fn cubic_spline(
+        source: [Self; 3],
+        source_time: f32,
+        target: [Self; 3],
+        target_time: f32,
+        amount: f32,
+    ) -> Self {
+        let t = amount;
+        let p0 = source[1];
+        let m0 = (target_time - source_time) * source[2];
+        let p1 = target[1];
+        let m1 = (target_time - source_time) * target[0];
+
+        (2.0 * t * t * t - 3.0 * t * t + 1.0) * p0
+            + (t * t * t - 2.0 * t * t + t) * m0
+            + (-2.0 * t * t * t + 3.0 * t * t) * p1
+            + (t * t * t - t * t) * m1
+    }
 }
 
 impl Interpolate for Quaternion<f32> {
     fn linear(self, other: Self, amount: f32) -> Self {
         slerp(self, other, amount)
+    }
+
+    fn cubic_spline(
+        source: [Self; 3],
+        source_time: f32,
+        target: [Self; 3],
+        target_time: f32,
+        amount: f32,
+    ) -> Self {
+        let t = amount;
+        let p0 = source[1];
+        let m0 = (target_time - source_time) * source[2];
+        let p1 = target[1];
+        let m1 = (target_time - source_time) * target[0];
+
+        let result = (2.0 * t * t * t - 3.0 * t * t + 1.0) * p0
+            + (t * t * t - 2.0 * t * t + t) * m0
+            + (-2.0 * t * t * t + 3.0 * t * t) * p1
+            + (t * t * t - t * t) * m1;
+
+        result.normalize()
     }
 }
 
@@ -104,10 +152,36 @@ impl<T: Interpolate> Channel<T> {
             let from_start = t - previous_time;
             let factor = from_start / delta;
 
-            let previous_value = self.values[i];
-            let next_value = self.values[i + 1];
+            let i = match self.interpolation {
+                Interpolation::Step => self.values[i],
+                Interpolation::Linear => {
+                    let previous_value = self.values[i];
+                    let next_value = self.values[i + 1];
 
-            (self.node_index, previous_value.linear(next_value, factor))
+                    previous_value.linear(next_value, factor)
+                }
+                Interpolation::CubicSpline => {
+                    let previous_values = [
+                        self.values[i * 3],
+                        self.values[i * 3 + 1],
+                        self.values[i * 3 + 2],
+                    ];
+                    let next_values = [
+                        self.values[i * 3 + 3],
+                        self.values[i * 3 + 4],
+                        self.values[i * 3 + 5],
+                    ];
+                    Interpolate::cubic_spline(
+                        previous_values,
+                        previous_time,
+                        next_values,
+                        next_time,
+                        factor,
+                    )
+                }
+            };
+
+            (self.node_index, i)
         })
     }
 }
