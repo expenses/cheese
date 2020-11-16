@@ -118,7 +118,7 @@ async fn run() -> anyhow::Result<()> {
         );
     }
 
-    for i in 0..10 {
+    for i in 0..50 {
         ecs::Unit::MouseMarine.add_to_world(
             &mut world,
             Some(&assets),
@@ -164,6 +164,7 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::render_unit_under_cursor_system())
         //.add_system(ecs::render_building_grid_system())
         .add_system(ecs::render_pathfinding_map_system())
+        .add_system(ecs::render_unit_paths_system())
         .add_system(ecs::render_buildings_system())
         // Cleanup
         .flush()

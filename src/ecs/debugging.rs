@@ -1,4 +1,4 @@
-use super::Building;
+use super::{Building, Command, CommandQueue, Position};
 use crate::pathfinding::Map;
 use crate::renderer::Lines3dBuffer;
 use crate::resources::{DebugControls, RayCastLocation};
@@ -99,4 +99,20 @@ pub fn render_pathfinding_map(
         prev = Some((left, right));
     }
     */
+}
+
+#[legion::system(for_each)]
+pub fn render_unit_paths(
+    position: &Position,
+    commands: &CommandQueue,
+    #[resource] lines_3d_buffer: &mut Lines3dBuffer,
+) {
+    if let Some(&Command::MoveTo { ref path, .. }) = commands.0.front() {
+        let mut prev = position.0;
+
+        for point in path.iter() {
+            lines_3d_buffer.draw_line(prev, *point, 0.5, Vec4::new(1.0, 0.0, 1.0, 1.0));
+            prev = *point;
+        }
+    }
 }

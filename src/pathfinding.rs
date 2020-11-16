@@ -105,6 +105,11 @@ impl Map {
         self.dlt.remove(handle.top_left);
     }
 
+    pub fn impassable_between(&self, a: Vec2, b: Vec2) -> bool {
+        self.dlt
+            .intersects_constraint(&Point2::new(a.x, a.y), &Point2::new(b.x, b.y))
+    }
+
     pub fn pathfind(
         &self,
         start: Vec2,
@@ -118,10 +123,7 @@ impl Map {
         // in between.
         // It'd be better to iterate over all edges that intersect the line and check them against
         // the unit radius.
-        if !self
-            .dlt
-            .intersects_constraint(&Point2::new(start.x, start.y), &Point2::new(end.x, end.y))
-        {
+        if !self.impassable_between(start, end) {
             return Some(vec![end]);
         }
 

@@ -57,7 +57,13 @@ pub fn set_move_to(
     let mut pop_front = false;
 
     match commands.0.front_mut() {
-        Some(Command::MoveTo { target, .. }) => buffer.add_component(*entity, MoveTo(*target)),
+        Some(Command::MoveTo { ref mut path, .. }) => {
+            if path.is_empty() {
+                pop_front = true;
+            } else {
+                buffer.add_component(*entity, MoveTo(path[0]));
+            }
+        }
         Some(Command::Attack {
             target,
             first_out_of_range,
@@ -114,15 +120,14 @@ pub fn move_units(
     );
 
     if position.0 == move_to.0 {
-        if commands
-            .0
-            .front()
-            .map(|command| match command {
-                Command::MoveTo { .. } => true,
-                Command::Attack { .. } => false,
-            })
-            .unwrap_or(false)
-        {
+        let mut remove_command = false;
+        if let Some(&mut Command::MoveTo { ref mut path, .. }) = commands.0.front_mut() {
+            path.remove(0);
+            if path.is_empty() {
+                remove_command = true;
+            }
+        }
+        if remove_command {
             commands.0.pop_front();
         }
     }
@@ -170,10 +175,18 @@ pub fn apply_steering(
     entity: &Entity,
     position: &mut Position,
     avoidance: &Avoidance,
+    #[resource] map: &Map,
     command_buffer: &mut CommandBuffer,
 ) {
     // todo: delta time here
-    position.0 += avoidance.0 * 0.1;
+    let new_position = position.0 + avoidance.0 * 0.1;
+
+    // We don't want units to get pushed inside of buildings!
+    if map.impassable_between(position.0, new_position) {
+        return;
+    }
+
+    position.0 = new_position;
     command_buffer.remove_component::<Avoidance>(*entity);
 }
 
