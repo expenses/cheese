@@ -139,7 +139,13 @@ fn nearest_point_within_building(
 }
 
 #[legion::system(for_each)]
-pub fn set_move_to(entity: &Entity, commands: &mut CommandQueue, buffer: &mut CommandBuffer) {
+pub fn move_units(
+    position: &mut Position,
+    facing: &mut Facing,
+    move_speed: &MoveSpeed,
+    commands: &mut CommandQueue,
+    #[resource] delta_time: &DeltaTime,
+) {
     let mut pop_front = false;
 
     if let Some(path) = commands
@@ -150,54 +156,25 @@ pub fn set_move_to(entity: &Entity, commands: &mut CommandQueue, buffer: &mut Co
         if path.is_empty() {
             pop_front = true;
         } else {
-            buffer.add_component(*entity, MoveTo(path[0]));
+            move_towards(
+                &mut position.0,
+                &mut facing.0,
+                path[0],
+                move_speed.0,
+                delta_time.0,
+            );
+
+            if position.0 == path[0] {
+                path.remove(0);
+                if path.is_empty() {
+                    pop_front = true;
+                }
+            }
         }
     }
-
     if pop_front {
         commands.0.pop_front();
     }
-}
-
-#[legion::system(for_each)]
-pub fn move_units(
-    entity: &Entity,
-    position: &mut Position,
-    facing: &mut Facing,
-    move_to: &MoveTo,
-    move_speed: &MoveSpeed,
-    commands: &mut CommandQueue,
-    buffer: &mut CommandBuffer,
-    #[resource] delta_time: &DeltaTime,
-) {
-    move_towards(
-        &mut position.0,
-        &mut facing.0,
-        move_to.0,
-        move_speed.0,
-        delta_time.0,
-    );
-
-    if position.0 == move_to.0 {
-        let mut remove_command = false;
-        if let Some(ref mut path) = commands
-            .0
-            .front_mut()
-            .and_then(|command| command.path_mut())
-        {
-            if !path.is_empty() {
-                path.remove(0);
-            }
-            if path.is_empty() {
-                remove_command = true;
-            }
-        }
-        if remove_command {
-            commands.0.pop_front();
-        }
-    }
-
-    buffer.remove_component::<MoveTo>(*entity);
 }
 
 pub struct Avoidance(pub Vec2);

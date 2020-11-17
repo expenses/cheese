@@ -136,9 +136,6 @@ pub struct Bullet {
     target_position: Vec2,
 }
 
-#[derive(Debug)]
-pub struct MoveTo(pub Vec2);
-
 pub struct FiringCooldown(pub u8);
 
 #[derive(Copy, Clone)]
