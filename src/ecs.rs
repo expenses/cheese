@@ -64,6 +64,15 @@ pub enum Command {
 }
 
 impl Command {
+    fn new_attack(target: Entity, explicit: bool) -> Self {
+        Self::Attack {
+            target,
+            explicit,
+            first_out_of_range: true,
+            state: AttackState::OutOfRange { path: Vec::new() },
+        }
+    }
+
     fn path(&self) -> Option<&Vec<Vec2>> {
         if let &Command::MoveTo { ref path, .. }
         | &Command::Attack {
@@ -136,17 +145,62 @@ pub struct CommandGroup {
     entities: Vec<Entity>,
 }
 
-pub struct Building {
-    pub handle: MapHandle,
-    position: Vec2,
+#[derive(Copy, Clone)]
+pub enum Building {
+    Armoury,
+}
+
+struct BuildingStats {
+    pub radius: f32,
+    pub dimensions: Vec2,
+    pub max_health: u16,
 }
 
 impl Building {
-    pub fn new(center: Vec2, dimensions: Vec2, map: &mut Map) -> Option<Self> {
-        Some(Self {
-            handle: map.insert(center, dimensions)?,
-            position: center,
-        })
+    fn stats(self) -> BuildingStats {
+        match self {
+            Self::Armoury => BuildingStats {
+                radius: 6.0,
+                dimensions: Vec2::new(6.0, 10.0),
+                max_health: 200,
+            },
+        }
+    }
+
+    fn parts(
+        self,
+        position: Vec2,
+        side: Side,
+        map: &mut Map,
+    ) -> Option<(Position, MapHandle, Self, Radius, Selectable, Side, Health)> {
+        let BuildingStats {
+            radius,
+            dimensions,
+            max_health,
+        } = self.stats();
+
+        let handle = map.insert(position, dimensions)?;
+
+        Some((
+            Position(position),
+            handle,
+            self,
+            Radius(radius),
+            Selectable,
+            side,
+            Health(max_health),
+        ))
+    }
+
+    pub fn add_to_world(
+        self,
+        position: Vec2,
+        side: Side,
+        world: &mut World,
+        map: &mut Map,
+    ) -> Option<Entity> {
+        let parts = self.parts(position, side, map)?;
+        Some(world.push(parts))
     }
 }
 

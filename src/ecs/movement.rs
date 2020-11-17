@@ -13,6 +13,7 @@ pub fn reset_map_updated(#[resource] map: &mut Map) {
 #[legion::system(for_each)]
 #[filter(component::<Position>())]
 #[read_component(Position)]
+#[read_component(Building)]
 pub fn set_movement_paths(
     entity: &Entity,
     radius: &Radius,
@@ -70,7 +71,7 @@ pub fn set_movement_paths(
             ref mut first_out_of_range,
             ..
         }) => {
-            let target_pos = <&Position>::query()
+            let (target_pos, building) = <(&Position, Option<&Building>)>::query()
                 .get(world, target)
                 .expect("We've cancelled attack commands on dead entities");
 
@@ -80,7 +81,18 @@ pub fn set_movement_paths(
                 vector.mag_sq() > (firing_range.0 - FIRING_RANGE_FUDGE_FACTOR).powi(2);
 
             if out_of_range && *first_out_of_range {
-                match map.pathfind(position.0, target_pos.0, radius.0, None, None) {
+                let target_pos = if let Some(building) = building {
+                    nearest_point_within_building(
+                        position.0,
+                        radius.0,
+                        target_pos.0,
+                        building.stats().dimensions,
+                    )
+                } else {
+                    target_pos.0
+                };
+
+                match map.pathfind(position.0, target_pos, radius.0, None, None) {
                     Some(path) => *state = AttackState::OutOfRange { path },
                     None => pop_front = true,
                 }
@@ -96,6 +108,34 @@ pub fn set_movement_paths(
     if pop_front {
         command_queue.0.pop_front();
     }
+}
+
+fn nearest_point_within_building(
+    unit_pos: Vec2,
+    unit_radius: f32,
+    building_pos: Vec2,
+    building_dims: Vec2,
+) -> Vec2 {
+    let point = unit_pos - building_pos;
+    let bounding_box = building_dims / 2.0;
+
+    let x = if point.x > -bounding_box.x && point.x < bounding_box.y {
+        point.x
+    } else if point.x > 0.0 {
+        bounding_box.x + unit_radius
+    } else {
+        -(bounding_box.x + unit_radius)
+    };
+
+    let y = if point.y > -bounding_box.y && point.y < bounding_box.y {
+        point.y
+    } else if point.y > 0.0 {
+        bounding_box.y + unit_radius
+    } else {
+        -(bounding_box.y + unit_radius)
+    };
+
+    building_pos + Vec2::new(x, y)
 }
 
 #[legion::system(for_each)]
@@ -145,7 +185,9 @@ pub fn move_units(
             .front_mut()
             .and_then(|command| command.path_mut())
         {
-            path.remove(0);
+            if !path.is_empty() {
+                path.remove(0);
+            }
             if path.is_empty() {
                 remove_command = true;
             }

@@ -1,4 +1,4 @@
-use super::{Building, CommandQueue, MovementDebugging, Position, Selected};
+use super::{Building, CommandQueue, MovementDebugging, Position, Selected, Side};
 use crate::pathfinding::Map;
 use crate::renderer::Lines3dBuffer;
 use crate::resources::{DebugControls, RayCastLocation};
@@ -24,8 +24,8 @@ pub fn spawn_debug_building(
     command_buffer: &mut CommandBuffer,
 ) {
     if debug_controls.spawn_building_pressed {
-        if let Some(building) = Building::new(ray_cast_location.0, Vec2::new(6.0, 10.0), map) {
-            command_buffer.push((building,));
+        if let Some(parts) = Building::Armoury.parts(ray_cast_location.0, Side::Purple, map) {
+            command_buffer.push(parts);
         }
     }
 }

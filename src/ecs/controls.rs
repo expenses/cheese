@@ -161,12 +161,7 @@ fn issue_command(
         .map(|(entity, ..)| entity);
 
     let command = match enemy_entity_under_cursor {
-        Some(entity) => Command::Attack {
-            target: *entity,
-            explicit: true,
-            first_out_of_range: true,
-            state: AttackState::OutOfRange { path: Vec::new() },
-        },
+        Some(entity) => Command::new_attack(*entity, true),
         None => match rts_controls.mode {
             CommandMode::Normal => Command::MoveTo {
                 target: position,

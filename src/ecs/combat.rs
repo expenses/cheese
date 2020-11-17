@@ -1,6 +1,7 @@
 use super::*;
 
 #[legion::system(for_each)]
+#[read_component(Position)]
 pub fn stop_attacks_on_dead_entities(commands: &mut CommandQueue, world: &SubWorld) {
     while commands
         .0
@@ -86,24 +87,29 @@ pub fn handle_damaged(
     entity: &Entity,
     damaged: &DamagedThisTick,
     health: &mut Health,
-    commands: &mut CommandQueue,
+    // None in the case of a building.
+    commands: Option<&mut CommandQueue>,
+    map_handle: Option<&MapHandle>,
     buffer: &mut CommandBuffer,
+    #[resource] map: &mut Map,
 ) {
     health.0 = health.0.saturating_sub(1);
 
     if health.0 == 0 {
         buffer.remove(*entity);
+
+        if let Some(map_handle) = map_handle {
+            map.remove(map_handle);
+        }
+
         return;
     }
 
     // If the unit is idle and got attacked, go attack back!
-    if commands.0.is_empty() {
-        commands.0.push_front(Command::Attack {
-            target: damaged.0,
-            explicit: false,
-            first_out_of_range: true,
-            state: AttackState::OutOfRange { path: Vec::new() },
-        });
+    if let Some(commands) = commands {
+        if commands.0.is_empty() {
+            commands.0.push_front(Command::new_attack(damaged.0, false));
+        }
     }
 
     buffer.remove_component::<DamagedThisTick>(*entity);
@@ -134,12 +140,7 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
             .map(|(entity, ..)| entity);
 
         if let Some(target) = target {
-            commands.0.push_front(Command::Attack {
-                target: *target,
-                explicit: false,
-                first_out_of_range: true,
-                state: AttackState::OutOfRange { path: Vec::new() },
-            })
+            commands.0.push_front(Command::new_attack(*target, false))
         }
     }
 }

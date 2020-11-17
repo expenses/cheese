@@ -130,16 +130,25 @@ async fn run() -> anyhow::Result<()> {
 
     let mut map = pathfinding::Map::new();
 
-    world.push((
-        ecs::Building::new(Vec2::new(-20.0, 10.0), Vec2::new(6.0, 10.0), &mut map).unwrap(),
-    ));
-
-    world.push((
-        ecs::Building::new(Vec2::new(-30.0, 40.0), Vec2::new(6.0, 10.0), &mut map).unwrap(),
-    ));
-
-    world
-        .push((ecs::Building::new(Vec2::new(0.0, 50.0), Vec2::new(6.0, 10.0), &mut map).unwrap(),));
+    ecs::Building::Armoury
+        .add_to_world(
+            Vec2::new(-20.0, 10.0),
+            ecs::Side::Green,
+            &mut world,
+            &mut map,
+        )
+        .unwrap();
+    ecs::Building::Armoury
+        .add_to_world(
+            Vec2::new(-30.0, 40.0),
+            ecs::Side::Green,
+            &mut world,
+            &mut map,
+        )
+        .unwrap();
+    ecs::Building::Armoury
+        .add_to_world(Vec2::new(0.0, 50.0), ecs::Side::Green, &mut world, &mut map)
+        .unwrap();
 
     resources.insert(assets);
     resources.insert(map);

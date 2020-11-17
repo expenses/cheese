@@ -2,8 +2,8 @@ use cgmath::Point2;
 use ordered_float::OrderedFloat;
 use spade::{
     delaunay::{
-        CdtEdge, ConstrainedDelaunayTriangulation, FaceHandle, FixedVertexHandle,
-        PositionInTriangulation, VertexHandle,
+        CdtEdge, ConstrainedDelaunayTriangulation, FaceHandle, PositionInTriangulation,
+        VertexHandle,
     },
     kernels::FloatKernel,
 };
@@ -11,10 +11,10 @@ use std::hash::{Hash, Hasher};
 use ultraviolet::Vec2;
 
 pub struct MapHandle {
-    top_left: FixedVertexHandle,
-    top_right: FixedVertexHandle,
-    bottom_left: FixedVertexHandle,
-    bottom_right: FixedVertexHandle,
+    top_left: Point2<f32>,
+    top_right: Point2<f32>,
+    bottom_left: Point2<f32>,
+    bottom_right: Point2<f32>,
 }
 
 pub struct Map {
@@ -78,15 +78,17 @@ impl Map {
             return None;
         }
 
-        let top_left = self.dlt.insert(top_left);
-        let top_right = self.dlt.insert(top_right);
-        let bottom_left = self.dlt.insert(bottom_left);
-        let bottom_right = self.dlt.insert(bottom_right);
+        {
+            let top_left = self.dlt.insert(top_left);
+            let top_right = self.dlt.insert(top_right);
+            let bottom_left = self.dlt.insert(bottom_left);
+            let bottom_right = self.dlt.insert(bottom_right);
 
-        self.dlt.add_constraint(top_left, top_right);
-        self.dlt.add_constraint(bottom_left, bottom_right);
-        self.dlt.add_constraint(top_left, bottom_left);
-        self.dlt.add_constraint(top_right, bottom_right);
+            self.dlt.add_constraint(top_left, top_right);
+            self.dlt.add_constraint(bottom_left, bottom_right);
+            self.dlt.add_constraint(top_left, bottom_left);
+            self.dlt.add_constraint(top_right, bottom_right);
+        }
 
         self.updated_this_tick = true;
 
@@ -99,10 +101,10 @@ impl Map {
     }
 
     pub fn remove(&mut self, handle: &MapHandle) {
-        self.dlt.remove(handle.bottom_right);
-        self.dlt.remove(handle.bottom_left);
-        self.dlt.remove(handle.top_right);
-        self.dlt.remove(handle.top_left);
+        self.dlt.locate_and_remove(&handle.bottom_right);
+        self.dlt.locate_and_remove(&handle.bottom_left);
+        self.dlt.locate_and_remove(&handle.top_right);
+        self.dlt.locate_and_remove(&handle.top_left);
     }
 
     pub fn impassable_between(&self, a: Vec2, b: Vec2) -> bool {

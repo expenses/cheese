@@ -94,34 +94,47 @@ pub fn render_under_select_box(
 pub fn render_health_bars(
     position: &Position,
     health: &Health,
-    unit: &Unit,
+    unit: Option<&Unit>,
+    building: Option<&Building>,
     #[resource] camera: &Camera,
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] dpi_scaling: &DpiScaling,
     #[resource] line_buffers: &mut LineBuffers,
 ) {
-    let stats = unit.stats();
+    let stats = {
+        let unit_stats = unit.map(|unit| {
+            let stats = unit.stats();
+            (stats.max_health, stats.health_bar_height)
+        });
+        let building_stats = building.map(|building| {
+            let stats = building.stats();
+            (stats.max_health, 5.0)
+        });
+        unit_stats.or(building_stats)
+    };
 
-    if health.0 != stats.max_health {
-        let floating = Vec3::new(position.0.x, stats.health_bar_height, position.0.y);
-        let location = screen_location(floating, camera, screen_dimensions);
+    if let Some((max_health, health_bar_height)) = stats {
+        if health.0 != max_health {
+            let floating = Vec3::new(position.0.x, health_bar_height, position.0.y);
+            let location = screen_location(floating, camera, screen_dimensions);
 
-        let health_percentage = health.0 as f32 / stats.max_health as f32;
-        let length = 60.0 * health_percentage;
+            let health_percentage = health.0 as f32 / max_health as f32;
+            let length = 60.0 * health_percentage;
 
-        line_buffers.draw_filled_rect(
-            location,
-            Vec2::new(length + 2.0, 12.0),
-            Vec3::new(0.0, 0.0, 0.0),
-            dpi_scaling.0,
-        );
+            line_buffers.draw_filled_rect(
+                location,
+                Vec2::new(length + 2.0, 12.0),
+                Vec3::new(0.0, 0.0, 0.0),
+                dpi_scaling.0,
+            );
 
-        line_buffers.draw_filled_rect(
-            location,
-            Vec2::new(length, 10.0),
-            Vec3::new(1.0 - health_percentage, health_percentage, 0.0),
-            dpi_scaling.0,
-        );
+            line_buffers.draw_filled_rect(
+                location,
+                Vec2::new(length, 10.0),
+                Vec3::new(1.0 - health_percentage, health_percentage, 0.0),
+                dpi_scaling.0,
+            );
+        }
     }
 }
 
@@ -267,9 +280,13 @@ pub fn render_command_paths(
 }
 
 #[legion::system(for_each)]
-pub fn render_buildings(building: &Building, #[resource] model_buffers: &mut ModelBuffers) {
+pub fn render_buildings(
+    position: &Position,
+    building: &Building,
+    #[resource] model_buffers: &mut ModelBuffers,
+) {
     model_buffers.armouries.push(ModelInstance {
-        transform: Mat4::from_translation(Vec3::new(building.position.x, 0.0, building.position.y)),
+        transform: Mat4::from_translation(Vec3::new(position.0.x, 0.0, position.0.y)),
         flat_colour: Vec4::new(1.0, 1.0, 1.0, 1.0),
     })
 }
