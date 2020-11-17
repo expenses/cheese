@@ -57,7 +57,7 @@ pub fn firing(
                     target_position: target_position.0,
                 },
                 Facing(0.0),
-                MoveSpeed(10.0),
+                MoveSpeed(20.0),
             ));
             cooldown.0 = 10;
         }
@@ -126,12 +126,15 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
         .get(world, *entity)
         .expect("We've applied a filter for these components");
 
+    let agro_multiplier = 1.5;
+
     if matches!(commands.0.front(), None | Some(&Command::MoveTo { attack_move: true, .. })) {
         let target = <(Entity, &Position, &Side)>::query()
             .iter(world)
             .filter(|(.., entity_side)| *entity_side != side)
             .filter(|(_, entity_position, _)| {
-                (position.0 - entity_position.0).mag_sq() <= firing_range.0.powi(2)
+                (position.0 - entity_position.0).mag_sq()
+                    <= (firing_range.0 * agro_multiplier).powi(2)
             })
             .min_by_key(|(_, entity_position, _)| {
                 let distance_sq = (position.0 - entity_position.0).mag_sq();

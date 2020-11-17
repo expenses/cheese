@@ -266,6 +266,7 @@ pub fn apply_steering(
 #[write_component(Position)]
 pub fn move_bullets(
     entity: &Entity,
+    move_speed: &MoveSpeed,
     facing: &mut Facing,
     bullet: &mut Bullet,
     #[resource] delta_time: &DeltaTime,
@@ -281,7 +282,7 @@ pub fn move_bullets(
         &mut bullet_position.0,
         &mut facing.0,
         bullet.target_position,
-        10.0,
+        move_speed.0,
         delta_time.0,
     );
 }
