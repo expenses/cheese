@@ -141,10 +141,6 @@ pub struct MoveTo(pub Vec2);
 
 pub struct FiringCooldown(pub u8);
 
-pub struct CommandGroup {
-    entities: Vec<Entity>,
-}
-
 #[derive(Copy, Clone)]
 pub enum Building {
     Armoury,
@@ -162,7 +158,7 @@ impl Building {
             Self::Armoury => BuildingStats {
                 radius: 6.0,
                 dimensions: Vec2::new(6.0, 10.0),
-                max_health: 200,
+                max_health: 500,
             },
         }
     }

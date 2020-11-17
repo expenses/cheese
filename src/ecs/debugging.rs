@@ -119,7 +119,7 @@ pub fn render_unit_paths(
     }
 }
 
-fn render_triangles(triangles: &Vec<(Vec2, Vec2)>, lines_3d_buffer: &mut Lines3dBuffer) {
+fn render_triangles(triangles: &[(Vec2, Vec2)], lines_3d_buffer: &mut Lines3dBuffer) {
     let mut prev = None;
     for &(center, special) in triangles {
         if let Some((prev_center, prev_special)) = prev {
@@ -130,7 +130,7 @@ fn render_triangles(triangles: &Vec<(Vec2, Vec2)>, lines_3d_buffer: &mut Lines3d
     }
 }
 
-fn render_funnel_points(funnel_points: &Vec<(Vec2, Vec2)>, lines_3d_buffer: &mut Lines3dBuffer) {
+fn render_funnel_points(funnel_points: &[(Vec2, Vec2)], lines_3d_buffer: &mut Lines3dBuffer) {
     let mut prev = None;
     for &(left, right) in funnel_points {
         if let Some((prev_left, prev_right)) = prev {
@@ -142,7 +142,7 @@ fn render_funnel_points(funnel_points: &Vec<(Vec2, Vec2)>, lines_3d_buffer: &mut
     }
 }
 
-fn render_path(mut prev: Vec2, path: &Vec<Vec2>, lines_3d_buffer: &mut Lines3dBuffer) {
+fn render_path(mut prev: Vec2, path: &[Vec2], lines_3d_buffer: &mut Lines3dBuffer) {
     for &point in path {
         lines_3d_buffer.draw_line(prev, point, 0.5, Vec4::new(1.0, 0.0, 1.0, 1.0));
         prev = point;

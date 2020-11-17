@@ -381,7 +381,7 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
         if self.waiting.len() <= self.capacity {
             context.queue.write_buffer(&self.buffer, 0, bytes);
             self.waiting.clear();
-            return false;
+            false
         } else {
             self.capacity = (self.capacity * 2).max(self.waiting.len());
             log::debug!(
@@ -402,7 +402,7 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
                 .copy_from_slice(bytes);
             self.buffer.unmap();
             self.waiting.clear();
-            return true;
+            true
         }
     }
 
@@ -410,7 +410,7 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
         if self.len > 0 {
             let byte_len = (self.len * std::mem::size_of::<T>()) as u64;
 
-            return Some((self.buffer.slice(..byte_len), self.len as u32));
+            Some((self.buffer.slice(..byte_len), self.len as u32))
         } else {
             None
         }

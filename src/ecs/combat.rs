@@ -93,7 +93,7 @@ pub fn handle_damaged(
     buffer: &mut CommandBuffer,
     #[resource] map: &mut Map,
 ) {
-    health.0 = health.0.saturating_sub(1);
+    health.0 = health.0.saturating_sub(2);
 
     if health.0 == 0 {
         buffer.remove(*entity);

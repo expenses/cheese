@@ -29,7 +29,7 @@ pub fn progress_animations(
         animation_state.total_time = assets.mouse_model.animations[animation].total_time;
     } else {
         animation_state.time += delta_time.0;
-        animation_state.time = animation_state.time % animation_state.total_time;
+        animation_state.time %= animation_state.total_time;
     }
 
     assets.mouse_model.animations[animation_state.animation].animate(skin, animation_state.time);
