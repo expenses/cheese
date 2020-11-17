@@ -44,9 +44,10 @@ pub fn firing(
             .expect("We've cancelled attack commands on dead entities");
 
         let vector = target_position.0 - position.0;
-        facing.0 = vector.y.atan2(vector.x);
 
         if vector.mag_sq() <= firing_range.0.powi(2) {
+            facing.0 = vector.y.atan2(vector.x);
+
             buffer.push((
                 Position(position.0),
                 Bullet {
@@ -101,7 +102,7 @@ pub fn handle_damaged(
             target: damaged.0,
             explicit: false,
             first_out_of_range: true,
-            out_of_range: true,
+            state: AttackState::OutOfRange { path: Vec::new() },
         });
     }
 
@@ -137,7 +138,7 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
                 target: *target,
                 explicit: false,
                 first_out_of_range: true,
-                out_of_range: true,
+                state: AttackState::OutOfRange { path: Vec::new() },
             })
         }
     }

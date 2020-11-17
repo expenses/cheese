@@ -59,8 +59,48 @@ pub enum Command {
         // better to just switch targets than to chase. We set this to true initially and just 'and'
         // it with whether the unit is out of range.
         first_out_of_range: bool,
-        out_of_range: bool,
+        state: AttackState,
     },
+}
+
+impl Command {
+    fn path(&self) -> Option<&Vec<Vec2>> {
+        if let &Command::MoveTo { ref path, .. }
+        | &Command::Attack {
+            state: AttackState::OutOfRange { ref path },
+            ..
+        } = self
+        {
+            Some(path)
+        } else {
+            None
+        }
+    }
+
+    fn path_mut(&mut self) -> Option<&mut Vec<Vec2>> {
+        if let &mut Command::MoveTo { ref mut path, .. }
+        | &mut Command::Attack {
+            state: AttackState::OutOfRange { ref mut path },
+            ..
+        } = self
+        {
+            Some(path)
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum AttackState {
+    OutOfRange { path: Vec<Vec2> },
+    InRange,
+}
+
+impl AttackState {
+    fn is_out_of_range(&self) -> bool {
+        matches!(self, Self::OutOfRange { .. })
+    }
 }
 
 #[derive(Default)]

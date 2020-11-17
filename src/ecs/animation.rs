@@ -13,8 +13,8 @@ pub fn progress_animations(
 ) {
     let animation = match commands.0.front() {
         Some(&Command::MoveTo { .. }) => MouseAnimation::Walking,
-        Some(&Command::Attack { out_of_range, .. }) => {
-            if out_of_range {
+        Some(&Command::Attack { ref state, .. }) => {
+            if state.is_out_of_range() {
                 MouseAnimation::Walking
             } else {
                 MouseAnimation::Idle

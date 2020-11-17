@@ -1,4 +1,4 @@
-use super::{Building, Command, CommandQueue, MovementDebugging, Position, Selected};
+use super::{Building, CommandQueue, MovementDebugging, Position, Selected};
 use crate::pathfinding::Map;
 use crate::renderer::Lines3dBuffer;
 use crate::resources::{DebugControls, RayCastLocation};
@@ -95,7 +95,7 @@ pub fn render_debug_unit_pathfinding(
     movement_debugging: &MovementDebugging,
     #[resource] lines_3d_buffer: &mut Lines3dBuffer,
 ) {
-    if let Some(&Command::MoveTo { ref path, .. }) = commands.0.front() {
+    if let Some(path) = commands.0.front().and_then(|command| command.path()) {
         if path.len() > 1 {
             render_triangles(&movement_debugging.triangles, lines_3d_buffer);
             render_funnel_points(&movement_debugging.funnel_points, lines_3d_buffer);
@@ -114,7 +114,7 @@ pub fn render_unit_paths(
     commands: &CommandQueue,
     #[resource] lines_3d_buffer: &mut Lines3dBuffer,
 ) {
-    if let Some(&Command::MoveTo { ref path, .. }) = commands.0.front() {
+    if let Some(path) = commands.0.front().and_then(|command| command.path()) {
         render_path(position.0, path, lines_3d_buffer);
     }
 }

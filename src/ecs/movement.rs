@@ -2,70 +2,25 @@ use super::*;
 use crate::pathfinding::Map;
 use crate::resources::DeltaTime;
 
+// Units try to get this much closer to enemies than their firing range.
+const FIRING_RANGE_FUDGE_FACTOR: f32 = 0.05;
+
 #[legion::system]
 pub fn reset_map_updated(#[resource] map: &mut Map) {
     map.updated_this_tick = false;
 }
 
 #[legion::system(for_each)]
-pub fn set_movement_paths(
-    position: &Position,
-    radius: &Radius,
-    command_queue: &mut CommandQueue,
-    mut movement_debugging: Option<&mut MovementDebugging>,
-    #[resource] map: &Map,
-) {
-    let mut pop_front = false;
-
-    if let Some(&mut Command::MoveTo {
-        target,
-        ref mut path,
-        ..
-    }) = command_queue.0.front_mut()
-    {
-        if path.is_empty() || map.updated_this_tick {
-            let (debug_triangles, debug_funnel_points) = match movement_debugging.as_mut() {
-                Some(movement_debugging) => (
-                    Some(&mut movement_debugging.triangles),
-                    Some(&mut movement_debugging.funnel_points),
-                ),
-                None => (None, None),
-            };
-
-            match map.pathfind(
-                position.0,
-                target,
-                radius.0,
-                debug_triangles,
-                debug_funnel_points,
-            ) {
-                Some(pathing) => {
-                    *path = pathing;
-
-                    if let Some(md) = movement_debugging {
-                        md.path_start = position.0;
-                        md.path_end = target;
-                    }
-                }
-                None => pop_front = true,
-            }
-        }
-    }
-
-    if pop_front {
-        command_queue.0.pop_front();
-    }
-}
-
-#[legion::system(for_each)]
 #[filter(component::<Position>())]
 #[read_component(Position)]
-pub fn set_move_to(
+pub fn set_movement_paths(
     entity: &Entity,
+    radius: &Radius,
     firing_range: &FiringRange,
-    commands: &mut CommandQueue,
-    buffer: &mut CommandBuffer,
+    command_queue: &mut CommandQueue,
+    mut movement_debugging: Option<&mut MovementDebugging>,
     world: &SubWorld,
+    #[resource] map: &Map,
 ) {
     // Grrrr.... In a `for_each` system, you can't pass in an `&T` and also have a query accessing
     // it, so we have to add `filter(component::<T>())` and do this.
@@ -73,48 +28,90 @@ pub fn set_move_to(
         .get(world, *entity)
         .expect("We've applied a filter to this system for Position");
 
-    // Units try to get this much closer to enemies than their firing range.
-    let fudge_factor = 0.05;
-
     let mut pop_front = false;
 
-    match commands.0.front_mut() {
-        Some(Command::MoveTo { ref mut path, .. }) => {
-            if path.is_empty() {
-                pop_front = true;
-            } else {
-                buffer.add_component(*entity, MoveTo(path[0]));
+    match command_queue.0.front_mut() {
+        Some(&mut Command::MoveTo {
+            target,
+            ref mut path,
+            ..
+        }) => {
+            if path.is_empty() || map.updated_this_tick {
+                let (debug_triangles, debug_funnel_points) = match movement_debugging.as_mut() {
+                    Some(movement_debugging) => (
+                        Some(&mut movement_debugging.triangles),
+                        Some(&mut movement_debugging.funnel_points),
+                    ),
+                    None => (None, None),
+                };
+
+                match map.pathfind(
+                    position.0,
+                    target,
+                    radius.0,
+                    debug_triangles,
+                    debug_funnel_points,
+                ) {
+                    Some(pathing) => {
+                        *path = pathing;
+
+                        if let Some(md) = movement_debugging {
+                            md.path_start = position.0;
+                            md.path_end = target;
+                        }
+                    }
+                    None => pop_front = true,
+                }
             }
         }
-        Some(Command::Attack {
+        Some(&mut Command::Attack {
             target,
-            first_out_of_range,
-            out_of_range,
+            ref mut state,
+            ref mut first_out_of_range,
             ..
         }) => {
             let target_pos = <&Position>::query()
-                .get(world, *target)
+                .get(world, target)
                 .expect("We've cancelled attack commands on dead entities");
 
             let vector = target_pos.0 - position.0;
 
-            *out_of_range = vector.mag_sq() > (firing_range.0 - fudge_factor).powi(2);
+            let out_of_range =
+                vector.mag_sq() > (firing_range.0 - FIRING_RANGE_FUDGE_FACTOR).powi(2);
 
-            // We check first_out_of_range here to make sure that units only chase when out of range
-            // once.
-            if *out_of_range && *first_out_of_range {
-                let mag = vector.mag();
-                let distance_to_go = mag - (firing_range.0 - fudge_factor);
-                let target = position.0 + vector.normalized() * distance_to_go;
-                buffer.add_component(*entity, MoveTo(target));
-            } else if *out_of_range && !*first_out_of_range {
-                // Remove the attack command so the unit can retarget.
+            if out_of_range && *first_out_of_range {
+                match map.pathfind(position.0, target_pos.0, radius.0, None, None) {
+                    Some(path) => *state = AttackState::OutOfRange { path },
+                    None => pop_front = true,
+                }
+            } else if out_of_range {
                 pop_front = true;
             } else {
+                *state = AttackState::InRange;
                 *first_out_of_range = false;
             }
         }
         None => {}
+    }
+    if pop_front {
+        command_queue.0.pop_front();
+    }
+}
+
+#[legion::system(for_each)]
+pub fn set_move_to(entity: &Entity, commands: &mut CommandQueue, buffer: &mut CommandBuffer) {
+    let mut pop_front = false;
+
+    if let Some(path) = commands
+        .0
+        .front_mut()
+        .and_then(|command| command.path_mut())
+    {
+        if path.is_empty() {
+            pop_front = true;
+        } else {
+            buffer.add_component(*entity, MoveTo(path[0]));
+        }
     }
 
     if pop_front {
@@ -143,7 +140,11 @@ pub fn move_units(
 
     if position.0 == move_to.0 {
         let mut remove_command = false;
-        if let Some(&mut Command::MoveTo { ref mut path, .. }) = commands.0.front_mut() {
+        if let Some(ref mut path) = commands
+            .0
+            .front_mut()
+            .and_then(|command| command.path_mut())
+        {
             path.remove(0);
             if path.is_empty() {
                 remove_command = true;
@@ -165,9 +166,11 @@ pub struct Avoidable;
 #[read_component(Position)]
 #[read_component(Radius)]
 pub fn avoidance(world: &SubWorld, command_buffer: &mut CommandBuffer) {
+    let command_buffer = std::sync::Mutex::new(command_buffer);
+
     <(Entity, &Position, &Radius)>::query()
         .filter(component::<Avoids>())
-        .for_each(world, |(entity, position, radius)| {
+        .par_for_each(world, |(entity, position, radius)| {
             let mut avoidance_direction = Vec2::new(0.0, 0.0);
             let mut count = 0;
 
@@ -189,7 +192,10 @@ pub fn avoidance(world: &SubWorld, command_buffer: &mut CommandBuffer) {
 
             if count > 0 {
                 avoidance_direction /= count as f32;
-                command_buffer.add_component(*entity, Avoidance(avoidance_direction));
+                command_buffer
+                    .lock()
+                    .unwrap()
+                    .add_component(*entity, Avoidance(avoidance_direction));
             }
         })
 }

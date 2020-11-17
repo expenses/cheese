@@ -199,16 +199,16 @@ impl Animation {
     ///
     /// Returns true if any nodes was updated.
     pub fn animate(&self, skin: &mut Skin, time: f32) {
-        let (translations, rotations, scale) = self.sample(time);
+        let (translations, rotations) = self.sample(time);
         translations.for_each(|(node_index, translation)| {
             skin.nodes.nodes_mut()[node_index].local_translation = translation;
         });
         rotations.for_each(|(node_index, rotation)| {
             skin.nodes.nodes_mut()[node_index].local_rotation = rotation;
         });
-        scale.for_each(|(node_index, scale)| {
+        /*scale.for_each(|(node_index, scale)| {
             skin.nodes.nodes_mut()[node_index].local_scale = scale;
-        });
+        });*/
 
         skin.update();
     }
@@ -219,16 +219,12 @@ impl Animation {
     ) -> (
         impl Iterator<Item = (usize, Vec3)> + '_,
         impl Iterator<Item = (usize, Quaternion<f32>)> + '_,
-        impl Iterator<Item = (usize, Vec3)> + '_,
     ) {
         (
             self.translation_channels
                 .iter()
                 .filter_map(move |tc| tc.sample(t)),
             self.rotation_channels
-                .iter()
-                .filter_map(move |tc| tc.sample(t)),
-            self.scale_channels
                 .iter()
                 .filter_map(move |tc| tc.sample(t)),
         )

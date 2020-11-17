@@ -118,7 +118,7 @@ async fn run() -> anyhow::Result<()> {
         );
     }
 
-    for i in 0..50 {
+    for i in 0..10 {
         ecs::Unit::MouseMarine.add_to_world(
             &mut world,
             Some(&assets),
