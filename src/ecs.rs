@@ -33,6 +33,14 @@ pub enum Side {
 pub struct Selected;
 pub struct Selectable;
 
+#[derive(Default)]
+pub struct MovementDebugging {
+    triangles: Vec<(Vec2, Vec2)>,
+    funnel_points: Vec<(Vec2, Vec2)>,
+    path_start: Vec2,
+    path_end: Vec2,
+}
+
 #[derive(Clone)]
 pub enum Command {
     MoveTo {
@@ -172,6 +180,8 @@ impl Unit {
             FiringRange(firing_range),
             MoveSpeed(move_speed),
             Radius(radius),
+            // Uncomment to debug movement.
+            // MovementDebugging::default(),
         ));
 
         if let Some(assets) = assets {

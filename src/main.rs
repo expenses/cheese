@@ -165,7 +165,9 @@ async fn run() -> anyhow::Result<()> {
         //.add_system(ecs::render_building_grid_system())
         .add_system(ecs::render_pathfinding_map_system())
         .add_system(ecs::render_unit_paths_system())
+        .add_system(ecs::render_debug_unit_pathfinding_system())
         .add_system(ecs::render_buildings_system())
+        //.add_system(ecs::debug_specific_path_system())
         // Cleanup
         .flush()
         .add_system(ecs::cleanup_controls_system())

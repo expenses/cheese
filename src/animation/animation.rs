@@ -2,7 +2,7 @@
 // https://github.com/adrien-ben/gltf-viewer-rs/blob/master/model/src/animation.rs
 
 use super::skin::Skin;
-use cgmath::{Quaternion, InnerSpace};
+use cgmath::{InnerSpace, Quaternion};
 use gltf::{
     animation::{
         iter::Channels,

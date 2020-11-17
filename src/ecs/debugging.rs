@@ -1,7 +1,8 @@
-use super::{Building, Command, CommandQueue, Position};
+use super::{Building, Command, CommandQueue, MovementDebugging, Position, Selected};
 use crate::pathfinding::Map;
 use crate::renderer::Lines3dBuffer;
 use crate::resources::{DebugControls, RayCastLocation};
+use legion::component;
 use legion::systems::CommandBuffer;
 use ultraviolet::{Vec2, Vec4};
 
@@ -46,8 +47,6 @@ pub fn render_building_grid(#[resource] lines_3d_buffer: &mut Lines3dBuffer) {
 #[legion::system]
 pub fn render_pathfinding_map(
     #[resource] map: &Map,
-    #[resource] debug_controls: &DebugControls,
-    #[resource] ray_cast_location: &RayCastLocation,
     #[resource] lines_3d_buffer: &mut Lines3dBuffer,
 ) {
     for (a, b, constraint) in map.edges() {
@@ -59,46 +58,54 @@ pub fn render_pathfinding_map(
 
         lines_3d_buffer.draw_line(a, b, 0.1, colour);
     }
+}
+
+// There is a bug in the pathfinding code that means that units go out to the edge of the map and
+// back in a very specific circumstance.
+#[legion::system]
+pub fn debug_specific_path(#[resource] map: &Map, #[resource] lines_3d_buffer: &mut Lines3dBuffer) {
+    let start = Vec2 {
+        x: -16.221794,
+        y: 4.150668,
+    };
+    let end = Vec2 {
+        x: -19.93689,
+        y: 15.350003,
+    };
 
     let mut debug_triangles = Vec::new();
-    //let mut debug_funnel_points = Vec::new();
-
+    let mut debug_funnel_portals = Vec::new();
     if let Some(path) = map.pathfind(
-        debug_controls.pathfinding_start,
-        ray_cast_location.0,
+        start,
+        end,
         1.0,
         Some(&mut debug_triangles),
-        None, // Some(&mut debug_funnel_points),
+        Some(&mut debug_funnel_portals),
     ) {
-        let mut prev = debug_controls.pathfinding_start;
+        render_path(start, &path, lines_3d_buffer);
+    }
+    render_triangles(&debug_triangles, lines_3d_buffer);
+    render_funnel_points(&debug_funnel_portals, lines_3d_buffer);
+}
 
-        for point in path {
-            lines_3d_buffer.draw_line(prev, point, 0.2, Vec4::new(0.0, 1.0, 0.0, 1.0));
-            prev = point;
+#[legion::system(for_each)]
+#[filter(component::<Selected>())]
+pub fn render_debug_unit_pathfinding(
+    commands: &CommandQueue,
+    movement_debugging: &MovementDebugging,
+    #[resource] lines_3d_buffer: &mut Lines3dBuffer,
+) {
+    if let Some(&Command::MoveTo { ref path, .. }) = commands.0.front() {
+        if path.len() > 1 {
+            render_triangles(&movement_debugging.triangles, lines_3d_buffer);
+            render_funnel_points(&movement_debugging.funnel_points, lines_3d_buffer);
+            // Print out the start and end points of the path. Useful for reproducing.
+            println!(
+                "{:?} -> {:?}",
+                movement_debugging.path_start, movement_debugging.path_end
+            );
         }
     }
-
-    let mut prev = None;
-    for (center, special) in debug_triangles {
-        if let Some((prev_center, prev_special)) = prev {
-            lines_3d_buffer.draw_line(prev_center, center, 0.3, Vec4::new(0.25, 0.25, 0.25, 1.0));
-            lines_3d_buffer.draw_line(prev_special, special, 1.5, Vec4::new(0.0, 0.0, 0.0, 1.0));
-        }
-        prev = Some((center, special));
-    }
-
-    /*
-    let mut prev = None;
-
-    for (left, right) in debug_funnel_points {
-        if let Some((prev_left, prev_right)) = prev {
-            lines_3d_buffer.draw_line(prev_left, left, 1.0, Vec4::new(1.0, 1.0, 0.0, 1.0));
-            lines_3d_buffer.draw_line(prev_right, right, 1.0, Vec4::new(0.0, 1.0, 1.0, 1.0));
-        }
-
-        prev = Some((left, right));
-    }
-    */
 }
 
 #[legion::system(for_each)]
@@ -108,11 +115,36 @@ pub fn render_unit_paths(
     #[resource] lines_3d_buffer: &mut Lines3dBuffer,
 ) {
     if let Some(&Command::MoveTo { ref path, .. }) = commands.0.front() {
-        let mut prev = position.0;
+        render_path(position.0, path, lines_3d_buffer);
+    }
+}
 
-        for point in path.iter() {
-            lines_3d_buffer.draw_line(prev, *point, 0.5, Vec4::new(1.0, 0.0, 1.0, 1.0));
-            prev = *point;
+fn render_triangles(triangles: &Vec<(Vec2, Vec2)>, lines_3d_buffer: &mut Lines3dBuffer) {
+    let mut prev = None;
+    for &(center, special) in triangles {
+        if let Some((prev_center, prev_special)) = prev {
+            lines_3d_buffer.draw_line(prev_center, center, 0.3, Vec4::new(0.25, 0.25, 0.25, 1.0));
+            lines_3d_buffer.draw_line(prev_special, special, 1.5, Vec4::new(0.0, 0.0, 0.0, 1.0));
         }
+        prev = Some((center, special));
+    }
+}
+
+fn render_funnel_points(funnel_points: &Vec<(Vec2, Vec2)>, lines_3d_buffer: &mut Lines3dBuffer) {
+    let mut prev = None;
+    for &(left, right) in funnel_points {
+        if let Some((prev_left, prev_right)) = prev {
+            lines_3d_buffer.draw_line(prev_left, left, 1.0, Vec4::new(1.0, 1.0, 0.0, 1.0));
+            lines_3d_buffer.draw_line(prev_right, right, 1.0, Vec4::new(0.0, 1.0, 1.0, 1.0));
+        }
+
+        prev = Some((left, right));
+    }
+}
+
+fn render_path(mut prev: Vec2, path: &Vec<Vec2>, lines_3d_buffer: &mut Lines3dBuffer) {
+    for &point in path {
+        lines_3d_buffer.draw_line(prev, point, 0.5, Vec4::new(1.0, 0.0, 1.0, 1.0));
+        prev = point;
     }
 }

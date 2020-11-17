@@ -12,6 +12,7 @@ pub fn set_movement_paths(
     position: &Position,
     radius: &Radius,
     command_queue: &mut CommandQueue,
+    mut movement_debugging: Option<&mut MovementDebugging>,
     #[resource] map: &Map,
 ) {
     let mut pop_front = false;
@@ -23,8 +24,29 @@ pub fn set_movement_paths(
     }) = command_queue.0.front_mut()
     {
         if path.is_empty() || map.updated_this_tick {
-            match map.pathfind(position.0, target, radius.0, None, None) {
-                Some(pathing) => *path = pathing,
+            let (debug_triangles, debug_funnel_points) = match movement_debugging.as_mut() {
+                Some(movement_debugging) => (
+                    Some(&mut movement_debugging.triangles),
+                    Some(&mut movement_debugging.funnel_points),
+                ),
+                None => (None, None),
+            };
+
+            match map.pathfind(
+                position.0,
+                target,
+                radius.0,
+                debug_triangles,
+                debug_funnel_points,
+            ) {
+                Some(pathing) => {
+                    *path = pathing;
+
+                    if let Some(md) = movement_debugging {
+                        md.path_start = position.0;
+                        md.path_end = target;
+                    }
+                }
                 None => pop_front = true,
             }
         }
@@ -92,7 +114,7 @@ pub fn set_move_to(
                 *first_out_of_range = false;
             }
         }
-        None => {},
+        None => {}
     }
 
     if pop_front {
