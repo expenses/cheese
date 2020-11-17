@@ -139,6 +139,9 @@ impl Map {
         // A better system would be to iterate over all paths and select the one with the shortest
         // funnel distance.
 
+        // Todo: look into rewriting the implementation based on
+        // http://ahamnett.blogspot.com/2012/10/funnel-algorithm.html
+
         let (triangles, _length) = pathfinding::directed::astar::astar(
             &start_tri,
             |&tri| tri.neighbours(self, unit_radius * 2.0, &end_tri),
