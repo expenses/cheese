@@ -1,4 +1,4 @@
-use super::{AnimationState, Command, CommandQueue, MouseAnimation};
+use super::{AnimationState, Building, Command, CommandQueue, MouseAnimation};
 use crate::animation::Skin;
 use crate::assets::Assets;
 use crate::resources::DeltaTime;
@@ -33,4 +33,24 @@ pub fn progress_animations(
     }
 
     assets.mouse_model.animations[animation_state.animation].animate(skin, animation_state.time);
+}
+
+#[legion::system(for_each)]
+pub fn progress_building_animations(
+    building: &Building,
+    skin: &mut Skin,
+    animation_state: &mut AnimationState,
+    #[resource] assets: &Assets,
+    #[resource] delta_time: &DeltaTime,
+) {
+    animation_state.time += delta_time.0;
+    animation_state.time %= animation_state.total_time;
+
+    match building {
+        Building::Pump => {
+            assets.pump_model.animations[animation_state.animation]
+                .animate(skin, animation_state.time);
+        }
+        Building::Armoury => {}
+    }
 }

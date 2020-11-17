@@ -283,12 +283,24 @@ pub fn render_command_paths(
 pub fn render_buildings(
     position: &Position,
     building: &Building,
+    skin: Option<&Skin>,
     #[resource] model_buffers: &mut ModelBuffers,
 ) {
-    model_buffers.armouries.push(ModelInstance {
+    let buffer = match building {
+        Building::Armoury => &mut model_buffers.armouries,
+        Building::Pump => &mut model_buffers.pumps,
+    };
+
+    buffer.push(ModelInstance {
         transform: Mat4::from_translation(Vec3::new(position.0.x, 0.0, position.0.y)),
         flat_colour: Vec4::new(1.0, 1.0, 1.0, 1.0),
-    })
+    });
+
+    if let Some(skin) = skin {
+        for joint in &skin.joints {
+            model_buffers.pump_joints.push(joint.matrix);
+        }
+    }
 }
 
 #[legion::system]

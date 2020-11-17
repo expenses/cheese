@@ -1,4 +1,5 @@
-use super::{Building, CommandQueue, MovementDebugging, Position, Selected, Side};
+use super::{AnimationState, Building, CommandQueue, MovementDebugging, Position, Selected, Side};
+use crate::assets::Assets;
 use crate::pathfinding::Map;
 use crate::renderer::Lines3dBuffer;
 use crate::resources::{DebugControls, RayCastLocation};
@@ -20,12 +21,31 @@ pub fn set_debug_pathfinding_start(
 pub fn spawn_debug_building(
     #[resource] debug_controls: &DebugControls,
     #[resource] ray_cast_location: &RayCastLocation,
+    #[resource] assets: &Assets,
     #[resource] map: &mut Map,
     command_buffer: &mut CommandBuffer,
 ) {
     if debug_controls.spawn_building_pressed {
-        if let Some(parts) = Building::Armoury.parts(ray_cast_location.0, Side::Purple, map) {
-            command_buffer.push(parts);
+        if let Some((pos, handle, building, radius, selectable, side, health)) =
+            Building::Pump.parts(ray_cast_location.0, Side::Purple, map)
+        {
+            let skin = assets.pump_model.skin.clone();
+            let animation_state = AnimationState {
+                animation: 0,
+                time: 0.0,
+                total_time: assets.pump_model.animations[0].total_time,
+            };
+            command_buffer.push((
+                pos,
+                handle,
+                building,
+                radius,
+                selectable,
+                side,
+                health,
+                skin,
+                animation_state,
+            ));
         }
     }
 }

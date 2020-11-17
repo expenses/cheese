@@ -221,3 +221,5 @@ pub enum Mode {
     Playing,
     Quit,
 }
+
+pub struct Gravity(pub f32);

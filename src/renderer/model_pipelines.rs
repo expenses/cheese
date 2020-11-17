@@ -368,10 +368,16 @@ pub struct ModelBuffers {
     pub mice: DynamicBuffer<ModelInstance>,
     pub mice_joints: DynamicBuffer<Mat4>,
     pub mice_joints_bind_group: wgpu::BindGroup,
+
+    pub pumps: DynamicBuffer<ModelInstance>,
+    pub pump_joints: DynamicBuffer<Mat4>,
+    pub pump_joints_bind_group: wgpu::BindGroup,
+
     pub bullets: DynamicBuffer<ModelInstance>,
     pub command_indicators: DynamicBuffer<ModelInstance>,
     pub command_paths: DynamicBuffer<ModelInstance>,
     pub armouries: DynamicBuffer<ModelInstance>,
+    pub cheese_droplets: DynamicBuffer<ModelInstance>,
 }
 
 impl ModelBuffers {
@@ -380,6 +386,13 @@ impl ModelBuffers {
             &context.device,
             400,
             "Cheese mice joints buffer",
+            wgpu::BufferUsage::STORAGE,
+        );
+
+        let pump_joints = DynamicBuffer::new(
+            &context.device,
+            20,
+            "Cheese pump joints buffer",
             wgpu::BufferUsage::STORAGE,
         );
 
@@ -397,6 +410,21 @@ impl ModelBuffers {
                 &assets.mouse_model,
             ),
             mice_joints,
+
+            pumps: DynamicBuffer::new(
+                &context.device,
+                10,
+                "Cheese pumps buffer",
+                wgpu::BufferUsage::VERTEX,
+            ),
+            pump_joints_bind_group: create_joint_bind_group(
+                context,
+                "Cheese pumps bind group",
+                &pump_joints,
+                &assets.pump_model,
+            ),
+            pump_joints,
+
             bullets: DynamicBuffer::new(
                 &context.device,
                 200,
@@ -417,8 +445,14 @@ impl ModelBuffers {
             ),
             armouries: DynamicBuffer::new(
                 &context.device,
-                1,
+                10,
                 "Cheese armoury buffer",
+                wgpu::BufferUsage::VERTEX,
+            ),
+            cheese_droplets: DynamicBuffer::new(
+                &context.device,
+                5000,
+                "Cheese cheese droplets buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
         }
@@ -430,7 +464,10 @@ impl ModelBuffers {
         self.command_indicators.upload(context);
         self.command_paths.upload(context);
         self.armouries.upload(context);
+        self.cheese_droplets.upload(context);
+        self.pumps.upload(context);
         let mice_resized = self.mice_joints.upload(context);
+        let pumps_resized = self.pump_joints.upload(context);
 
         // We need to recreate the bind group
         if mice_resized {
@@ -439,6 +476,15 @@ impl ModelBuffers {
                 "Cheese mice joints bind group",
                 &self.mice_joints,
                 &assets.mouse_model,
+            );
+        }
+
+        if pumps_resized {
+            self.pump_joints_bind_group = create_joint_bind_group(
+                context,
+                "Cheese pumps bind group",
+                &self.pump_joints,
+                &assets.pump_model,
             );
         }
     }

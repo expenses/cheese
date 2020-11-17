@@ -13,6 +13,8 @@ pub struct Assets {
     pub armoury_model: Model,
     pub cheese_moon_model: Model,
     pub billboard_model: Model,
+    pub cheese_droplet_model: Model,
+    pub pump_model: AnimatedModel,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
@@ -20,6 +22,7 @@ pub struct Assets {
     pub mouse_texture: wgpu::BindGroup,
     pub misc_texture: wgpu::BindGroup,
     pub armoury_texture: wgpu::BindGroup,
+    pub pump_texture: wgpu::BindGroup,
 }
 
 impl Assets {
@@ -94,6 +97,17 @@ impl Assets {
                 "Cheese billboard model",
                 device,
             )?,
+            cheese_droplet_model: Model::load_gltf(
+                include_bytes!("../models/cheese_droplet.gltf"),
+                "Cheese cheese droplet model",
+                device,
+            )?,
+            pump_model: AnimatedModel::load_gltf(
+                include_bytes!("../models/pump.gltf"),
+                "Cheese pump model",
+                device,
+            )?,
+
             surface_texture: load_texture(
                 include_bytes!("../textures/surface.png"),
                 "Cheese surface texture",
@@ -118,6 +132,13 @@ impl Assets {
             armoury_texture: load_texture(
                 include_bytes!("../textures/armoury.png"),
                 "Cheese armoury texture",
+                &texture_bind_group_layout,
+                device,
+                &mut init_encoder,
+            )?,
+            pump_texture: load_texture(
+                include_bytes!("../textures/pump.png"),
+                "Cheese pump texture",
                 &texture_bind_group_layout,
                 device,
                 &mut init_encoder,
@@ -307,6 +328,8 @@ impl AnimatedModel {
                 let joints = reader.read_joints(0).unwrap().into_u16();
                 let weights = reader.read_weights(0).unwrap().into_f32();
 
+                let num_vertices = vertices.len() as u32;
+
                 positions
                     .zip(tex_coordinates)
                     .zip(normals)
@@ -322,7 +345,13 @@ impl AnimatedModel {
                         });
                     });
 
-                indices.extend(reader.read_indices().unwrap().into_u32());
+                indices.extend(
+                    reader
+                        .read_indices()
+                        .unwrap()
+                        .into_u32()
+                        .map(|i| i + num_vertices),
+                );
             }
         }
 

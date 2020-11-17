@@ -13,10 +13,11 @@ use crate::renderer::{
 };
 use crate::resources::{
     Camera, CameraControls, CommandMode, ControlGroups, CursorIcon, DebugControls, DeltaTime,
-    DpiScaling, Mode, MouseState, PlayerSide, RayCastLocation, RtsControls, ScreenDimensions,
+    DpiScaling, Gravity, Mode, MouseState, PlayerSide, RayCastLocation, RtsControls,
+    ScreenDimensions,
 };
 use legion::*;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use ultraviolet::Vec2;
 use winit::{
     dpi::PhysicalPosition,
@@ -49,7 +50,11 @@ fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(ecs::set_movement_paths_system())
         .add_system(ecs::reduce_cooldowns_system())
         .add_system(ecs::set_debug_pathfinding_start_system())
+        // Cheese droplets.
+        .add_system(ecs::spawn_cheese_droplets_system())
         .flush()
+        .add_system(ecs::apply_gravity_system())
+        .add_system(ecs::move_cheese_droplets_system())
         .add_system(ecs::move_units_system())
         .add_system(ecs::move_bullets_system())
         .add_system(ecs::apply_steering_system())
@@ -99,6 +104,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(titlescreen::TitlescreenMoon::default());
     resources.insert(Mode::Playing);
     resources.insert(DebugControls::default());
+    resources.insert(Gravity(5.0));
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
@@ -134,23 +140,42 @@ async fn run() -> anyhow::Result<()> {
             Vec2::new(-20.0, 10.0),
             ecs::Side::Green,
             &mut world,
+            &assets,
             &mut map,
         )
         .unwrap();
-    ecs::Building::Armoury
+    ecs::Building::Pump
         .add_to_world(
             Vec2::new(-30.0, 40.0),
             ecs::Side::Green,
             &mut world,
+            &assets,
             &mut map,
         )
         .unwrap();
-    ecs::Building::Armoury
-        .add_to_world(Vec2::new(0.0, 50.0), ecs::Side::Green, &mut world, &mut map)
+    ecs::Building::Pump
+        .add_to_world(
+            Vec2::new(0.0, 50.0),
+            ecs::Side::Green,
+            &mut world,
+            &assets,
+            &mut map,
+        )
         .unwrap();
+
+    for _ in 0..10 {
+        world.push((
+            ecs::Position(Vec2::new(
+                rng.gen_range(-100.0, 100.0),
+                rng.gen_range(-100.0, 100.0),
+            )),
+            ecs::CheeseGuyser,
+        ));
+    }
 
     resources.insert(assets);
     resources.insert(map);
+    resources.insert(rng);
 
     let mut titlescreen_schedule = titlescreen::titlescreen_schedule();
 
@@ -159,6 +184,7 @@ async fn run() -> anyhow::Result<()> {
 
     let mut schedule = builder
         .add_system(ecs::progress_animations_system())
+        .add_system(ecs::progress_building_animations_system())
         // Rendering
         .add_system(ecs::render_bullets_system())
         .add_system(ecs::render_units_system())
@@ -171,10 +197,11 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::render_health_bars_system())
         .add_system(ecs::render_unit_under_cursor_system())
         //.add_system(ecs::render_building_grid_system())
-        .add_system(ecs::render_pathfinding_map_system())
+        //.add_system(ecs::render_pathfinding_map_system())
         .add_system(ecs::render_unit_paths_system())
         .add_system(ecs::render_debug_unit_pathfinding_system())
         .add_system(ecs::render_buildings_system())
+        .add_system(ecs::render_cheese_droplets_system())
         //.add_system(ecs::debug_specific_path_system())
         // Cleanup
         .flush()
@@ -414,6 +441,19 @@ fn render_playing<'a>(
     );
     model_pipelines.render_animated(
         &mut render_pass,
+        &model_buffers.pumps,
+        &assets.pump_texture,
+        &assets.pump_model,
+        &model_buffers.pump_joints_bind_group,
+    );
+    model_pipelines.render_instanced(
+        &mut render_pass,
+        &model_buffers.cheese_droplets,
+        &assets.surface_texture,
+        &assets.cheese_droplet_model,
+    );
+    model_pipelines.render_animated(
+        &mut render_pass,
         &model_buffers.mice,
         &assets.mouse_texture,
         &assets.mouse_model,
@@ -466,7 +506,7 @@ fn handle_key(
     debug_controls: &mut DebugControls,
     control_flow: &mut ControlFlow,
 ) {
-    log::debug!("{:?} (scancode: {}) pressed: {}", code, scancode, pressed);
+    log::trace!("{:?} (scancode: {}) pressed: {}", code, scancode, pressed);
 
     if let Some(code) = code {
         match code {

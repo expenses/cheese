@@ -13,14 +13,18 @@ mod animation;
 mod combat;
 mod controls;
 mod debugging;
+mod effects;
 mod movement;
 mod rendering;
 pub use animation::*;
 pub use combat::*;
 pub use controls::*;
 pub use debugging::*;
+pub use effects::*;
 pub use movement::*;
 pub use rendering::*;
+
+pub struct CheeseGuyser;
 
 #[derive(Debug)]
 pub struct Position(pub Vec2);
@@ -141,6 +145,7 @@ pub struct FiringCooldown(pub u8);
 #[derive(Copy, Clone)]
 pub enum Building {
     Armoury,
+    Pump,
 }
 
 struct BuildingStats {
@@ -156,6 +161,11 @@ impl Building {
                 radius: 6.0,
                 dimensions: Vec2::new(6.0, 10.0),
                 max_health: 500,
+            },
+            Self::Pump => BuildingStats {
+                radius: 3.0,
+                dimensions: Vec2::new(4.0, 4.0),
+                max_health: 200,
             },
         }
     }
@@ -190,10 +200,24 @@ impl Building {
         position: Vec2,
         side: Side,
         world: &mut World,
+        assets: &Assets,
         map: &mut Map,
     ) -> Option<Entity> {
         let parts = self.parts(position, side, map)?;
-        Some(world.push(parts))
+        let entity = world.push(parts);
+
+        if let Building::Pump = self {
+            let mut entry = world.entry(entity).unwrap();
+
+            entry.add_component(assets.pump_model.skin.clone());
+            entry.add_component(AnimationState {
+                animation: 0,
+                time: 0.0,
+                total_time: assets.pump_model.animations[0].total_time,
+            });
+        }
+
+        Some(entity)
     }
 }
 
@@ -342,3 +366,6 @@ impl SelectBox {
 fn vec2_to_ncollide_point(point: Vec2) -> ncollide3d::math::Point<f32> {
     ncollide3d::math::Point::new(point.x, 0.0, point.y)
 }
+
+pub struct CheeseDropletPosition(Vec3);
+pub struct CheeseDropletVelocity(Vec3);
