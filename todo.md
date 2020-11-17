@@ -1,7 +1,6 @@
 - Resources
 - Cheese wells on map
-- Buildings
-- A kind of internal selection group system for things like moving units as a group
+- Units should not try to move to the sample spot, but the path locations should be spread out.
 - AI
 - Fill out HUD (medium)
 - Pyschic units
