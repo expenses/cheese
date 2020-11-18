@@ -5,7 +5,7 @@ layout(location = 1) in vec4 flat_colour;
 
 layout(location = 0) out vec4 colour;
 
-layout(set = 0, binding = 2) uniform sampler u_sampler;
+layout(set = 0, binding = 3) uniform sampler u_sampler;
 layout(set = 1, binding = 0) uniform texture2D u_texture;
 
 void main() {

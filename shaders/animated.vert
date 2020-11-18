@@ -11,6 +11,7 @@ layout(location = 6) in mat4 transform;
 
 layout(location = 0) out vec2 out_uv;
 layout(location = 1) out vec4 out_flat_colour;
+layout(location = 2) out float out_brightness;
 
 layout(set = 0, binding = 0) uniform Perspective {
     mat4 perspective;
@@ -18,6 +19,10 @@ layout(set = 0, binding = 0) uniform Perspective {
 
 layout(set = 0, binding = 1) uniform View {
     mat4 view;
+};
+
+layout(set = 0, binding = 2) uniform Sun {
+    vec3 sun_direction;
 };
 
 layout(set = 2, binding = 0) readonly buffer Joints {
@@ -41,6 +46,11 @@ void main() {
 		joint_weights.z * joints[int(joint_indices.z) + joint_offset] +
 		joint_weights.w * joints[int(joint_indices.w) + joint_offset];
 
-    mat4 modelview = view * transform;
-    gl_Position = perspective * modelview * skin * vec4(position, 1.0);
+    mat4 model_transform = transform * skin;
+
+    vec3 transformed_normal = mat3(transpose(inverse(model_transform))) * normal;
+
+    out_brightness = max(0.0, dot(normalize(transformed_normal), normalize(sun_direction)));
+
+    gl_Position = perspective * view * model_transform * vec4(position, 1.0);
 }
