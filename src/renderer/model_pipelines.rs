@@ -1,6 +1,6 @@
 use super::{
-    alpha_blend_state, draw_model, AnimatedVertex, DynamicBuffer, RenderContext, StaticBuffer,
-    Vertex, DEPTH_FORMAT, DISPLAY_FORMAT,
+    colour_state_descriptor, draw_model, AnimatedVertex, DynamicBuffer, RenderContext,
+    StaticBuffer, Vertex, DEPTH_FORMAT,
 };
 use crate::assets::{AnimatedModel, Assets, Model};
 use std::sync::Arc;
@@ -349,19 +349,6 @@ fn create_animated_pipeline(
 		sample_mask: !0,
 		alpha_to_coverage_enabled: false,
 	})
-}
-
-fn colour_state_descriptor(alpha_blend: bool) -> wgpu::ColorStateDescriptor {
-    if alpha_blend {
-        alpha_blend_state()
-    } else {
-        wgpu::ColorStateDescriptor {
-            format: DISPLAY_FORMAT,
-            color_blend: wgpu::BlendDescriptor::REPLACE,
-            alpha_blend: wgpu::BlendDescriptor::REPLACE,
-            write_mask: wgpu::ColorWrite::ALL,
-        }
-    }
 }
 
 pub struct ModelBuffers {

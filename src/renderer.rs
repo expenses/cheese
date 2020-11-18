@@ -32,6 +32,12 @@ pub struct RenderContext {
     surface: wgpu::Surface,
     swap_chain_desc: wgpu::SwapChainDescriptor,
     pub depth_texture: wgpu::TextureView,
+
+    framebuffer_bind_group_layout: wgpu::BindGroupLayout,
+    pub framebuffer_bind_group: wgpu::BindGroup,
+    pub framebuffer: wgpu::TextureView,
+    pub post_processing_pipeline: wgpu::RenderPipeline,
+
     sampler: wgpu::Sampler,
 
     perspective_buffer: wgpu::Buffer,
@@ -188,6 +194,76 @@ impl RenderContext {
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
         let depth_texture = create_depth_texture(&device, window_size.width, window_size.height);
 
+        let framebuffer_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Cheese framebuffer bind group layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStage::FRAGMENT,
+                        ty: wgpu::BindingType::SampledTexture {
+                            multisampled: false,
+                            dimension: wgpu::TextureViewDimension::D2,
+                            component_type: wgpu::TextureComponentType::Float,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStage::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler { comparison: false },
+                        count: None,
+                    },
+                ],
+            });
+
+        let post_processing_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Cheese post-processing pipeline layout"),
+                bind_group_layouts: &[&framebuffer_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let vs_post_processing =
+            wgpu::include_spirv!("../shaders/compiled/post_processing.vert.spv");
+        let vs_post_processing_module = device.create_shader_module(vs_post_processing);
+        let fs_post_processing =
+            wgpu::include_spirv!("../shaders/compiled/post_processing.frag.spv");
+        let fs_post_processing_module = device.create_shader_module(fs_post_processing);
+
+        let post_processing_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Cheese post-processing pipeline"),
+                layout: Some(&post_processing_pipeline_layout),
+                vertex_stage: wgpu::ProgrammableStageDescriptor {
+                    module: &vs_post_processing_module,
+                    entry_point: "main",
+                },
+                fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+                    module: &fs_post_processing_module,
+                    entry_point: "main",
+                }),
+                rasterization_state: Some(wgpu::RasterizationStateDescriptor::default()),
+                primitive_topology: wgpu::PrimitiveTopology::TriangleList,
+                color_states: &[colour_state_descriptor(false)],
+                depth_stencil_state: None,
+                vertex_state: wgpu::VertexStateDescriptor {
+                    index_format: wgpu::IndexFormat::Uint32,
+                    vertex_buffers: &[],
+                },
+                sample_count: 1,
+                sample_mask: !0,
+                alpha_to_coverage_enabled: false,
+            });
+
+        let (framebuffer, framebuffer_bind_group) = create_framebuffer(
+            &device,
+            &framebuffer_bind_group_layout,
+            &sampler,
+            window_size.width,
+            window_size.height,
+        );
+
         let joint_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Cheese joint bind group layout"),
@@ -234,6 +310,10 @@ impl RenderContext {
             joint_bind_group_layout,
             main_bind_group: Arc::new(main_bind_group),
             fs_transparent_module,
+            framebuffer,
+            framebuffer_bind_group,
+            framebuffer_bind_group_layout,
+            post_processing_pipeline,
         })
     }
 
@@ -252,6 +332,15 @@ impl RenderContext {
             .device
             .create_swap_chain(&self.surface, &self.swap_chain_desc);
         self.depth_texture = create_depth_texture(&self.device, width, height);
+        let (framebuffer, framebuffer_bind_group) = create_framebuffer(
+            &self.device,
+            &self.framebuffer_bind_group_layout,
+            &self.sampler,
+            width,
+            height,
+        );
+        self.framebuffer = framebuffer;
+        self.framebuffer_bind_group = framebuffer_bind_group;
 
         self.queue.write_buffer(
             &self.perspective_buffer,
@@ -291,6 +380,47 @@ pub fn create_perspective_mat4(window_width: u32, window_height: u32) -> Mat4 {
     )
 }
 
+fn create_framebuffer(
+    device: &wgpu::Device,
+    bind_group_layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    width: u32,
+    height: u32,
+) -> (wgpu::TextureView, wgpu::BindGroup) {
+    let framebuffer = device
+        .create_texture(&wgpu::TextureDescriptor {
+            label: Some("Cheese framebuffer texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: DISPLAY_FORMAT,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        })
+        .create_view(&wgpu::TextureViewDescriptor::default());
+
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Cheese framebuffer bind group"),
+        layout: bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&framebuffer),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ],
+    });
+
+    (framebuffer, bind_group)
+}
+
 fn create_depth_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
     device
         .create_texture(&wgpu::TextureDescriptor {
@@ -309,20 +439,29 @@ fn create_depth_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu:
         .create_view(&wgpu::TextureViewDescriptor::default())
 }
 
-fn alpha_blend_state() -> wgpu::ColorStateDescriptor {
-    wgpu::ColorStateDescriptor {
-        format: DISPLAY_FORMAT,
-        color_blend: wgpu::BlendDescriptor {
-            src_factor: wgpu::BlendFactor::SrcAlpha,
-            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-            operation: wgpu::BlendOperation::Add,
-        },
-        alpha_blend: wgpu::BlendDescriptor {
-            src_factor: wgpu::BlendFactor::SrcAlpha,
-            dst_factor: wgpu::BlendFactor::DstAlpha,
-            operation: wgpu::BlendOperation::Max,
-        },
-        write_mask: wgpu::ColorWrite::ALL,
+fn colour_state_descriptor(alpha_blend: bool) -> wgpu::ColorStateDescriptor {
+    if alpha_blend {
+        wgpu::ColorStateDescriptor {
+            format: DISPLAY_FORMAT,
+            color_blend: wgpu::BlendDescriptor {
+                src_factor: wgpu::BlendFactor::SrcAlpha,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
+            },
+            alpha_blend: wgpu::BlendDescriptor {
+                src_factor: wgpu::BlendFactor::SrcAlpha,
+                dst_factor: wgpu::BlendFactor::DstAlpha,
+                operation: wgpu::BlendOperation::Max,
+            },
+            write_mask: wgpu::ColorWrite::ALL,
+        }
+    } else {
+        wgpu::ColorStateDescriptor {
+            format: DISPLAY_FORMAT,
+            color_blend: wgpu::BlendDescriptor::REPLACE,
+            alpha_blend: wgpu::BlendDescriptor::REPLACE,
+            write_mask: wgpu::ColorWrite::ALL,
+        }
     }
 }
 

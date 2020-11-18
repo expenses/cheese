@@ -1,4 +1,4 @@
-use super::{alpha_blend_state, DynamicBuffer, RenderContext, DEPTH_FORMAT};
+use super::{colour_state_descriptor, DynamicBuffer, RenderContext, DEPTH_FORMAT};
 use std::sync::Arc;
 use ultraviolet::{Vec2, Vec3, Vec4};
 
@@ -42,7 +42,7 @@ impl Lines3dPipeline {
                     ..Default::default()
                 }),
                 primitive_topology: wgpu::PrimitiveTopology::LineList,
-                color_states: &[alpha_blend_state()],
+                color_states: &[colour_state_descriptor(true)],
                 depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
                     format: DEPTH_FORMAT,
                     depth_write_enabled: true,

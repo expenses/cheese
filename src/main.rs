@@ -331,7 +331,7 @@ async fn run() -> anyhow::Result<()> {
                     // This is super messy and should be abstracted.
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: &frame.output.view,
+                            attachment: &render_context.framebuffer,
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -401,13 +401,36 @@ async fn run() -> anyhow::Result<()> {
                             &render_context.device,
                             &mut staging_belt,
                             &mut encoder,
-                            &frame.output.view,
+                            &render_context.framebuffer,
                             size.width,
                             size.height,
                         )
                         .unwrap();
 
                     staging_belt.finish();
+
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                            attachment: &frame.output.view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color {
+                                    r: 0.0,
+                                    g: 0.0,
+                                    b: 0.0,
+                                    a: 1.0,
+                                }),
+                                store: true,
+                            },
+                        }],
+                        depth_stencil_attachment: None,
+                    });
+
+                    render_pass.set_pipeline(&render_context.post_processing_pipeline);
+                    render_pass.set_bind_group(0, &render_context.framebuffer_bind_group, &[]);
+                    render_pass.draw(0..3, 0..1);
+
+                    drop(render_pass);
 
                     // Do I need to do this?
                     // staging_belt.recall();
