@@ -4,7 +4,6 @@ use ultraviolet::{Vec2, Vec3};
 use wgpu::util::DeviceExt;
 
 pub struct LinesPipeline {
-    uniforms_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
     hud_buffer: wgpu::Buffer,
@@ -41,15 +40,6 @@ impl LinesPipeline {
                     ],
                 });
 
-        let uniforms_buffer =
-            context
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Cheese line uniforms buffer"),
-                    contents: bytemuck::bytes_of(&Uniforms::new(width, height)),
-                    usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-                });
-
         let bind_group = context
             .device
             .create_bind_group(&wgpu::BindGroupDescriptor {
@@ -58,7 +48,7 @@ impl LinesPipeline {
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: wgpu::BindingResource::Buffer(uniforms_buffer.slice(..)),
+                        resource: wgpu::BindingResource::Buffer(context.screen_dimension_uniform_buffer.slice(..)),
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
@@ -124,7 +114,6 @@ impl LinesPipeline {
             });
 
         Self {
-            uniforms_buffer,
             bind_group,
             pipeline,
             hud_buffer,
@@ -132,11 +121,6 @@ impl LinesPipeline {
     }
 
     pub fn resize(&self, context: &RenderContext, width: u32, height: u32) {
-        context.queue.write_buffer(
-            &self.uniforms_buffer,
-            0,
-            bytemuck::bytes_of(&Uniforms::new(width, height)),
-        );
         context.queue.write_buffer(
             &self.hud_buffer,
             0,
@@ -281,20 +265,6 @@ impl LineBuffers {
                 Some((vertices_slice, indices_slice, num_indices))
             }
             _ => None,
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
-struct Uniforms {
-    screen_dimensions: Vec2,
-}
-
-impl Uniforms {
-    fn new(width: u32, height: u32) -> Self {
-        Self {
-            screen_dimensions: Vec2::new(width as f32, height as f32),
         }
     }
 }

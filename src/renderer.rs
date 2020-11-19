@@ -37,6 +37,8 @@ pub struct RenderContext {
     framebuffer_bind_group_layout: wgpu::BindGroupLayout,
     pub framebuffer_bind_group: wgpu::BindGroup,
     pub framebuffer: wgpu::TextureView,
+    pub framebuffer_sampler: wgpu::Sampler,
+    pub screen_dimension_uniform_buffer: wgpu::Buffer,
     pub post_processing_pipeline: wgpu::RenderPipeline,
 
     sampler: wgpu::Sampler,
@@ -126,7 +128,12 @@ impl RenderContext {
             min_filter: wgpu::FilterMode::Nearest,
             address_mode_u: wgpu::AddressMode::Repeat,
             address_mode_v: wgpu::AddressMode::Repeat,
-            label: Some("Cheese Sampler"),
+            label: Some("Cheese sampler"),
+            ..Default::default()
+        });
+
+        let framebuffer_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Cheese framebuffer sampler"),
             ..Default::default()
         });
 
@@ -157,6 +164,12 @@ impl RenderContext {
             label: Some("Cheese sun buffer"),
             contents: &bytemuck::bytes_of(&SUN_DIRECTION),
             usage: wgpu::BufferUsage::UNIFORM,
+        });
+
+        let screen_dimension_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Cheese screen dimension uniform buffer"),
+            contents: &bytemuck::bytes_of(&ScreenDimensionUniform::new(window_size.width, window_size.height)),
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         });
 
         let main_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -260,7 +273,7 @@ impl RenderContext {
         let (framebuffer, framebuffer_bind_group) = create_framebuffer(
             &device,
             &framebuffer_bind_group_layout,
-            &sampler,
+            &framebuffer_sampler,
             window_size.width,
             window_size.height,
         );
@@ -314,7 +327,9 @@ impl RenderContext {
             framebuffer,
             framebuffer_bind_group,
             framebuffer_bind_group_layout,
+            framebuffer_sampler,
             post_processing_pipeline,
+            screen_dimension_uniform_buffer,
         })
     }
 
@@ -336,12 +351,18 @@ impl RenderContext {
         let (framebuffer, framebuffer_bind_group) = create_framebuffer(
             &self.device,
             &self.framebuffer_bind_group_layout,
-            &self.sampler,
+            &self.framebuffer_sampler,
             width,
             height,
         );
         self.framebuffer = framebuffer;
         self.framebuffer_bind_group = framebuffer_bind_group;
+
+        self.queue.write_buffer(
+            &self.screen_dimension_uniform_buffer,
+            0,
+            bytemuck::bytes_of(&ScreenDimensionUniform::new(width, height)),
+        );
 
         self.queue.write_buffer(
             &self.perspective_buffer,
@@ -377,7 +398,7 @@ pub fn create_perspective_mat4(window_width: u32, window_height: u32) -> Mat4 {
         45.0,
         window_width as f32 / window_height as f32,
         0.1,
-        1000.0,
+        250.0,
     )
 }
 
@@ -465,6 +486,21 @@ fn colour_state_descriptor(alpha_blend: bool) -> wgpu::ColorStateDescriptor {
         }
     }
 }
+
+#[repr(C)]
+#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
+struct ScreenDimensionUniform {
+    screen_dimensions: Vec2,
+}
+
+impl ScreenDimensionUniform {
+    pub fn new(width: u32, height: u32) -> Self {
+        Self {
+            screen_dimensions: Vec2::new(width as f32, height as f32),
+        }
+    }
+}
+
 
 pub struct StaticBuffer<T: bytemuck::Pod> {
     buffer: wgpu::Buffer,
