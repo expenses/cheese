@@ -15,6 +15,7 @@ pub struct Assets {
     pub billboard_model: Model,
     pub cheese_droplet_model: Model,
     pub pump_model: AnimatedModel,
+    pub pump_static_model: Model,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
@@ -105,6 +106,11 @@ impl Assets {
             pump_model: AnimatedModel::load_gltf(
                 include_bytes!("../models/pump.gltf"),
                 "Cheese pump model",
+                device,
+            )?,
+            pump_static_model: Model::load_gltf(
+                include_bytes!("../models/pump.gltf"),
+                "Cheese static pump model",
                 device,
             )?,
 
@@ -245,6 +251,16 @@ impl Model {
                 let tex_coordinates = reader.read_tex_coords(0).unwrap().into_f32();
                 let normals = reader.read_normals().unwrap();
 
+                let num_vertices = vertices.len() as u32;
+
+                indices.extend(
+                    reader
+                        .read_indices()
+                        .unwrap()
+                        .into_u32()
+                        .map(|i| i + num_vertices),
+                );
+
                 positions
                     .zip(tex_coordinates)
                     .zip(normals)
@@ -255,8 +271,6 @@ impl Model {
                             uv: uv.into(),
                         });
                     });
-
-                indices.extend(reader.read_indices().unwrap().into_u32());
             }
         }
 
@@ -330,6 +344,14 @@ impl AnimatedModel {
 
                 let num_vertices = vertices.len() as u32;
 
+                indices.extend(
+                    reader
+                        .read_indices()
+                        .unwrap()
+                        .into_u32()
+                        .map(|i| i + num_vertices),
+                );
+
                 positions
                     .zip(tex_coordinates)
                     .zip(normals)
@@ -344,14 +366,6 @@ impl AnimatedModel {
                             joint_weights: w.into(),
                         });
                     });
-
-                indices.extend(
-                    reader
-                        .read_indices()
-                        .unwrap()
-                        .into_u32()
-                        .map(|i| i + num_vertices),
-                );
             }
         }
 

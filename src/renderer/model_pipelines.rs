@@ -98,10 +98,7 @@ impl ModelPipelines {
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Cheese identity instance buffer"),
-                    contents: bytemuck::bytes_of(&ModelInstance {
-                        transform: Mat4::identity(),
-                        flat_colour: Vec4::one(),
-                    }),
+                    contents: bytemuck::bytes_of(&ModelInstance::default()),
                     usage: wgpu::BufferUsage::VERTEX,
                 });
 
@@ -351,6 +348,27 @@ fn create_animated_pipeline(
 	})
 }
 
+pub struct BuildingPlan {
+    building: Option<crate::ecs::Building>,
+    buffer: StaticBuffer<ModelInstance>,
+}
+
+impl BuildingPlan {
+    pub fn set(&mut self, building: crate::ecs::Building, instance: ModelInstance) {
+        self.building = Some(building);
+        self.buffer.write(instance);
+    }
+
+    fn upload(&mut self, context: &RenderContext) {
+        self.buffer.upload(context);
+    }
+
+    pub fn get(&self) -> Option<(crate::ecs::Building, &wgpu::Buffer)> {
+        self.building
+            .map(|building| (building, &self.buffer.buffer))
+    }
+}
+
 pub struct ModelBuffers {
     pub mice: DynamicBuffer<ModelInstance>,
     pub mice_joints: DynamicBuffer<Mat4>,
@@ -365,6 +383,8 @@ pub struct ModelBuffers {
     pub command_paths: DynamicBuffer<ModelInstance>,
     pub armouries: DynamicBuffer<ModelInstance>,
     pub cheese_droplets: DynamicBuffer<ModelInstance>,
+
+    pub building_plan: BuildingPlan,
 }
 
 impl ModelBuffers {
@@ -442,6 +462,15 @@ impl ModelBuffers {
                 "Cheese cheese droplets buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
+            building_plan: BuildingPlan {
+                building: None,
+                buffer: StaticBuffer::new(
+                    &context.device,
+                    ModelInstance::default(),
+                    "Cheese building plan buffer",
+                    wgpu::BufferUsage::VERTEX,
+                ),
+            },
         }
     }
 
@@ -453,6 +482,7 @@ impl ModelBuffers {
         self.armouries.upload(context);
         self.cheese_droplets.upload(context);
         self.pumps.upload(context);
+        self.building_plan.upload(context);
         let mice_resized = self.mice_joints.upload(context);
         let pumps_resized = self.pump_joints.upload(context);
 
@@ -540,4 +570,13 @@ fn create_joint_bind_group(
 pub struct ModelInstance {
     pub flat_colour: Vec4,
     pub transform: Mat4,
+}
+
+impl Default for ModelInstance {
+    fn default() -> Self {
+        Self {
+            transform: Mat4::identity(),
+            flat_colour: Vec4::one(),
+        }
+    }
 }

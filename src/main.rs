@@ -201,6 +201,7 @@ async fn run() -> anyhow::Result<()> {
         .add_system(ecs::render_unit_paths_system())
         .add_system(ecs::render_debug_unit_pathfinding_system())
         .add_system(ecs::render_buildings_system())
+        .add_system(ecs::render_building_plan_system())
         .add_system(ecs::render_cheese_droplets_system())
         //.add_system(ecs::debug_specific_path_system())
         // Cleanup
@@ -514,6 +515,18 @@ fn render_playing<'a>(
         &assets.mouse_helmet_model,
         &model_buffers.mice_joints_bind_group,
     );
+
+    if let Some((building, buffer)) = model_buffers.building_plan.get() {
+        model_pipelines.render_transparent_buffer(
+            &mut render_pass,
+            match building {
+                ecs::Building::Pump => &assets.pump_static_model,
+                ecs::Building::Armoury => &assets.armoury_model,
+            },
+            buffer,
+            1,
+        );
+    }
 
     // Render 2D items.
     lines_pipeline.render(&mut render_pass, &line_buffers);

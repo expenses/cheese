@@ -9,6 +9,5 @@ layout(set = 0, binding = 1) uniform sampler u_sampler;
 
 void main() {
     vec4 sampled = texture(sampler2D(u_texture, u_sampler), uv);
-    float dist = length(uv - 0.5);
-    colour = vec4((1.0 - dist) * sampled.xyz, 1.0);
+    colour = vec4(sampled.rgb, 1.0);
 }

@@ -14,6 +14,24 @@ fn mix(colour_a: Vec3, colour_b: Vec3, factor: f32) -> Vec3 {
     colour_a * (1.0 - factor) + colour_b * factor
 }
 
+#[legion::system]
+pub fn render_building_plan(
+    #[resource] ray_cast_location: &RayCastLocation,
+    #[resource] model_buffers: &mut ModelBuffers,
+) {
+    model_buffers.building_plan.set(
+        Building::Pump,
+        ModelInstance {
+            transform: Mat4::from_translation(Vec3::new(
+                ray_cast_location.0.x,
+                0.0,
+                ray_cast_location.0.y,
+            )),
+            flat_colour: Vec4::new(0.0, 1.0, 0.0, 0.25),
+        },
+    );
+}
+
 #[legion::system(for_each)]
 #[filter(component::<Unit>())]
 pub fn render_units(
