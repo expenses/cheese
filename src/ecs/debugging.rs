@@ -1,11 +1,34 @@
-use super::{AnimationState, Building, CommandQueue, MovementDebugging, Position, Selected, Side};
+use super::{
+    AnimationState, Building, CommandQueue, FiringRange, MovementDebugging, Position, Selected,
+    Side,
+};
 use crate::assets::Assets;
 use crate::pathfinding::Map;
-use crate::renderer::Lines3dBuffer;
-use crate::resources::{DebugControls, RayCastLocation};
+use crate::renderer::{Lines3dBuffer, TorusBuffer, TorusInstance};
+use crate::resources::{DebugControls, PlayerSide, RayCastLocation};
 use legion::component;
 use legion::systems::CommandBuffer;
-use ultraviolet::{Vec2, Vec4};
+use ultraviolet::{Vec2, Vec3, Vec4};
+
+#[legion::system(for_each)]
+#[filter(component::<Selected>())]
+pub fn render_firing_ranges(
+    position: &Position,
+    firing_range: &FiringRange,
+    side: &Side,
+    #[resource] player_side: &PlayerSide,
+    #[resource] torus_buffer: &mut TorusBuffer,
+) {
+    if *side != player_side.0 {
+        return;
+    }
+
+    torus_buffer.toruses.push(TorusInstance {
+        center: Vec3::new(position.0.x, 0.0, position.0.y),
+        colour: Vec3::new(0.5, 0.0, 0.0),
+        radius: firing_range.0,
+    });
+}
 
 #[legion::system]
 pub fn set_debug_pathfinding_start(

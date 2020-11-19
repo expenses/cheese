@@ -175,26 +175,6 @@ fn wgpu_to_screen(wgpu: Vec2, width: f32, height: f32) -> Vec2 {
     Vec2::new((wgpu.x + 1.0) / 2.0 * width, (1.0 - wgpu.y) / 2.0 * height)
 }
 
-#[legion::system(for_each)]
-#[filter(component::<Selected>())]
-pub fn render_firing_ranges(
-    position: &Position,
-    firing_range: &FiringRange,
-    side: &Side,
-    #[resource] player_side: &PlayerSide,
-    #[resource] torus_buffer: &mut TorusBuffer,
-) {
-    if *side != player_side.0 {
-        return;
-    }
-
-    torus_buffer.toruses.push(TorusInstance {
-        center: Vec3::new(position.0.x, 0.0, position.0.y),
-        colour: Vec3::new(0.5, 0.0, 0.0),
-        radius: firing_range.0,
-    });
-}
-
 #[legion::system]
 #[read_component(Entity)]
 #[read_component(Health)]

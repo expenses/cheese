@@ -191,7 +191,6 @@ pub struct Animation {
     pub total_time: f32,
     translation_channels: Vec<Channel<Vec3>>,
     rotation_channels: Vec<Channel<Quaternion<f32>>>,
-    scale_channels: Vec<Channel<Vec3>>,
 }
 
 impl Animation {
@@ -206,9 +205,6 @@ impl Animation {
         rotations.for_each(|(node_index, rotation)| {
             skin.nodes.nodes_mut()[node_index].local_rotation = rotation;
         });
-        /*scale.for_each(|(node_index, scale)| {
-            skin.nodes.nodes_mut()[node_index].local_scale = scale;
-        });*/
 
         skin.update();
     }
@@ -240,7 +236,6 @@ pub fn load_animations(gltf_animations: GltfAnimations, data: &[Vec<u8>]) -> Vec
 fn map_animation(gltf_animation: &GltfAnimation, data: &[Vec<u8>]) -> Animation {
     let translation_channels = map_translation_channels(gltf_animation.channels(), data);
     let rotation_channels = map_rotation_channels(gltf_animation.channels(), data);
-    let scale_channels = map_scale_channels(gltf_animation.channels(), data);
 
     let max_translation_time = translation_channels
         .iter()
@@ -252,13 +247,8 @@ fn map_animation(gltf_animation: &GltfAnimation, data: &[Vec<u8>]) -> Animation 
         .map(Channel::get_max_time)
         .max_by(|c0, c1| c0.partial_cmp(&c1).unwrap_or(Ordering::Equal))
         .unwrap_or(0.0);
-    let max_scale_time = scale_channels
-        .iter()
-        .map(Channel::get_max_time)
-        .max_by(|c0, c1| c0.partial_cmp(&c1).unwrap_or(Ordering::Equal))
-        .unwrap_or(0.0);
 
-    let total_time = *[max_translation_time, max_rotation_time, max_scale_time]
+    let total_time = *[max_translation_time, max_rotation_time]
         .iter()
         .max_by(|c0, c1| c0.partial_cmp(&c1).unwrap_or(Ordering::Equal))
         .unwrap_or(&0.0);
@@ -267,7 +257,6 @@ fn map_animation(gltf_animation: &GltfAnimation, data: &[Vec<u8>]) -> Animation 
         total_time,
         translation_channels,
         rotation_channels,
-        scale_channels,
     }
 }
 
@@ -325,30 +314,6 @@ fn map_rotation_channel(
     }
 }
 
-fn map_scale_channels(gltf_channels: Channels, data: &[Vec<u8>]) -> Vec<Channel<Vec3>> {
-    gltf_channels
-        .filter(|c| c.target().property() == Property::Scale)
-        .filter_map(|c| map_scale_channel(&c, data))
-        .collect::<Vec<_>>()
-}
-
-fn map_scale_channel(gltf_channel: &GltfChannel, data: &[Vec<u8>]) -> Option<Channel<Vec3>> {
-    let gltf_sampler = gltf_channel.sampler();
-    if let Property::Scale = gltf_channel.target().property() {
-        let reader = gltf_channel.reader(|buffer| Some(&data[buffer.index()]));
-        let times = read_times(&reader);
-        let output = read_scales(&reader);
-        Some(Channel {
-            interpolation: gltf_sampler.interpolation(),
-            times,
-            values: output,
-            node_index: gltf_channel.target().node().index(),
-        })
-    } else {
-        None
-    }
-}
-
 fn read_times<'a, 's, F>(reader: &Reader<'a, 's, F>) -> Vec<f32>
 where
     F: Clone + Fn(Buffer<'a>) -> Option<&'s [u8]>,
@@ -364,18 +329,6 @@ where
         .read_outputs()
         .map_or(vec![], |outputs| match outputs {
             ReadOutputs::Translations(translations) => translations.map(Vec3::from).collect(),
-            _ => vec![],
-        })
-}
-
-fn read_scales<'a, 's, F>(reader: &Reader<'a, 's, F>) -> Vec<Vec3>
-where
-    F: Clone + Fn(Buffer<'a>) -> Option<&'s [u8]>,
-{
-    reader
-        .read_outputs()
-        .map_or(vec![], |outputs| match outputs {
-            ReadOutputs::Scales(scales) => scales.map(Vec3::from).collect(),
             _ => vec![],
         })
 }

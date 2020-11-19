@@ -16,13 +16,114 @@ mod debugging;
 mod effects;
 mod movement;
 mod rendering;
-pub use animation::*;
-pub use combat::*;
-pub use controls::*;
-pub use debugging::*;
-pub use effects::*;
-pub use movement::*;
-pub use rendering::*;
+
+use crate::resources::DebugControls;
+use animation::{progress_animations_system, progress_building_animations_system};
+use combat::{
+    add_attack_commands_system, apply_bullets_system, firing_system, handle_damaged_system,
+    reduce_cooldowns_system, stop_attacks_on_dead_entities_system,
+};
+use controls::{
+    cast_ray_system, control_camera_system, handle_control_groups_system,
+    handle_drag_selection_system, handle_left_click_system, handle_right_click_system,
+    handle_stop_command_system, remove_dead_entities_from_control_groups_system,
+};
+use debugging::{
+    debug_specific_path_system, render_building_grid_system, render_debug_unit_pathfinding_system,
+    render_firing_ranges_system, render_pathfinding_map_system, render_unit_paths_system,
+    set_debug_pathfinding_start_system, spawn_debug_building_system,
+};
+use effects::{
+    apply_gravity_system, move_cheese_droplets_system, render_cheese_droplets_system,
+    spawn_cheese_droplets_system,
+};
+use movement::{
+    apply_steering_system, avoidance_system, move_bullets_system, move_units_system,
+    reset_map_updated_system, set_movement_paths_system, Avoidable, Avoids,
+};
+use rendering::{
+    render_building_plan_system, render_buildings_system, render_bullets_system,
+    render_command_paths_system, render_drag_box_system, render_health_bars_system,
+    render_selections_system, render_ui_system, render_under_select_box_system,
+    render_unit_under_cursor_system, render_units_system,
+};
+
+#[legion::system]
+pub fn cleanup_controls(
+    #[resource] mouse_state: &mut MouseState,
+    #[resource] rts_controls: &mut RtsControls,
+    #[resource] debug_controls: &mut DebugControls,
+) {
+    let position = mouse_state.position;
+    mouse_state.left_state.update(position);
+    mouse_state.right_state.update(position);
+
+    rts_controls.stop_pressed = false;
+
+    for i in 0..10 {
+        rts_controls.control_group_key_pressed[i] = false;
+    }
+
+    debug_controls.set_pathfinding_start_pressed = false;
+}
+
+pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
+    builder
+        .add_system(reset_map_updated_system())
+        .add_system(cast_ray_system())
+        .add_system(remove_dead_entities_from_control_groups_system())
+        .add_system(stop_attacks_on_dead_entities_system())
+        .add_system(control_camera_system())
+        .add_system(handle_left_click_system())
+        .add_system(handle_right_click_system())
+        .add_system(handle_stop_command_system())
+        .add_system(handle_drag_selection_system())
+        .add_system(handle_control_groups_system())
+        .add_system(avoidance_system())
+        .add_system(add_attack_commands_system())
+        .add_system(set_movement_paths_system())
+        .add_system(reduce_cooldowns_system())
+        .add_system(set_debug_pathfinding_start_system())
+        // Cheese droplets.
+        .add_system(spawn_cheese_droplets_system())
+        .flush()
+        .add_system(apply_gravity_system())
+        .add_system(move_cheese_droplets_system())
+        .add_system(move_units_system())
+        .add_system(move_bullets_system())
+        .add_system(apply_steering_system())
+        .add_system(firing_system())
+        .add_system(apply_bullets_system())
+        .flush()
+        .add_system(handle_damaged_system());
+}
+
+pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
+    builder
+        .add_system(progress_animations_system())
+        .add_system(progress_building_animations_system())
+        // Rendering
+        .add_system(render_bullets_system())
+        .add_system(render_units_system())
+        .add_system(render_selections_system())
+        //.add_system(render_firing_ranges_system())
+        .add_system(render_under_select_box_system())
+        .add_system(render_drag_box_system())
+        .add_system(render_command_paths_system())
+        .add_system(render_ui_system())
+        .add_system(render_health_bars_system())
+        .add_system(render_unit_under_cursor_system())
+        //.add_system(render_pathfinding_map_system())
+        .add_system(render_unit_paths_system())
+        .add_system(render_debug_unit_pathfinding_system())
+        .add_system(render_buildings_system())
+        .add_system(render_building_plan_system())
+        .add_system(render_cheese_droplets_system())
+        //.add_system(debug_specific_path_system())
+        // Cleanup
+        .flush()
+        .add_system(cleanup_controls_system());
+}
 
 pub struct CheeseGuyser;
 

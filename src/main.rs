@@ -32,37 +32,6 @@ fn main() -> anyhow::Result<()> {
     futures::executor::block_on(run())
 }
 
-fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
-    builder
-        .add_system(ecs::reset_map_updated_system())
-        .add_system(ecs::cast_ray_system())
-        .add_system(ecs::remove_dead_entities_from_control_groups_system())
-        .add_system(ecs::stop_attacks_on_dead_entities_system())
-        .add_system(ecs::control_camera_system())
-        .add_system(ecs::handle_left_click_system())
-        .add_system(ecs::handle_right_click_system())
-        .add_system(ecs::handle_stop_command_system())
-        .add_system(ecs::handle_drag_selection_system())
-        .add_system(ecs::handle_control_groups_system())
-        .add_system(ecs::avoidance_system())
-        .add_system(ecs::add_attack_commands_system())
-        .add_system(ecs::set_movement_paths_system())
-        .add_system(ecs::reduce_cooldowns_system())
-        .add_system(ecs::set_debug_pathfinding_start_system())
-        // Cheese droplets.
-        .add_system(ecs::spawn_cheese_droplets_system())
-        .flush()
-        .add_system(ecs::apply_gravity_system())
-        .add_system(ecs::move_cheese_droplets_system())
-        .add_system(ecs::move_units_system())
-        .add_system(ecs::move_bullets_system())
-        .add_system(ecs::apply_steering_system())
-        .add_system(ecs::firing_system())
-        .add_system(ecs::apply_bullets_system())
-        .flush()
-        .add_system(ecs::handle_damaged_system());
-}
-
 async fn run() -> anyhow::Result<()> {
     env_logger::init();
 
@@ -179,110 +148,75 @@ async fn run() -> anyhow::Result<()> {
     let mut titlescreen_schedule = titlescreen::titlescreen_schedule();
 
     let mut builder = Schedule::builder();
-    add_gameplay_systems(&mut builder);
-
-    let mut schedule = builder
-        .add_system(ecs::progress_animations_system())
-        .add_system(ecs::progress_building_animations_system())
-        // Rendering
-        .add_system(ecs::render_bullets_system())
-        .add_system(ecs::render_units_system())
-        .add_system(ecs::render_selections_system())
-        //.add_system(ecs::render_firing_ranges_system())
-        .add_system(ecs::render_under_select_box_system())
-        .add_system(ecs::render_drag_box_system())
-        .add_system(ecs::render_command_paths_system())
-        .add_system(ecs::render_ui_system())
-        .add_system(ecs::render_health_bars_system())
-        .add_system(ecs::render_unit_under_cursor_system())
-        //.add_system(ecs::render_building_grid_system())
-        //.add_system(ecs::render_pathfinding_map_system())
-        .add_system(ecs::render_unit_paths_system())
-        .add_system(ecs::render_debug_unit_pathfinding_system())
-        .add_system(ecs::render_buildings_system())
-        .add_system(ecs::render_building_plan_system())
-        .add_system(ecs::render_cheese_droplets_system())
-        //.add_system(ecs::debug_specific_path_system())
-        // Cleanup
-        .flush()
-        .add_system(ecs::cleanup_controls_system())
-        .build();
+    ecs::add_gameplay_systems(&mut builder);
+    ecs::add_rendering_systems(&mut builder);
+    let mut schedule = builder.build();
 
     let mut time = std::time::Instant::now();
 
     event_loop.run(move |event, _, control_flow| {
         match event {
-            Event::WindowEvent { ref event, .. } => {
-                match event {
-                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                    WindowEvent::Resized(size) => {
-                        render_context.resize(size.width as u32, size.height as u32);
-                        lines_pipeline.resize(
-                            &render_context,
-                            size.width as u32,
-                            size.height as u32,
-                        );
-                        resources.insert(ScreenDimensions {
-                            width: size.width as u32,
-                            height: size.height as u32,
-                        })
-                    }
-                    WindowEvent::KeyboardInput {
-                        input:
-                            KeyboardInput {
-                                state,
-                                virtual_keycode,
-                                scancode,
-                                ..
-                            },
-                        ..
-                    } => {
-                        // Was previously disabled due to a bug where a right keypress gets
-                        // inserted at the start. This doesn't seem to happen now as we start the
-                        // window in fullscreen.
-
-                        let pressed = *state == ElementState::Pressed;
-
-                        let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
-                        let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
-                        let mut debug_controls = resources.get_mut::<DebugControls>().unwrap();
-
-                        handle_key(
-                            *virtual_keycode,
-                            *scancode,
-                            pressed,
-                            &mut camera_controls,
-                            &mut rts_controls,
-                            &mut debug_controls,
-                            control_flow,
-                        );
-                    }
-                    WindowEvent::MouseWheel { delta, .. } => {
-                        let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
-
-                        camera_controls.zoom_delta += match delta {
-                            MouseScrollDelta::LineDelta(_, y) => y * 100.0,
-                            MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => *y as f32,
-                        };
-                    }
-                    WindowEvent::CursorMoved { position, .. } => {
-                        let mut mouse_state = resources.get_mut::<MouseState>().unwrap();
-                        mouse_state.position = Vec2::new(position.x as f32, position.y as f32);
-                    }
-                    WindowEvent::MouseInput { state, button, .. } => {
-                        let pressed = *state == ElementState::Pressed;
-
-                        let mut mouse_state = resources.get_mut::<MouseState>().unwrap();
-                        let position = mouse_state.position;
-                        match button {
-                            MouseButton::Left => mouse_state.left_state.handle(position, pressed),
-                            MouseButton::Right => mouse_state.right_state.handle(position, pressed),
-                            _ => {}
-                        }
-                    }
-                    _ => {}
+            Event::WindowEvent { ref event, .. } => match event {
+                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                WindowEvent::Resized(size) => {
+                    render_context.resize(size.width as u32, size.height as u32);
+                    lines_pipeline.resize(&render_context, size.width as u32, size.height as u32);
+                    resources.insert(ScreenDimensions {
+                        width: size.width as u32,
+                        height: size.height as u32,
+                    })
                 }
-            }
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            state,
+                            virtual_keycode,
+                            scancode,
+                            ..
+                        },
+                    ..
+                } => {
+                    let pressed = *state == ElementState::Pressed;
+
+                    let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
+                    let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
+                    let mut debug_controls = resources.get_mut::<DebugControls>().unwrap();
+
+                    handle_key(
+                        *virtual_keycode,
+                        *scancode,
+                        pressed,
+                        &mut camera_controls,
+                        &mut rts_controls,
+                        &mut debug_controls,
+                        control_flow,
+                    );
+                }
+                WindowEvent::MouseWheel { delta, .. } => {
+                    let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
+
+                    camera_controls.zoom_delta += match delta {
+                        MouseScrollDelta::LineDelta(_, y) => y * 100.0,
+                        MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => *y as f32,
+                    };
+                }
+                WindowEvent::CursorMoved { position, .. } => {
+                    let mut mouse_state = resources.get_mut::<MouseState>().unwrap();
+                    mouse_state.position = Vec2::new(position.x as f32, position.y as f32);
+                }
+                WindowEvent::MouseInput { state, button, .. } => {
+                    let pressed = *state == ElementState::Pressed;
+
+                    let mut mouse_state = resources.get_mut::<MouseState>().unwrap();
+                    let position = mouse_state.position;
+                    match button {
+                        MouseButton::Left => mouse_state.left_state.handle(position, pressed),
+                        MouseButton::Right => mouse_state.right_state.handle(position, pressed),
+                        _ => {}
+                    }
+                }
+                _ => {}
+            },
             Event::MainEventsCleared => {
                 let now = std::time::Instant::now();
                 let elapsed = (now - time).as_secs_f32();

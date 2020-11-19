@@ -1,5 +1,5 @@
 use super::*;
-use crate::resources::{CommandMode, ControlGroups, DebugControls, RayCastLocation};
+use crate::resources::{CommandMode, ControlGroups, RayCastLocation};
 
 #[legion::system]
 pub fn control_camera(
@@ -313,25 +313,6 @@ pub fn handle_control_groups(
             }
         }
     }
-}
-
-#[legion::system]
-pub fn cleanup_controls(
-    #[resource] mouse_state: &mut MouseState,
-    #[resource] rts_controls: &mut RtsControls,
-    #[resource] debug_controls: &mut DebugControls,
-) {
-    let position = mouse_state.position;
-    mouse_state.left_state.update(position);
-    mouse_state.right_state.update(position);
-
-    rts_controls.stop_pressed = false;
-
-    for i in 0..10 {
-        rts_controls.control_group_key_pressed[i] = false;
-    }
-
-    debug_controls.set_pathfinding_start_pressed = false;
 }
 
 fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {
