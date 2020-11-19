@@ -1,4 +1,4 @@
-use super::{colour_state_descriptor, DynamicBuffer, RenderContext, DEPTH_FORMAT};
+use super::{colour_state_descriptor, DynamicBuffer, RenderContext, DEPTH_FORMAT, INDEX_FORMAT};
 use std::sync::Arc;
 use ultraviolet::{Vec2, Vec3, Vec4};
 
@@ -50,7 +50,7 @@ impl Lines3dPipeline {
                     stencil: wgpu::StencilStateDescriptor::default(),
                 }),
                 vertex_state: wgpu::VertexStateDescriptor {
-                    index_format: wgpu::IndexFormat::Uint32,
+                    index_format: INDEX_FORMAT,
                     vertex_buffers: &[wgpu::VertexBufferDescriptor {
                         stride: std::mem::size_of::<Lines3dVertex>() as u64,
                         step_mode: wgpu::InputStepMode::Vertex,

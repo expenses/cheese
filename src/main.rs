@@ -44,7 +44,6 @@ fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(ecs::handle_stop_command_system())
         .add_system(ecs::handle_drag_selection_system())
         .add_system(ecs::handle_control_groups_system())
-        .add_system(ecs::spawn_debug_building_system())
         .add_system(ecs::avoidance_system())
         .add_system(ecs::add_attack_commands_system())
         .add_system(ecs::set_movement_paths_system())
@@ -554,7 +553,7 @@ fn handle_key(
             VirtualKeyCode::LControl => rts_controls.control_held = pressed,
             VirtualKeyCode::S if pressed => rts_controls.stop_pressed = true,
             VirtualKeyCode::A if pressed => rts_controls.mode = CommandMode::AttackMove,
-            VirtualKeyCode::B if pressed => debug_controls.spawn_building_pressed = true,
+            VirtualKeyCode::B if pressed => rts_controls.mode = CommandMode::Construct,
             VirtualKeyCode::T if pressed => debug_controls.set_pathfinding_start_pressed = true,
             VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
 

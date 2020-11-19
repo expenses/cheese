@@ -3,7 +3,7 @@ use crate::animation::Skin;
 use crate::renderer::{
     Font, LineBuffers, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance,
 };
-use crate::resources::{CursorIcon, DpiScaling, RayCastLocation};
+use crate::resources::{CommandMode, CursorIcon, DpiScaling, RayCastLocation};
 use ultraviolet::Vec4;
 
 const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
@@ -17,8 +17,14 @@ fn mix(colour_a: Vec3, colour_b: Vec3, factor: f32) -> Vec3 {
 #[legion::system]
 pub fn render_building_plan(
     #[resource] ray_cast_location: &RayCastLocation,
+    #[resource] rts_controls: &RtsControls,
     #[resource] model_buffers: &mut ModelBuffers,
 ) {
+    if rts_controls.mode != CommandMode::Construct {
+        model_buffers.building_plan.clear();
+        return;
+    }
+
     model_buffers.building_plan.set(
         Building::Pump,
         ModelInstance {

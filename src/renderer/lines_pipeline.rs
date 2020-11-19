@@ -1,4 +1,4 @@
-use super::{DynamicBuffer, RenderContext, DEPTH_FORMAT, DISPLAY_FORMAT};
+use super::{colour_state_descriptor, DynamicBuffer, RenderContext, DEPTH_FORMAT, INDEX_FORMAT};
 use crate::assets::Assets;
 use ultraviolet::{Vec2, Vec3};
 use wgpu::util::DeviceExt;
@@ -95,20 +95,7 @@ impl LinesPipeline {
             }),
             rasterization_state: Some(wgpu::RasterizationStateDescriptor::default()),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: &[wgpu::ColorStateDescriptor {
-                format: DISPLAY_FORMAT,
-                color_blend: wgpu::BlendDescriptor {
-                    src_factor: wgpu::BlendFactor::SrcAlpha,
-                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                    operation: wgpu::BlendOperation::Add,
-                },
-                alpha_blend: wgpu::BlendDescriptor {
-                    src_factor: wgpu::BlendFactor::SrcAlpha,
-                    dst_factor: wgpu::BlendFactor::DstAlpha,
-                    operation: wgpu::BlendOperation::Max,
-                },
-                write_mask: wgpu::ColorWrite::ALL,
-            }],
+            color_states: &[colour_state_descriptor(true)],
             depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
                 format: DEPTH_FORMAT,
                 depth_write_enabled: false,
@@ -116,7 +103,7 @@ impl LinesPipeline {
                 stencil: wgpu::StencilStateDescriptor::default(),
             }),
             vertex_state: wgpu::VertexStateDescriptor {
-                index_format: wgpu::IndexFormat::Uint32,
+                index_format: INDEX_FORMAT,
                 vertex_buffers: &[wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<Vertex>() as u64,
                     step_mode: wgpu::InputStepMode::Vertex,

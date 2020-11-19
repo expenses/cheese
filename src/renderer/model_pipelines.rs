@@ -354,12 +354,16 @@ pub struct BuildingPlan {
 }
 
 impl BuildingPlan {
+    pub fn clear(&mut self) {
+        self.building = None;
+    }
+
     pub fn set(&mut self, building: crate::ecs::Building, instance: ModelInstance) {
         self.building = Some(building);
         self.buffer.write(instance);
     }
 
-    fn upload(&mut self, context: &RenderContext) {
+    fn upload(&self, context: &RenderContext) {
         self.buffer.upload(context);
     }
 

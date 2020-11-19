@@ -1,4 +1,7 @@
-use super::{draw_model, DynamicBuffer, RenderContext, Vertex, DEPTH_FORMAT, DISPLAY_FORMAT};
+use super::{
+    colour_state_descriptor, draw_model, DynamicBuffer, RenderContext, Vertex, DEPTH_FORMAT,
+    INDEX_FORMAT,
+};
 use crate::assets::Model;
 use std::sync::Arc;
 use ultraviolet::Vec3;
@@ -46,12 +49,7 @@ impl TorusPipeline {
                 ..Default::default()
             }),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: &[wgpu::ColorStateDescriptor {
-                format: DISPLAY_FORMAT,
-                color_blend: wgpu::BlendDescriptor::REPLACE,
-                alpha_blend: wgpu::BlendDescriptor::REPLACE,
-                write_mask: wgpu::ColorWrite::ALL,
-            }],
+            color_states: &[colour_state_descriptor(false)],
             depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
                 format: DEPTH_FORMAT,
                 depth_write_enabled: true,
@@ -59,7 +57,7 @@ impl TorusPipeline {
                 stencil: wgpu::StencilStateDescriptor::default(),
             }),
             vertex_state: wgpu::VertexStateDescriptor {
-                index_format: wgpu::IndexFormat::Uint32,
+                index_format: INDEX_FORMAT,
                 vertex_buffers: &[
                     wgpu::VertexBufferDescriptor {
                         stride: std::mem::size_of::<Vertex>() as u64,

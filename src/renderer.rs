@@ -20,6 +20,7 @@ pub use torus_pipeline::{TorusBuffer, TorusInstance, TorusPipeline};
 const DISPLAY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+const INDEX_FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint32;
 
 const SUN_DIRECTION: Vec3 = Vec3::new(5.0, 10.0, 0.0);
 
@@ -248,7 +249,7 @@ impl RenderContext {
                 color_states: &[colour_state_descriptor(false)],
                 depth_stencil_state: None,
                 vertex_state: wgpu::VertexStateDescriptor {
-                    index_format: wgpu::IndexFormat::Uint32,
+                    index_format: INDEX_FORMAT,
                     vertex_buffers: &[],
                 },
                 sample_count: 1,

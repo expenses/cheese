@@ -30,6 +30,7 @@ pub struct DebugControls {
 pub enum CommandMode {
     Normal,
     AttackMove,
+    Construct,
 }
 
 impl Default for CommandMode {

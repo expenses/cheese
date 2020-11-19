@@ -70,6 +70,8 @@ pub fn handle_left_click(
     #[resource] ray_cast_location: &RayCastLocation,
     #[resource] rts_controls: &mut RtsControls,
     #[resource] player_side: &PlayerSide,
+    #[resource] map: &mut Map,
+    #[resource] assets: &Assets,
     world: &mut SubWorld,
     commands: &mut CommandBuffer,
 ) {
@@ -112,6 +114,29 @@ pub fn handle_left_click(
                         commands.add_component(*entity, Selected);
                     }
                 }
+            }
+        }
+        CommandMode::Construct => {
+            if let Some((pos, handle, building, radius, selectable, side, health)) =
+                Building::Pump.parts(ray_cast_location.0, Side::Purple, map)
+            {
+                let skin = assets.pump_model.skin.clone();
+                let animation_state = AnimationState {
+                    animation: 0,
+                    time: 0.0,
+                    total_time: assets.pump_model.animations[0].total_time,
+                };
+                commands.push((
+                    pos,
+                    handle,
+                    building,
+                    radius,
+                    selectable,
+                    side,
+                    health,
+                    skin,
+                    animation_state,
+                ));
             }
         }
     }
@@ -173,6 +198,7 @@ fn issue_command(
                 path: Vec::new(),
                 attack_move: true,
             },
+            CommandMode::Construct => unimplemented!(),
         },
     };
 
@@ -305,7 +331,6 @@ pub fn cleanup_controls(
         rts_controls.control_group_key_pressed[i] = false;
     }
 
-    debug_controls.spawn_building_pressed = false;
     debug_controls.set_pathfinding_start_pressed = false;
 }
 
