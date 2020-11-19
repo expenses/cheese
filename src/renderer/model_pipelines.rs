@@ -387,6 +387,7 @@ pub struct ModelBuffers {
     pub command_paths: DynamicBuffer<ModelInstance>,
     pub armouries: DynamicBuffer<ModelInstance>,
     pub cheese_droplets: DynamicBuffer<ModelInstance>,
+    pub giblets: DynamicBuffer<ModelInstance>,
 
     pub building_plan: BuildingPlan,
 }
@@ -466,6 +467,12 @@ impl ModelBuffers {
                 "Cheese cheese droplets buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
+            giblets: DynamicBuffer::new(
+                &context.device,
+                5000,
+                "Cheese giblets buffer",
+                wgpu::BufferUsage::VERTEX,
+            ),
             building_plan: BuildingPlan {
                 building: None,
                 buffer: StaticBuffer::new(
@@ -485,6 +492,7 @@ impl ModelBuffers {
         self.command_paths.upload(context);
         self.armouries.upload(context);
         self.cheese_droplets.upload(context);
+        self.giblets.upload(context);
         self.pumps.upload(context);
         self.building_plan.upload(context);
         let mice_resized = self.mice_joints.upload(context);

@@ -2,6 +2,7 @@ use crate::renderer::{Font, LineBuffers, ModelInstance, TextBuffer, TitlescreenB
 use crate::resources::{
     Camera, CursorIcon, DeltaTime, DpiScaling, Mode, MouseState, ScreenDimensions,
 };
+use crate::util::uniform_sphere_distribution_from_coords;
 use legion::*;
 use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
 
@@ -170,21 +171,4 @@ pub fn create_stars<R: rand::Rng>(rng: &mut R) -> Vec<ModelInstance> {
             }
         })
         .collect()
-}
-
-// http://corysimon.github.io/articles/uniformdistn-on-sphere/
-// I copied this function from a previous project I was working on a while ago.
-// I think technically the x and y arguments should be switched because we're using
-// a Y-up coordinate system but whatever.
-pub fn uniform_sphere_distribution_from_coords(x: f64, y: f64) -> Vec3 {
-    use std::f64::consts::PI;
-
-    let theta = 2.0 * PI * x;
-    let phi = (1.0 - 2.0 * y).acos();
-
-    Vec3::new(
-        (phi.sin() * theta.cos()) as f32,
-        (phi.sin() * theta.sin()) as f32,
-        phi.cos() as f32,
-    )
 }

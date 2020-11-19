@@ -34,8 +34,8 @@ use debugging::{
     set_debug_pathfinding_start_system, spawn_debug_building_system,
 };
 use effects::{
-    apply_gravity_system, move_cheese_droplets_system, render_cheese_droplets_system,
-    spawn_cheese_droplets_system,
+    apply_effect_gravity_system, apply_effect_velocity_system, spawn_cheese_droplets_system,
+    render_effects_system,
 };
 use movement::{
     apply_steering_system, avoidance_system, move_bullets_system, move_units_system,
@@ -87,8 +87,8 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         // Cheese droplets.
         .add_system(spawn_cheese_droplets_system())
         .flush()
-        .add_system(apply_gravity_system())
-        .add_system(move_cheese_droplets_system())
+        .add_system(apply_effect_gravity_system())
+        .add_system(apply_effect_velocity_system())
         .add_system(move_units_system())
         .add_system(move_bullets_system())
         .add_system(apply_steering_system())
@@ -118,7 +118,7 @@ pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
         .add_system(render_debug_unit_pathfinding_system())
         .add_system(render_buildings_system())
         .add_system(render_building_plan_system())
-        .add_system(render_cheese_droplets_system())
+        .add_system(render_effects_system())
         //.add_system(debug_specific_path_system())
         // Cleanup
         .flush()
@@ -468,5 +468,11 @@ fn vec2_to_ncollide_point(point: Vec2) -> ncollide3d::math::Point<f32> {
     ncollide3d::math::Point::new(point.x, 0.0, point.y)
 }
 
-pub struct CheeseDropletPosition(Vec3);
-pub struct CheeseDropletVelocity(Vec3);
+pub struct EffectPosition(Vec3);
+pub struct EffectVelocity(Vec3);
+pub struct EffectRotation(Mat4);
+
+pub enum ParticleType {
+    CheeseDroplet, Giblet,
+}
+pub struct Bounce;
