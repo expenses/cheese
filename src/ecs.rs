@@ -114,7 +114,7 @@ pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
         .add_system(render_health_bars_system())
         .add_system(render_unit_under_cursor_system())
         //.add_system(render_pathfinding_map_system())
-        .add_system(render_unit_paths_system())
+        //.add_system(render_unit_paths_system())
         .add_system(render_debug_unit_pathfinding_system())
         .add_system(render_buildings_system())
         .add_system(render_building_plan_system())

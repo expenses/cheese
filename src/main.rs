@@ -465,7 +465,7 @@ fn render_playing<'a>(
         &assets.mouse_model,
         &model_buffers.mice_joints_bind_group,
     );
-    model_pipelines.render_instanced(
+    model_pipelines.render_transparent_textured(
         &mut render_pass,
         &model_buffers.bullets,
         &assets.misc_texture,
@@ -478,13 +478,13 @@ fn render_playing<'a>(
         &assets.surface_texture,
         &assets.surface_model,
     );
-    model_pipelines.render_transparent_textured(
+    model_pipelines.render_transparent_textured_without_depth(
         &mut render_pass,
         &model_buffers.command_paths,
         &assets.misc_texture,
         &assets.command_path_model,
     );
-    model_pipelines.render_transparent_textured(
+    model_pipelines.render_transparent_textured_without_depth(
         &mut render_pass,
         &model_buffers.command_indicators,
         &assets.misc_texture,
