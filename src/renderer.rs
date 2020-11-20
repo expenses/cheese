@@ -10,11 +10,13 @@ use winit::{
 mod lines_3d_pipeline;
 mod lines_pipeline;
 mod model_pipelines;
+mod shadow_pipeline;
 mod torus_pipeline;
 
 pub use lines_3d_pipeline::{Lines3dBuffer, Lines3dPipeline};
 pub use lines_pipeline::{LineBuffers, LinesPipeline};
 pub use model_pipelines::{ModelBuffers, ModelInstance, ModelPipelines, TitlescreenBuffer};
+pub use shadow_pipeline::ShadowPipeline;
 pub use torus_pipeline::{TorusBuffer, TorusInstance, TorusPipeline};
 
 const DISPLAY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
@@ -41,6 +43,8 @@ pub struct RenderContext {
     pub screen_dimension_uniform_buffer: wgpu::Buffer,
     pub post_processing_pipeline: wgpu::RenderPipeline,
 
+    pub shadow_texture: wgpu::TextureView,
+
     sampler: wgpu::Sampler,
 
     perspective_buffer: wgpu::Buffer,
@@ -51,6 +55,8 @@ pub struct RenderContext {
     pub joint_bind_group_layout: wgpu::BindGroupLayout,
 
     pub fs_transparent_module: wgpu::ShaderModule,
+
+    pub identity_instance_buffer: Arc<wgpu::Buffer>,
 }
 
 impl RenderContext {
@@ -166,11 +172,15 @@ impl RenderContext {
             usage: wgpu::BufferUsage::UNIFORM,
         });
 
-        let screen_dimension_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Cheese screen dimension uniform buffer"),
-            contents: &bytemuck::bytes_of(&ScreenDimensionUniform::new(window_size.width, window_size.height)),
-            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        });
+        let screen_dimension_uniform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Cheese screen dimension uniform buffer"),
+                contents: &bytemuck::bytes_of(&ScreenDimensionUniform::new(
+                    window_size.width,
+                    window_size.height,
+                )),
+                usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            });
 
         let main_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &main_bind_group_layout,
@@ -270,6 +280,22 @@ impl RenderContext {
                 alpha_to_coverage_enabled: false,
             });
 
+        let shadow_texture = device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("Cheese shadow texture"),
+                size: wgpu::Extent3d {
+                    width: 1024,
+                    height: 1024,
+                    depth: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: DEPTH_FORMAT,
+                usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            })
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
         let (framebuffer, framebuffer_bind_group) = create_framebuffer(
             &device,
             &framebuffer_bind_group_layout,
@@ -309,6 +335,13 @@ impl RenderContext {
         let fs_transparent = wgpu::include_spirv!("../shaders/compiled/transparent.frag.spv");
         let fs_transparent_module = device.create_shader_module(fs_transparent);
 
+        let identity_instance_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Cheese identity instance buffer"),
+                contents: bytemuck::bytes_of(&ModelInstance::default()),
+                usage: wgpu::BufferUsage::VERTEX,
+            });
+
         Ok(Self {
             swap_chain,
             window,
@@ -330,6 +363,8 @@ impl RenderContext {
             framebuffer_sampler,
             post_processing_pipeline,
             screen_dimension_uniform_buffer,
+            shadow_texture,
+            identity_instance_buffer: Arc::new(identity_instance_buffer),
         })
     }
 
@@ -500,7 +535,6 @@ impl ScreenDimensionUniform {
         }
     }
 }
-
 
 pub struct StaticBuffer<T: bytemuck::Pod> {
     buffer: wgpu::Buffer,

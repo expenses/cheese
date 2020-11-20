@@ -8,7 +8,7 @@ use ultraviolet::{Mat4, Vec4};
 use wgpu::util::DeviceExt;
 
 pub struct ModelPipelines {
-    identity_instance_buffer: wgpu::Buffer,
+    identity_instance_buffer: Arc<wgpu::Buffer>,
     model_pipeline: wgpu::RenderPipeline,
     animated_pipeline: wgpu::RenderPipeline,
     transparent_animated_pipeline: wgpu::RenderPipeline,
@@ -93,23 +93,14 @@ impl ModelPipelines {
             true,
         );
 
-        let identity_instance_buffer =
-            context
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Cheese identity instance buffer"),
-                    contents: bytemuck::bytes_of(&ModelInstance::default()),
-                    usage: wgpu::BufferUsage::VERTEX,
-                });
-
         Self {
-            identity_instance_buffer,
             model_pipeline,
             animated_pipeline,
             transparent_animated_pipeline,
             transparent_textured_pipeline,
             transparent_pipeline,
             main_bind_group: context.main_bind_group.clone(),
+            identity_instance_buffer: context.identity_instance_buffer.clone(),
         }
     }
 

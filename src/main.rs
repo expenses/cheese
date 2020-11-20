@@ -9,7 +9,7 @@ mod titlescreen;
 use crate::assets::Assets;
 use crate::renderer::{
     LineBuffers, Lines3dBuffer, Lines3dPipeline, LinesPipeline, ModelBuffers, ModelPipelines,
-    RenderContext, TextBuffer, TitlescreenBuffer, TorusBuffer, TorusPipeline,
+    RenderContext, ShadowPipeline, TextBuffer, TitlescreenBuffer, TorusBuffer, TorusPipeline,
 };
 use crate::resources::{
     Camera, CameraControls, CommandMode, ControlGroups, CursorIcon, DebugControls, DeltaTime,
@@ -46,6 +46,7 @@ async fn run() -> anyhow::Result<()> {
     let torus_pipeline = TorusPipeline::new(&render_context);
     let lines_pipeline = LinesPipeline::new(&render_context, &assets);
     let lines_3d_pipeline = Lines3dPipeline::new(&render_context);
+    let shadow_pipeline = ShadowPipeline::new(&render_context);
     let model_buffers = ModelBuffers::new(&render_context, &assets);
     let torus_buffer = TorusBuffer::new(render_context.device());
     let lines_buffers = LineBuffers::new(render_context.device());
@@ -262,6 +263,27 @@ async fn run() -> anyhow::Result<()> {
                         },
                     );
 
+                    // shadow pass
+                    let mut shadow_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        color_attachments: &[],
+                        depth_stencil_attachment: Some(
+                            wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                                attachment: &render_context.shadow_texture,
+                                depth_ops: Some(wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(1.0),
+                                    store: true,
+                                }),
+                                stencil_ops: None,
+                            },
+                        ),
+                    });
+
+                    if let Mode::Playing = mode {
+                        render_shadows(&mut shadow_pass, &shadow_pipeline, &model_buffers, &assets);
+                    }
+
+                    drop(shadow_pass);
+
                     // This is super messy and should be abstracted.
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -375,6 +397,37 @@ async fn run() -> anyhow::Result<()> {
             _ => {}
         }
     });
+}
+
+fn render_shadows<'a>(
+    shadow_pass: &mut wgpu::RenderPass<'a>,
+    shadow_pipeline: &'a ShadowPipeline,
+    model_buffers: &'a ModelBuffers,
+    assets: &'a Assets,
+) {
+    shadow_pipeline.render_static(
+        shadow_pass,
+        &assets.armoury_model,
+        &model_buffers.armouries,
+    );
+    shadow_pipeline.render_animated(
+        shadow_pass,
+        &assets.pump_model,
+        &model_buffers.pump_joints_bind_group,
+        &model_buffers.pumps,
+    );
+    shadow_pipeline.render_single(shadow_pass, &assets.surface_model);
+    shadow_pipeline.render_static(
+        shadow_pass,
+        &assets.cheese_droplet_model,
+        &model_buffers.cheese_droplets,
+    );
+    shadow_pipeline.render_animated(
+        shadow_pass,
+        &assets.mouse_model,
+        &model_buffers.mice_joints_bind_group,
+        &model_buffers.mice,
+    );
 }
 
 fn render_playing<'a>(
