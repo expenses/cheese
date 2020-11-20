@@ -16,6 +16,7 @@ pub struct Assets {
     pub cheese_droplet_model: Model,
     pub pump_model: AnimatedModel,
     pub pump_static_model: Model,
+    pub giblet_model: Model,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
@@ -24,6 +25,7 @@ pub struct Assets {
     pub misc_texture: wgpu::BindGroup,
     pub armoury_texture: wgpu::BindGroup,
     pub pump_texture: wgpu::BindGroup,
+    pub giblet_texture: wgpu::BindGroup,
 }
 
 impl Assets {
@@ -113,6 +115,11 @@ impl Assets {
                 "Cheese static pump model",
                 device,
             )?,
+            giblet_model: Model::load_gltf(
+                include_bytes!("../models/giblet.gltf"),
+                "Cheese giblet model",
+                device,
+            )?,
 
             surface_texture: load_texture(
                 include_bytes!("../textures/surface.png"),
@@ -145,6 +152,13 @@ impl Assets {
             pump_texture: load_texture(
                 include_bytes!("../textures/pump.png"),
                 "Cheese pump texture",
+                &texture_bind_group_layout,
+                device,
+                &mut init_encoder,
+            )?,
+            giblet_texture: load_texture(
+                include_bytes!("../textures/giblet.png"),
+                "Cheese giblet texture",
                 &texture_bind_group_layout,
                 device,
                 &mut init_encoder,

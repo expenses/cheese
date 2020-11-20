@@ -1,4 +1,6 @@
 use super::*;
+use crate::util::random_rotation;
+use rand::Rng;
 
 #[legion::system(for_each)]
 #[read_component(Position)]
@@ -85,6 +87,7 @@ pub fn apply_bullets(
 #[legion::system(for_each)]
 pub fn handle_damaged(
     entity: &Entity,
+    position: &Position,
     damaged: &DamagedThisTick,
     health: &mut Health,
     // None in the case of a building.
@@ -92,6 +95,7 @@ pub fn handle_damaged(
     map_handle: Option<&MapHandle>,
     buffer: &mut CommandBuffer,
     #[resource] map: &mut Map,
+    #[resource] rng: &mut rand::rngs::SmallRng,
 ) {
     health.0 = health.0.saturating_sub(2);
 
@@ -100,6 +104,19 @@ pub fn handle_damaged(
 
         if let Some(map_handle) = map_handle {
             map.remove(map_handle);
+        }
+
+        for _ in 0..10 {
+            let rotation = rng.gen_range(0.0, std::f32::consts::TAU);
+            let force = 0.5;
+            let velocity = Vec3::new(rotation.cos() * force, 6.0, rotation.sin() * force);
+            buffer.push((
+                EffectPosition(Vec3::new(position.0.x, 0.5, position.0.y)),
+                EffectVelocity(velocity),
+                EffectRotation(random_rotation(rng).into_matrix().into_homogeneous()),
+                ParticleType::Giblet,
+                Bounce,
+            ));
         }
 
         return;

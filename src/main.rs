@@ -5,6 +5,7 @@ mod pathfinding;
 mod renderer;
 mod resources;
 mod titlescreen;
+mod util;
 
 use crate::assets::Assets;
 use crate::renderer::{
@@ -73,7 +74,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(titlescreen::TitlescreenMoon::default());
     resources.insert(Mode::Playing);
     resources.insert(DebugControls::default());
-    resources.insert(Gravity(5.0));
+    resources.insert(Gravity(7.5));
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
@@ -451,6 +452,12 @@ fn render_playing<'a>(
         &assets.pump_texture,
         &assets.pump_model,
         &model_buffers.pump_joints_bind_group,
+    );
+    model_pipelines.render_instanced(
+        &mut render_pass,
+        &model_buffers.giblets,
+        &assets.giblet_texture,
+        &assets.giblet_model,
     );
     model_pipelines.render_instanced(
         &mut render_pass,
