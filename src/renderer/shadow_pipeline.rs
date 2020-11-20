@@ -41,7 +41,6 @@ impl ShadowPipeline {
                 },
                 fragment_stage: None,
                 rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                    /// Todo: change this but still get the surface to render.
                     cull_mode: wgpu::CullMode::Back,
                     ..Default::default()
                 }),
@@ -95,7 +94,6 @@ impl ShadowPipeline {
                 },
                 fragment_stage: None,
                 rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                    /// Todo: change this but still get the surface to render.
                     cull_mode: wgpu::CullMode::Back,
                     ..Default::default()
                 }),

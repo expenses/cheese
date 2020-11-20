@@ -249,7 +249,7 @@ async fn run() -> anyhow::Result<()> {
                 let mode = *resources.get::<Mode>().unwrap();
 
                 // Upload buffers to the gpu.
-                render_context.update_view(camera.to_matrix());
+                render_context.update_from_camera(&camera);
                 model_buffers.upload(&render_context, &assets);
                 torus_buffer.upload(&render_context);
                 line_buffers.upload(&render_context);

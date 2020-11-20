@@ -1,4 +1,4 @@
-use crate::resources::ScreenDimensions;
+use crate::resources::{Camera, ScreenDimensions};
 use std::sync::Arc;
 use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
@@ -61,6 +61,7 @@ pub struct RenderContext {
 
     pub shadow_uniform_bind_group: Arc<wgpu::BindGroup>,
     pub shadow_uniform_bind_group_layout: wgpu::BindGroupLayout,
+    shadow_uniform_buffer: wgpu::Buffer,
 }
 
 impl RenderContext {
@@ -117,7 +118,7 @@ impl RenderContext {
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 2,
-                        visibility: wgpu::ShaderStage::VERTEX,
+                        visibility: wgpu::ShaderStage::FRAGMENT,
                         ty: wgpu::BindingType::UniformBuffer {
                             dynamic: false,
                             min_binding_size: None,
@@ -382,8 +383,13 @@ impl RenderContext {
 
         let shadow_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Cheese shadow uniform buffer"),
-            contents: bytemuck::bytes_of(&ShadowUniforms::new()),
-            usage: wgpu::BufferUsage::UNIFORM,
+            contents: bytemuck::bytes_of(&ShadowUniforms::new(
+                Vec2::one(),
+                Vec2::zero(),
+                Vec2::zero(),
+                Vec2::zero(),
+            )),
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         });
 
         let shadow_uniform_bind_group_layout =
@@ -435,6 +441,7 @@ impl RenderContext {
             identity_instance_buffer: Arc::new(identity_instance_buffer),
             shadow_uniform_bind_group: Arc::new(shadow_uniform_bind_group),
             shadow_uniform_bind_group_layout,
+            shadow_uniform_buffer,
         })
     }
 
@@ -476,9 +483,33 @@ impl RenderContext {
         );
     }
 
-    pub fn update_view(&self, view: Mat4) {
-        self.queue
-            .write_buffer(&self.view_buffer, 0, bytemuck::bytes_of(&view));
+    pub fn update_from_camera(&self, camera: &Camera) {
+        self.queue.write_buffer(
+            &self.view_buffer,
+            0,
+            bytemuck::bytes_of(&camera.to_matrix()),
+        );
+
+        let screen_dimensions = self.screen_dimensions();
+        let top_left = camera.cast_ray(Vec2::new(0.0, 0.0), &screen_dimensions);
+        let top_right = camera.cast_ray(
+            Vec2::new(screen_dimensions.width as f32, 0.0),
+            &screen_dimensions,
+        );
+        let bottom_right = camera.cast_ray(screen_dimensions.as_vec(), &screen_dimensions);
+
+        let look_at = Vec2::new(camera.looking_at.x, camera.looking_at.z);
+
+        self.queue.write_buffer(
+            &self.shadow_uniform_buffer,
+            0,
+            bytemuck::bytes_of(&ShadowUniforms::new(
+                look_at,
+                top_left,
+                top_right,
+                bottom_right,
+            )),
+        );
     }
 
     pub fn screen_dimensions(&self) -> ScreenDimensions {
@@ -828,11 +859,35 @@ struct ShadowUniforms {
 }
 
 impl ShadowUniforms {
-    fn new() -> Self {
-        let projection =
-            ultraviolet::projection::orthographic_wgpu_dx(-10.0, 10.0, -10.0, 10.0, 0.1, 20.0);
+    fn new(look_at: Vec2, top_left: Vec2, top_right: Vec2, bottom_right: Vec2) -> Self {
+        // Use the corner points of the camera view to figure out good corners for the projection
+        // matrix.
+        let top_left = top_left - look_at;
+        let top_right = top_right - look_at;
+        let bottom_right = bottom_right - look_at;
+        // multiply the sun direction by a 10 so that we can view shadows from a greater distance.
+        let sun_direction_multiplied = SUN_DIRECTION * 10.0;
 
-        let view = Mat4::look_at(SUN_DIRECTION, Vec3::zero(), Vec3::new(0.0, 1.0, 0.0));
+        // Using the camera distance from the ground is just a guesstimate that seems to work well here.
+        let near_plane = 0.1;
+        let far_plane = (sun_direction_multiplied * 1.5).mag();
+
+        let projection = ultraviolet::projection::orthographic_wgpu_dx(
+            -bottom_right.y,
+            -top_left.y,
+            -top_right.x,
+            -top_left.x,
+            near_plane,
+            far_plane,
+        );
+
+        let look_at = Vec3::new(look_at.x, 0.0, look_at.y);
+
+        let view = Mat4::look_at(
+            sun_direction_multiplied + look_at,
+            look_at,
+            Vec3::new(0.0, 1.0, 0.0),
+        );
 
         Self {
             light_projection_view: projection * view,
