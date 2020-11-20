@@ -1,56 +1,19 @@
 use super::{
-    draw_model, DynamicBuffer, ModelInstance, RenderContext, AnimatedVertex, Vertex, DEPTH_FORMAT, INDEX_FORMAT,
-    SUN_DIRECTION,
+    draw_model, AnimatedVertex, DynamicBuffer, ModelInstance, RenderContext, Vertex, DEPTH_FORMAT,
+    INDEX_FORMAT,
 };
 use crate::assets::{AnimatedModel, Model};
 use std::sync::Arc;
-use ultraviolet::{Mat4, Vec3};
-use wgpu::util::DeviceExt;
 
 pub struct ShadowPipeline {
     static_pipeline: wgpu::RenderPipeline,
     animated_pipeline: wgpu::RenderPipeline,
-    light_bind_group: wgpu::BindGroup,
+    bind_group: Arc<wgpu::BindGroup>,
     identity_instance_buffer: Arc<wgpu::Buffer>,
 }
 
 impl ShadowPipeline {
     pub fn new(context: &RenderContext) -> Self {
-        let light_buffer = context
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Cheese shadow light uniform buffer"),
-                contents: bytemuck::bytes_of(&LightUniforms::new()),
-                usage: wgpu::BufferUsage::UNIFORM,
-            });
-
-        let light_bind_group_layout =
-            context
-                .device
-                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: Some("Cheese shadow light bind group layout"),
-                    entries: &[wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStage::VERTEX,
-                        ty: wgpu::BindingType::UniformBuffer {
-                            dynamic: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    }],
-                });
-
-        let light_bind_group = context
-            .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("Cheese shadow light bind group"),
-                layout: &light_bind_group_layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer(light_buffer.slice(..)),
-                }],
-            });
-
         let vs_shadow_static =
             wgpu::include_spirv!("../../shaders/compiled/shadow_static.vert.spv");
         let vs_shadow_static_module = context.device.create_shader_module(vs_shadow_static);
@@ -64,7 +27,7 @@ impl ShadowPipeline {
                 .device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Cheese static shadow pipeline layout"),
-                    bind_group_layouts: &[&light_bind_group_layout],
+                    bind_group_layouts: &[&context.shadow_uniform_bind_group_layout],
                     push_constant_ranges: &[],
                 });
 
@@ -115,7 +78,10 @@ impl ShadowPipeline {
                 .device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Cheese animated shadow pipeline layout"),
-                    bind_group_layouts: &[&light_bind_group_layout, &context.joint_bind_group_layout],
+                    bind_group_layouts: &[
+                        &context.shadow_uniform_bind_group_layout,
+                        &context.joint_bind_group_layout,
+                    ],
                     push_constant_ranges: &[],
                 });
 
@@ -160,11 +126,12 @@ impl ShadowPipeline {
                 sample_mask: !0,
                 alpha_to_coverage_enabled: false,
             });
-        
+
         Self {
-            static_pipeline, animated_pipeline,
-            light_bind_group,
+            static_pipeline,
+            animated_pipeline,
             identity_instance_buffer: context.identity_instance_buffer.clone(),
+            bind_group: context.shadow_uniform_bind_group.clone(),
         }
     }
 
@@ -176,7 +143,7 @@ impl ShadowPipeline {
     ) {
         if let Some((slice, num)) = instances.get() {
             render_pass.set_pipeline(&self.static_pipeline);
-            render_pass.set_bind_group(0, &self.light_bind_group, &[]);
+            render_pass.set_bind_group(0, &self.bind_group, &[]);
             draw_model(render_pass, model, slice, num);
         }
     }
@@ -190,7 +157,7 @@ impl ShadowPipeline {
     ) {
         if let Some((instances, num_instances)) = instances.get() {
             render_pass.set_pipeline(&self.animated_pipeline);
-            render_pass.set_bind_group(0, &self.light_bind_group, &[]);
+            render_pass.set_bind_group(0, &self.bind_group, &[]);
             render_pass.set_bind_group(1, joints, &[]);
 
             render_pass.set_vertex_buffer(0, model.vertices.slice(..));
@@ -200,34 +167,14 @@ impl ShadowPipeline {
         }
     }
 
-
     pub fn render_single<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, model: &'a Model) {
         render_pass.set_pipeline(&self.static_pipeline);
-        render_pass.set_bind_group(0, &self.light_bind_group, &[]);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
         draw_model(
             render_pass,
             model,
             self.identity_instance_buffer.slice(..),
             1,
         );
-    }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct LightUniforms {
-    projection_view: Mat4,
-}
-
-impl LightUniforms {
-    fn new() -> Self {
-        let projection =
-            ultraviolet::projection::orthographic_wgpu_dx(-10.0, 10.0, -10.0, 10.0, 0.1, 20.0);
-
-        let view = Mat4::look_at(SUN_DIRECTION, Vec3::zero(), Vec3::new(0.0, 1.0, 0.0));
-
-        Self {
-            projection_view: projection * view,
-        }
     }
 }

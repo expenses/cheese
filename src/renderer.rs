@@ -54,9 +54,13 @@ pub struct RenderContext {
 
     pub joint_bind_group_layout: wgpu::BindGroupLayout,
 
+    pub vs_transparent_module: wgpu::ShaderModule,
     pub fs_transparent_module: wgpu::ShaderModule,
 
     pub identity_instance_buffer: Arc<wgpu::Buffer>,
+
+    pub shadow_uniform_bind_group: Arc<wgpu::BindGroup>,
+    pub shadow_uniform_bind_group_layout: wgpu::BindGroupLayout,
 }
 
 impl RenderContext {
@@ -126,6 +130,22 @@ impl RenderContext {
                         ty: wgpu::BindingType::Sampler { comparison: false },
                         count: None,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: wgpu::ShaderStage::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler { comparison: false },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 5,
+                        visibility: wgpu::ShaderStage::FRAGMENT,
+                        ty: wgpu::BindingType::SampledTexture {
+                            multisampled: false,
+                            dimension: wgpu::TextureViewDimension::D2,
+                            component_type: wgpu::TextureComponentType::Float,
+                        },
+                        count: None,
+                    },
                 ],
             });
 
@@ -135,6 +155,13 @@ impl RenderContext {
             address_mode_u: wgpu::AddressMode::Repeat,
             address_mode_v: wgpu::AddressMode::Repeat,
             label: Some("Cheese sampler"),
+            ..Default::default()
+        });
+
+        let shadow_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            label: Some("Cheese shadow sampler"),
             ..Default::default()
         });
 
@@ -182,6 +209,22 @@ impl RenderContext {
                 usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
             });
 
+        let shadow_texture = device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("Cheese shadow texture"),
+                size: wgpu::Extent3d {
+                    width: 1024,
+                    height: 1024,
+                    depth: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: DEPTH_FORMAT,
+                usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            })
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
         let main_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &main_bind_group_layout,
             entries: &[
@@ -200,6 +243,14 @@ impl RenderContext {
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Sampler(&shadow_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: wgpu::BindingResource::TextureView(&shadow_texture),
                 },
             ],
             label: Some("Cheese main bind group"),
@@ -280,22 +331,6 @@ impl RenderContext {
                 alpha_to_coverage_enabled: false,
             });
 
-        let shadow_texture = device
-            .create_texture(&wgpu::TextureDescriptor {
-                label: Some("Cheese shadow texture"),
-                size: wgpu::Extent3d {
-                    width: 1024,
-                    height: 1024,
-                    depth: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: DEPTH_FORMAT,
-                usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
-            })
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
         let (framebuffer, framebuffer_bind_group) = create_framebuffer(
             &device,
             &framebuffer_bind_group_layout,
@@ -332,6 +367,9 @@ impl RenderContext {
                 ],
             });
 
+        let vs_transparent = wgpu::include_spirv!("../shaders/compiled/transparent.vert.spv");
+        let vs_transparent_module = device.create_shader_module(vs_transparent);
+
         let fs_transparent = wgpu::include_spirv!("../shaders/compiled/transparent.frag.spv");
         let fs_transparent_module = device.create_shader_module(fs_transparent);
 
@@ -341,6 +379,35 @@ impl RenderContext {
                 contents: bytemuck::bytes_of(&ModelInstance::default()),
                 usage: wgpu::BufferUsage::VERTEX,
             });
+
+        let shadow_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Cheese shadow uniform buffer"),
+            contents: bytemuck::bytes_of(&ShadowUniforms::new()),
+            usage: wgpu::BufferUsage::UNIFORM,
+        });
+
+        let shadow_uniform_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Cheese shadow uniform bind group layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX,
+                    ty: wgpu::BindingType::UniformBuffer {
+                        dynamic: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let shadow_uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Cheese shadow uniform bind group"),
+            layout: &shadow_uniform_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(shadow_uniform_buffer.slice(..)),
+            }],
+        });
 
         Ok(Self {
             swap_chain,
@@ -357,6 +424,7 @@ impl RenderContext {
             joint_bind_group_layout,
             main_bind_group: Arc::new(main_bind_group),
             fs_transparent_module,
+            vs_transparent_module,
             framebuffer,
             framebuffer_bind_group,
             framebuffer_bind_group_layout,
@@ -365,6 +433,8 @@ impl RenderContext {
             screen_dimension_uniform_buffer,
             shadow_texture,
             identity_instance_buffer: Arc::new(identity_instance_buffer),
+            shadow_uniform_bind_group: Arc::new(shadow_uniform_bind_group),
+            shadow_uniform_bind_group_layout,
         })
     }
 
@@ -749,4 +819,23 @@ pub struct AnimatedVertex {
     pub uv: Vec2,
     pub joints: Vec4,
     pub joint_weights: Vec4,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct ShadowUniforms {
+    light_projection_view: Mat4,
+}
+
+impl ShadowUniforms {
+    fn new() -> Self {
+        let projection =
+            ultraviolet::projection::orthographic_wgpu_dx(-10.0, 10.0, -10.0, 10.0, 0.1, 20.0);
+
+        let view = Mat4::look_at(SUN_DIRECTION, Vec3::zero(), Vec3::new(0.0, 1.0, 0.0));
+
+        Self {
+            light_projection_view: projection * view,
+        }
+    }
 }

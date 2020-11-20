@@ -12,6 +12,7 @@ layout(location = 6) in mat4 transform;
 layout(location = 0) out vec2 out_uv;
 layout(location = 1) out vec4 out_flat_colour;
 layout(location = 2) out float out_brightness;
+layout(location = 3) out vec4 out_light_space;
 
 layout(set = 0, binding = 0) uniform Perspective {
     mat4 perspective;
@@ -33,6 +34,10 @@ layout(set = 2, binding = 1) uniform JointUniforms {
     uint num_joints;
 };
 
+layout(set = 3, binding = 0) uniform ShadowUniforms {
+    mat4 light_projection_view;   
+};
+
 void main() {
     out_uv = uv;
     out_flat_colour = flat_colour;
@@ -51,6 +56,8 @@ void main() {
     vec3 transformed_normal = mat3(transpose(inverse(model_transform))) * normal;
 
     out_brightness = max(0.0, dot(normalize(transformed_normal), normalize(sun_direction)));
+
+    out_light_space = light_projection_view * model_transform * vec4(position, 1.0);
 
     gl_Position = perspective * view * model_transform * vec4(position, 1.0);
 }

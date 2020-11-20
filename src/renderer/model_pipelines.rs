@@ -15,6 +15,7 @@ pub struct ModelPipelines {
     transparent_textured_pipeline: wgpu::RenderPipeline,
     transparent_pipeline: wgpu::RenderPipeline,
     main_bind_group: Arc<wgpu::BindGroup>,
+    shadow_uniform_bind_group: Arc<wgpu::BindGroup>,
 }
 
 impl ModelPipelines {
@@ -38,6 +39,7 @@ impl ModelPipelines {
             &[
                 &context.main_bind_group_layout,
                 &assets.texture_bind_group_layout,
+                &context.shadow_uniform_bind_group_layout,
             ],
             "Cheese model pipeline",
             &vs_module,
@@ -52,6 +54,7 @@ impl ModelPipelines {
                 &context.main_bind_group_layout,
                 &assets.texture_bind_group_layout,
                 &context.joint_bind_group_layout,
+                &context.shadow_uniform_bind_group_layout,
             ],
             &vs_animated_module,
             &fs_module,
@@ -64,6 +67,7 @@ impl ModelPipelines {
                 &context.main_bind_group_layout,
                 &assets.texture_bind_group_layout,
                 &context.joint_bind_group_layout,
+                &context.shadow_uniform_bind_group_layout,
             ],
             &vs_animated_module,
             &context.fs_transparent_module,
@@ -77,7 +81,7 @@ impl ModelPipelines {
                 &assets.texture_bind_group_layout,
             ],
             "Cheese transparent textured pipeline",
-            &vs_module,
+            &context.vs_transparent_module,
             &fs_transparent_textured_module,
             true,
             false,
@@ -87,7 +91,7 @@ impl ModelPipelines {
             &context.device,
             &[&context.main_bind_group_layout],
             "Cheese transparent pipeline",
-            &vs_module,
+            &context.vs_transparent_module,
             &context.fs_transparent_module,
             true,
             true,
@@ -101,6 +105,7 @@ impl ModelPipelines {
             transparent_pipeline,
             main_bind_group: context.main_bind_group.clone(),
             identity_instance_buffer: context.identity_instance_buffer.clone(),
+            shadow_uniform_bind_group: context.shadow_uniform_bind_group.clone(),
         }
     }
 
@@ -117,6 +122,7 @@ impl ModelPipelines {
             render_pass.set_bind_group(0, &self.main_bind_group, &[]);
             render_pass.set_bind_group(1, texture, &[]);
             render_pass.set_bind_group(2, joints, &[]);
+            render_pass.set_bind_group(3, &self.shadow_uniform_bind_group, &[]);
 
             render_pass.set_vertex_buffer(0, model.vertices.slice(..));
             render_pass.set_vertex_buffer(1, slice);
@@ -140,6 +146,7 @@ impl ModelPipelines {
             // (basically because I don't want to have 2 animation vertex shaders)
             render_pass.set_bind_group(1, dummy_texture, &[]);
             render_pass.set_bind_group(2, joints, &[]);
+            render_pass.set_bind_group(3, &self.shadow_uniform_bind_group, &[]);
 
             render_pass.set_vertex_buffer(0, model.vertices.slice(..));
             render_pass.set_vertex_buffer(1, slice);
@@ -157,6 +164,7 @@ impl ModelPipelines {
         render_pass.set_pipeline(&self.model_pipeline);
         render_pass.set_bind_group(0, &self.main_bind_group, &[]);
         render_pass.set_bind_group(1, texture, &[]);
+        render_pass.set_bind_group(2, &self.shadow_uniform_bind_group, &[]);
         draw_model(
             render_pass,
             model,
@@ -175,6 +183,7 @@ impl ModelPipelines {
         render_pass.set_pipeline(&self.model_pipeline);
         render_pass.set_bind_group(0, &self.main_bind_group, &[]);
         render_pass.set_bind_group(1, texture, &[]);
+        render_pass.set_bind_group(2, &self.shadow_uniform_bind_group, &[]);
         draw_model(render_pass, model, transform.buffer.slice(..), 1);
     }
 
@@ -189,6 +198,7 @@ impl ModelPipelines {
             render_pass.set_pipeline(&self.model_pipeline);
             render_pass.set_bind_group(0, &self.main_bind_group, &[]);
             render_pass.set_bind_group(1, texture, &[]);
+            render_pass.set_bind_group(2, &self.shadow_uniform_bind_group, &[]);
             draw_model(render_pass, model, slice, num);
         }
     }

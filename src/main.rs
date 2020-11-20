@@ -405,11 +405,7 @@ fn render_shadows<'a>(
     model_buffers: &'a ModelBuffers,
     assets: &'a Assets,
 ) {
-    shadow_pipeline.render_static(
-        shadow_pass,
-        &assets.armoury_model,
-        &model_buffers.armouries,
-    );
+    shadow_pipeline.render_static(shadow_pass, &assets.armoury_model, &model_buffers.armouries);
     shadow_pipeline.render_animated(
         shadow_pass,
         &assets.pump_model,
