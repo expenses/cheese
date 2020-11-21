@@ -40,7 +40,7 @@ async fn run() -> anyhow::Result<()> {
     let mut rng = rand::rngs::SmallRng::from_entropy();
 
     let mut render_context = RenderContext::new(&event_loop).await?;
-    let (assets, command_buffer) = Assets::new(&render_context.device())?;
+    let (assets, animations, command_buffer) = Assets::new(&render_context.device())?;
     render_context.submit(command_buffer);
     let model_pipelines = ModelPipelines::new(&render_context, &assets);
     let torus_pipeline = TorusPipeline::new(&render_context);
@@ -85,7 +85,7 @@ async fn run() -> anyhow::Result<()> {
     for i in 0..10 {
         ecs::Unit::MouseMarine.add_to_world(
             &mut world,
-            Some(&assets),
+            Some(&animations),
             Vec2::new(-10.0, i as f32 / 100.0),
             ecs::Facing(1.0),
             ecs::Side::Purple,
@@ -95,7 +95,7 @@ async fn run() -> anyhow::Result<()> {
     for i in 0..10 {
         ecs::Unit::MouseMarine.add_to_world(
             &mut world,
-            Some(&assets),
+            Some(&animations),
             Vec2::new(10.0, i as f32 / 100.0),
             ecs::Facing(1.0),
             ecs::Side::Green,
@@ -109,7 +109,7 @@ async fn run() -> anyhow::Result<()> {
             Vec2::new(-20.0, 10.0),
             ecs::Side::Green,
             &mut world,
-            &assets,
+            &animations,
             &mut map,
         )
         .unwrap();
@@ -118,7 +118,7 @@ async fn run() -> anyhow::Result<()> {
             Vec2::new(-30.0, 40.0),
             ecs::Side::Green,
             &mut world,
-            &assets,
+            &animations,
             &mut map,
         )
         .unwrap();
@@ -127,7 +127,7 @@ async fn run() -> anyhow::Result<()> {
             Vec2::new(0.0, 50.0),
             ecs::Side::Green,
             &mut world,
-            &assets,
+            &animations,
             &mut map,
         )
         .unwrap();
@@ -142,7 +142,7 @@ async fn run() -> anyhow::Result<()> {
         ));
     }
 
-    resources.insert(assets);
+    resources.insert(animations);
     resources.insert(map);
     resources.insert(rng);
 
@@ -245,7 +245,6 @@ async fn run() -> anyhow::Result<()> {
                 let mut text_buffer = resources.get_mut::<TextBuffer>().unwrap();
                 let mut lines_3d_buffer = resources.get_mut::<Lines3dBuffer>().unwrap();
                 let titlescreen_buffer = resources.get::<TitlescreenBuffer>().unwrap();
-                let assets = resources.get::<Assets>().unwrap();
                 let mode = *resources.get::<Mode>().unwrap();
 
                 // Upload buffers to the gpu.

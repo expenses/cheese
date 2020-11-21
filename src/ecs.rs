@@ -1,8 +1,8 @@
+use crate::assets::ModelAnimations;
 use crate::pathfinding::{Map, MapHandle};
 use crate::resources::{
     Camera, CameraControls, MouseState, PlayerSide, RtsControls, ScreenDimensions,
 };
-use crate::Assets;
 use legion::systems::CommandBuffer;
 use legion::world::SubWorld;
 use legion::*;
@@ -301,7 +301,7 @@ impl Building {
         position: Vec2,
         side: Side,
         world: &mut World,
-        assets: &Assets,
+        animations: &ModelAnimations,
         map: &mut Map,
     ) -> Option<Entity> {
         let parts = self.parts(position, side, map)?;
@@ -310,11 +310,11 @@ impl Building {
         if let Building::Pump = self {
             let mut entry = world.entry(entity).unwrap();
 
-            entry.add_component(assets.pump_model.skin.clone());
+            entry.add_component(animations.pump.skin.clone());
             entry.add_component(AnimationState {
                 animation: 0,
                 time: 0.0,
-                total_time: assets.pump_model.animations[0].total_time,
+                total_time: animations.pump.animations[0].total_time,
             });
         }
 
@@ -365,7 +365,7 @@ impl Unit {
         self,
         world: &mut World,
         // This is only `None` when being run in a test
-        assets: Option<&Assets>,
+        animations: Option<&ModelAnimations>,
         position: Vec2,
         facing: Facing,
         side: Side,
@@ -396,14 +396,14 @@ impl Unit {
             // MovementDebugging::default(),
         ));
 
-        if let Some(assets) = assets {
+        if let Some(animations) = animations {
             let mut entry = world.entry(entity).unwrap();
 
-            entry.add_component(assets.mouse_model.skin.clone());
+            entry.add_component(animations.mouse.skin.clone());
             entry.add_component(AnimationState {
                 animation: MouseAnimation::Idle as usize,
                 time: 0.0,
-                total_time: assets.mouse_model.animations[MouseAnimation::Idle as usize].total_time,
+                total_time: animations.mouse.animations[MouseAnimation::Idle as usize].total_time,
             });
         }
 

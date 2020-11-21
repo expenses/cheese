@@ -2,7 +2,7 @@ use super::{
     AnimationState, Building, CommandQueue, FiringRange, MovementDebugging, Position, Selected,
     Side,
 };
-use crate::assets::Assets;
+use crate::assets::ModelAnimations;
 use crate::pathfinding::Map;
 use crate::renderer::{Lines3dBuffer, TorusBuffer, TorusInstance};
 use crate::resources::{DebugControls, PlayerSide, RayCastLocation};
@@ -44,7 +44,7 @@ pub fn set_debug_pathfinding_start(
 pub fn spawn_debug_building(
     #[resource] debug_controls: &DebugControls,
     #[resource] ray_cast_location: &RayCastLocation,
-    #[resource] assets: &Assets,
+    #[resource] animations: &ModelAnimations,
     #[resource] map: &mut Map,
     command_buffer: &mut CommandBuffer,
 ) {
@@ -52,11 +52,11 @@ pub fn spawn_debug_building(
         if let Some((pos, handle, building, radius, selectable, side, health)) =
             Building::Pump.parts(ray_cast_location.0, Side::Purple, map)
         {
-            let skin = assets.pump_model.skin.clone();
+            let skin = animations.pump.skin.clone();
             let animation_state = AnimationState {
                 animation: 0,
                 time: 0.0,
-                total_time: assets.pump_model.animations[0].total_time,
+                total_time: animations.pump.animations[0].total_time,
             };
             command_buffer.push((
                 pos,

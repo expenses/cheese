@@ -1,4 +1,5 @@
 use super::*;
+use crate::assets::ModelAnimations;
 use crate::resources::{CommandMode, ControlGroups, RayCastLocation};
 
 #[legion::system]
@@ -71,7 +72,7 @@ pub fn handle_left_click(
     #[resource] rts_controls: &mut RtsControls,
     #[resource] player_side: &PlayerSide,
     #[resource] map: &mut Map,
-    #[resource] assets: &Assets,
+    #[resource] animations: &ModelAnimations,
     world: &mut SubWorld,
     commands: &mut CommandBuffer,
 ) {
@@ -120,11 +121,11 @@ pub fn handle_left_click(
             if let Some((pos, handle, building, radius, selectable, side, health)) =
                 Building::Pump.parts(ray_cast_location.0, Side::Purple, map)
             {
-                let skin = assets.pump_model.skin.clone();
+                let skin = animations.pump.skin.clone();
                 let animation_state = AnimationState {
                     animation: 0,
                     time: 0.0,
-                    total_time: assets.pump_model.animations[0].total_time,
+                    total_time: animations.pump.animations[0].total_time,
                 };
                 commands.push((
                     pos,
@@ -325,7 +326,10 @@ fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {
 
 #[test]
 fn selection_and_deselection() {
+    use crate::assets::ModelAnimations;
+    use crate::pathfinding::Map;
     use crate::resources::*;
+    use rand::SeedableRng;
 
     let mut world = World::default();
     let mut resources = Resources::default();
@@ -342,9 +346,14 @@ fn selection_and_deselection() {
     resources.insert(DeltaTime(1.0 / 60.0));
     resources.insert(RayCastLocation::default());
     resources.insert(ControlGroups::default());
+    resources.insert(Map::new());
+    resources.insert(Gravity(5.0));
+    resources.insert(DebugControls::default());
+    resources.insert(rand::rngs::SmallRng::from_entropy());
+    resources.insert(ModelAnimations::default());
 
     let mut builder = Schedule::builder();
-    crate::add_gameplay_systems(&mut builder);
+    super::add_gameplay_systems(&mut builder);
     let mut schedule = builder.build();
     let entity = Unit::MouseMarine.add_to_world(
         &mut world,

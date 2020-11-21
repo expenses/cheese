@@ -4,7 +4,7 @@
 use cgmath::Quaternion;
 use ultraviolet::{Mat4, Vec3};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Nodes {
     nodes: Vec<Node>,
     roots_indices: Vec<usize>,

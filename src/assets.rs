@@ -26,8 +26,16 @@ pub struct Assets {
     pub pump_texture: wgpu::BindGroup,
 }
 
+#[derive(Default)]
+pub struct ModelAnimations {
+    pub mouse: AnimationInfo,
+    pub pump: AnimationInfo,
+}
+
 impl Assets {
-    pub fn new(device: &wgpu::Device) -> anyhow::Result<(Self, wgpu::CommandBuffer)> {
+    pub fn new(
+        device: &wgpu::Device,
+    ) -> anyhow::Result<(Self, ModelAnimations, wgpu::CommandBuffer)> {
         let mut init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Cheese init_encoder"),
         });
@@ -47,7 +55,28 @@ impl Assets {
                 }],
             });
 
+        let (mouse_model, mouse_animation_info) = AnimatedModel::load_gltf(
+            include_bytes!("../models/mouse.gltf"),
+            "Cheese mouse model",
+            device,
+        )?;
+
+        let (mouse_helmet_model, _) = AnimatedModel::load_gltf(
+            include_bytes!("../models/mouse_helmet.gltf"),
+            "Cheese mouse helmet model",
+            device,
+        )?;
+
+        let (pump_model, pump_animation_info) = AnimatedModel::load_gltf(
+            include_bytes!("../models/pump.gltf"),
+            "Cheese pump model",
+            device,
+        )?;
+
         let assets = Self {
+            mouse_model,
+            mouse_helmet_model,
+            pump_model,
             surface_model: Model::load_gltf(
                 include_bytes!("../models/surface.gltf"),
                 "Cheese surface model",
@@ -56,16 +85,6 @@ impl Assets {
             bullet_model: Model::load_gltf(
                 include_bytes!("../models/bullet.gltf"),
                 "Cheese bullet model",
-                device,
-            )?,
-            mouse_model: AnimatedModel::load_gltf(
-                include_bytes!("../models/mouse.gltf"),
-                "Cheese mouse model",
-                device,
-            )?,
-            mouse_helmet_model: AnimatedModel::load_gltf(
-                include_bytes!("../models/mouse_helmet.gltf"),
-                "Cheese mouse helmet model",
                 device,
             )?,
             torus_model: Model::load_gltf(
@@ -101,11 +120,6 @@ impl Assets {
             cheese_droplet_model: Model::load_gltf(
                 include_bytes!("../models/cheese_droplet.gltf"),
                 "Cheese cheese droplet model",
-                device,
-            )?,
-            pump_model: AnimatedModel::load_gltf(
-                include_bytes!("../models/pump.gltf"),
-                "Cheese pump model",
                 device,
             )?,
             pump_static_model: Model::load_gltf(
@@ -153,7 +167,12 @@ impl Assets {
             texture_bind_group_layout,
         };
 
-        Ok((assets, init_encoder.finish()))
+        let animations = ModelAnimations {
+            mouse: mouse_animation_info,
+            pump: pump_animation_info,
+        };
+
+        Ok((assets, animations, init_encoder.finish()))
     }
 }
 
@@ -302,6 +321,10 @@ pub struct AnimatedModel {
     pub indices: wgpu::Buffer,
     pub num_indices: u32,
     pub joint_uniforms: wgpu::Buffer,
+}
+
+#[derive(Default)]
+pub struct AnimationInfo {
     pub skin: Skin,
     pub animations: Vec<Animation>,
 }
@@ -317,7 +340,7 @@ impl AnimatedModel {
         gltf_bytes: &'static [u8],
         label: &str,
         device: &wgpu::Device,
-    ) -> anyhow::Result<Self> {
+    ) -> anyhow::Result<(Self, AnimationInfo)> {
         let gltf = gltf::Gltf::from_slice(gltf_bytes)?;
 
         let buffers = load_buffers(&gltf)?;
@@ -387,28 +410,29 @@ impl AnimatedModel {
             animations.len(),
         );
 
-        Ok(Self {
-            vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(label),
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsage::VERTEX,
-            }),
-            indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Cheese index buffer"),
-                contents: bytemuck::cast_slice(&indices),
-                usage: wgpu::BufferUsage::INDEX,
-            }),
-            joint_uniforms: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Cheese joint uniform buffer"),
-                contents: bytemuck::bytes_of(&JointUniforms {
-                    num_joints: skin.joints.len() as u32,
+        Ok((
+            Self {
+                vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some(label),
+                    contents: bytemuck::cast_slice(&vertices),
+                    usage: wgpu::BufferUsage::VERTEX,
                 }),
-                usage: wgpu::BufferUsage::UNIFORM,
-            }),
-            num_indices: indices.len() as u32,
-            animations,
-            skin,
-        })
+                indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Cheese index buffer"),
+                    contents: bytemuck::cast_slice(&indices),
+                    usage: wgpu::BufferUsage::INDEX,
+                }),
+                joint_uniforms: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Cheese joint uniform buffer"),
+                    contents: bytemuck::bytes_of(&JointUniforms {
+                        num_joints: skin.joints.len() as u32,
+                    }),
+                    usage: wgpu::BufferUsage::UNIFORM,
+                }),
+                num_indices: indices.len() as u32,
+            },
+            AnimationInfo { animations, skin },
+        ))
     }
 }
 

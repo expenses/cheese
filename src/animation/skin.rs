@@ -4,7 +4,7 @@
 use super::node::{Node, Nodes};
 use ultraviolet::Mat4;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Skin {
     pub joints: Vec<Joint>,
     pub nodes: Nodes,
