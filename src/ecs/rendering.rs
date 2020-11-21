@@ -39,17 +39,29 @@ pub fn render_building_plan(
 }
 
 #[legion::system(for_each)]
-#[filter(component::<Unit>())]
 pub fn render_units(
     position: &Position,
     side: &Side,
     facing: &Facing,
     skin: &Skin,
+    unit: &Unit,
     #[resource] model_buffers: &mut ModelBuffers,
 ) {
     let translation = Mat4::from_translation(Vec3::new(position.0.x, 0.0, position.0.y));
     let rotation = Mat4::from_rotation_y(facing.0);
-    model_buffers.mice.push(ModelInstance {
+
+    let (instance_buffer, joint_buffer) = match unit {
+        Unit::MouseMarine => (
+            &mut model_buffers.mice_marines,
+            &mut model_buffers.mice_marines_joints,
+        ),
+        Unit::Engineer => (
+            &mut model_buffers.mice_engineers,
+            &mut model_buffers.mice_engineers_joints,
+        ),
+    };
+
+    instance_buffer.push(ModelInstance {
         transform: translation * rotation,
         flat_colour: {
             let colour = match side {
@@ -62,7 +74,7 @@ pub fn render_units(
         },
     });
     for joint in &skin.joints {
-        model_buffers.mice_joints.push(joint.matrix);
+        joint_buffer.push(joint.matrix);
     }
 }
 

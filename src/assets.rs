@@ -16,6 +16,7 @@ pub struct Assets {
     pub cheese_droplet_model: Model,
     pub pump_model: AnimatedModel,
     pub pump_static_model: Model,
+    pub wrench_model: AnimatedModel,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
@@ -67,6 +68,12 @@ impl Assets {
             device,
         )?;
 
+        let (wrench_model, _) = AnimatedModel::load_gltf(
+            include_bytes!("../models/wrench.gltf"),
+            "Cheese wrench model",
+            device,
+        )?;
+
         let (pump_model, pump_animation_info) = AnimatedModel::load_gltf(
             include_bytes!("../models/pump.gltf"),
             "Cheese pump model",
@@ -77,6 +84,7 @@ impl Assets {
             mouse_model,
             mouse_helmet_model,
             pump_model,
+            wrench_model,
             surface_model: Model::load_gltf(
                 include_bytes!("../models/surface.gltf"),
                 "Cheese surface model",

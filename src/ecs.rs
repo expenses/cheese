@@ -325,7 +325,7 @@ impl Building {
 #[derive(Copy, Clone)]
 pub enum Unit {
     MouseMarine,
-    Hulk,
+    Engineer,
 }
 
 pub struct UnitStats {
@@ -337,8 +337,9 @@ pub struct UnitStats {
 }
 
 enum MouseAnimation {
-    Idle = 0,
-    Walking = 1,
+    Build = 0,
+    Idle = 1,
+    Walking = 2,
 }
 
 impl Unit {
@@ -351,11 +352,11 @@ impl Unit {
                 radius: 1.0,
                 health_bar_height: 3.0,
             },
-            Self::Hulk => UnitStats {
-                max_health: 500,
-                firing_range: 5.0,
+            Self::Engineer => UnitStats {
+                max_health: 40,
+                firing_range: 1.0,
                 move_speed: 6.0,
-                radius: 1.5,
+                radius: 1.0,
                 health_bar_height: 3.0,
             },
         }

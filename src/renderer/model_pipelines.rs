@@ -410,14 +410,77 @@ impl BuildingPlan {
     }
 }
 
+fn create_joint_bind_group(
+    context: &RenderContext,
+    label: &str,
+    joint_buffer: &DynamicBuffer<Mat4>,
+    model: &AnimatedModel,
+) -> wgpu::BindGroup {
+    context
+        .device
+        .create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(label),
+            layout: &context.joint_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(joint_buffer.buffer.slice(..)),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Buffer(model.joint_uniforms.slice(..)),
+                },
+            ],
+        })
+}
+
+pub struct JointBuffer {
+    buffer: DynamicBuffer<Mat4>,
+    pub bind_group: wgpu::BindGroup,
+    bind_group_label: &'static str,
+}
+
+impl JointBuffer {
+    fn new(
+        context: &RenderContext,
+        capacity: usize,
+        label: &'static str,
+        bind_group_label: &'static str,
+        model: &AnimatedModel,
+    ) -> Self {
+        let buffer =
+            DynamicBuffer::new(&context.device, capacity, label, wgpu::BufferUsage::STORAGE);
+
+        Self {
+            bind_group: create_joint_bind_group(context, bind_group_label, &buffer, model),
+            buffer,
+            bind_group_label,
+        }
+    }
+
+    fn upload(&mut self, context: &RenderContext, model: &AnimatedModel) {
+        let resized = self.buffer.upload(context);
+
+        if resized {
+            self.bind_group =
+                create_joint_bind_group(context, &self.bind_group_label, &self.buffer, model);
+        }
+    }
+
+    pub fn push(&mut self, joint: Mat4) {
+        self.buffer.push(joint);
+    }
+}
+
 pub struct ModelBuffers {
-    pub mice: DynamicBuffer<ModelInstance>,
-    pub mice_joints: DynamicBuffer<Mat4>,
-    pub mice_joints_bind_group: wgpu::BindGroup,
+    pub mice_marines: DynamicBuffer<ModelInstance>,
+    pub mice_marines_joints: JointBuffer,
+
+    pub mice_engineers: DynamicBuffer<ModelInstance>,
+    pub mice_engineers_joints: JointBuffer,
 
     pub pumps: DynamicBuffer<ModelInstance>,
-    pub pump_joints: DynamicBuffer<Mat4>,
-    pub pump_joints_bind_group: wgpu::BindGroup,
+    pub pump_joints: JointBuffer,
 
     pub bullets: DynamicBuffer<ModelInstance>,
     pub command_indicators: DynamicBuffer<ModelInstance>,
@@ -430,48 +493,46 @@ pub struct ModelBuffers {
 
 impl ModelBuffers {
     pub fn new(context: &RenderContext, assets: &Assets) -> Self {
-        let mice_joints = DynamicBuffer::new(
-            &context.device,
-            400,
-            "Cheese mice joints buffer",
-            wgpu::BufferUsage::STORAGE,
-        );
-
-        let pump_joints = DynamicBuffer::new(
-            &context.device,
-            20,
-            "Cheese pump joints buffer",
-            wgpu::BufferUsage::STORAGE,
-        );
-
         Self {
-            mice: DynamicBuffer::new(
+            mice_marines: DynamicBuffer::new(
                 &context.device,
                 50,
-                "Cheese mice instance buffer",
+                "Cheese mice marines instance buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
-            mice_joints_bind_group: create_joint_bind_group(
+            mice_marines_joints: JointBuffer::new(
                 context,
-                "Cheese mice joints bind group",
-                &mice_joints,
+                400,
+                "Cheese mice marines joints buffer",
+                "Cheese mice marines joints bind group",
                 &assets.mouse_model,
             ),
-            mice_joints,
-
+            mice_engineers: DynamicBuffer::new(
+                &context.device,
+                50,
+                "Cheese mice engineers instance buffer",
+                wgpu::BufferUsage::VERTEX,
+            ),
+            mice_engineers_joints: JointBuffer::new(
+                context,
+                400,
+                "Cheese mice engineers joints buffer",
+                "Cheese mice engineers joints bind group",
+                &assets.mouse_model,
+            ),
             pumps: DynamicBuffer::new(
                 &context.device,
                 10,
                 "Cheese pumps buffer",
                 wgpu::BufferUsage::VERTEX,
             ),
-            pump_joints_bind_group: create_joint_bind_group(
+            pump_joints: JointBuffer::new(
                 context,
-                "Cheese pumps bind group",
-                &pump_joints,
+                20,
+                "Cheese pump joints buffer",
+                "Cheese pump joints bind group",
                 &assets.pump_model,
             ),
-            pump_joints,
 
             bullets: DynamicBuffer::new(
                 &context.device,
@@ -516,7 +577,6 @@ impl ModelBuffers {
     }
 
     pub fn upload(&mut self, context: &RenderContext, assets: &Assets) {
-        self.mice.upload(context);
         self.bullets.upload(context);
         self.command_indicators.upload(context);
         self.command_paths.upload(context);
@@ -524,27 +584,13 @@ impl ModelBuffers {
         self.cheese_droplets.upload(context);
         self.pumps.upload(context);
         self.building_plan.upload(context);
-        let mice_resized = self.mice_joints.upload(context);
-        let pumps_resized = self.pump_joints.upload(context);
-
-        // We need to recreate the bind group
-        if mice_resized {
-            self.mice_joints_bind_group = create_joint_bind_group(
-                context,
-                "Cheese mice joints bind group",
-                &self.mice_joints,
-                &assets.mouse_model,
-            );
-        }
-
-        if pumps_resized {
-            self.pump_joints_bind_group = create_joint_bind_group(
-                context,
-                "Cheese pumps bind group",
-                &self.pump_joints,
-                &assets.pump_model,
-            );
-        }
+        self.mice_marines.upload(context);
+        self.mice_engineers.upload(context);
+        self.mice_marines_joints
+            .upload(context, &assets.mouse_model);
+        self.mice_engineers_joints
+            .upload(context, &assets.mouse_model);
+        self.pump_joints.upload(context, &assets.pump_model);
     }
 }
 
@@ -580,30 +626,6 @@ impl TitlescreenBuffer {
     pub fn upload(&self, context: &RenderContext) {
         self.moon.upload(context);
     }
-}
-
-fn create_joint_bind_group(
-    context: &RenderContext,
-    label: &str,
-    joint_buffer: &DynamicBuffer<Mat4>,
-    model: &AnimatedModel,
-) -> wgpu::BindGroup {
-    context
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some(label),
-            layout: &context.joint_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer(joint_buffer.buffer.slice(..)),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Buffer(model.joint_uniforms.slice(..)),
-                },
-            ],
-        })
 }
 
 #[repr(C)]

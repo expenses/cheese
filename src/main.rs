@@ -102,6 +102,14 @@ async fn run() -> anyhow::Result<()> {
         );
     }
 
+    ecs::Unit::Engineer.add_to_world(
+        &mut world,
+        Some(&animations),
+        Vec2::new(20.0, 0.0),
+        ecs::Facing(1.0),
+        ecs::Side::Green,
+    );
+
     let mut map = pathfinding::Map::new();
 
     ecs::Building::Armoury
@@ -478,7 +486,7 @@ fn render_shadows<'a>(
     shadow_pipeline.render_animated(
         shadow_pass,
         &assets.pump_model,
-        &model_buffers.pump_joints_bind_group,
+        &model_buffers.pump_joints.bind_group,
         &model_buffers.pumps,
     );
     shadow_pipeline.render_single(shadow_pass, &assets.surface_model);
@@ -490,8 +498,20 @@ fn render_shadows<'a>(
     shadow_pipeline.render_animated(
         shadow_pass,
         &assets.mouse_model,
-        &model_buffers.mice_joints_bind_group,
-        &model_buffers.mice,
+        &model_buffers.mice_marines_joints.bind_group,
+        &model_buffers.mice_marines,
+    );
+    shadow_pipeline.render_animated(
+        shadow_pass,
+        &assets.mouse_model,
+        &model_buffers.mice_engineers_joints.bind_group,
+        &model_buffers.mice_engineers,
+    );
+    shadow_pipeline.render_animated(
+        shadow_pass,
+        &assets.wrench_model,
+        &model_buffers.mice_engineers_joints.bind_group,
+        &model_buffers.mice_engineers,
     );
 }
 
@@ -519,7 +539,7 @@ fn render_playing<'a>(
         &model_buffers.pumps,
         &assets.pump_texture,
         &assets.pump_model,
-        &model_buffers.pump_joints_bind_group,
+        &model_buffers.pump_joints.bind_group,
     );
     model_pipelines.render_instanced(
         &mut render_pass,
@@ -527,13 +547,30 @@ fn render_playing<'a>(
         &assets.surface_texture,
         &assets.cheese_droplet_model,
     );
+    // Mice marines
     model_pipelines.render_animated(
         &mut render_pass,
-        &model_buffers.mice,
+        &model_buffers.mice_marines,
         &assets.mouse_texture,
         &assets.mouse_model,
-        &model_buffers.mice_joints_bind_group,
+        &model_buffers.mice_marines_joints.bind_group,
     );
+    // Mice engineers
+    model_pipelines.render_animated(
+        &mut render_pass,
+        &model_buffers.mice_engineers,
+        &assets.mouse_texture,
+        &assets.mouse_model,
+        &model_buffers.mice_engineers_joints.bind_group,
+    );
+    model_pipelines.render_animated(
+        &mut render_pass,
+        &model_buffers.mice_engineers,
+        &assets.armoury_texture,
+        &assets.wrench_model,
+        &model_buffers.mice_engineers_joints.bind_group,
+    );
+    // Bullets
     model_pipelines.render_transparent_textured_with_bloom(
         &mut render_pass,
         &model_buffers.bullets,
@@ -561,10 +598,17 @@ fn render_playing<'a>(
     );
     model_pipelines.render_transparent_animated(
         &mut render_pass,
-        &model_buffers.mice,
+        &model_buffers.mice_marines,
         &assets.mouse_texture,
         &assets.mouse_helmet_model,
-        &model_buffers.mice_joints_bind_group,
+        &model_buffers.mice_marines_joints.bind_group,
+    );
+    model_pipelines.render_transparent_animated(
+        &mut render_pass,
+        &model_buffers.mice_engineers,
+        &assets.mouse_texture,
+        &assets.mouse_helmet_model,
+        &model_buffers.mice_engineers_joints.bind_group,
     );
 
     if let Some((building, buffer)) = model_buffers.building_plan.get() {
