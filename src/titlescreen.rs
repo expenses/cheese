@@ -3,7 +3,7 @@ use crate::resources::{
     Camera, CursorIcon, DeltaTime, DpiScaling, Mode, MouseState, ScreenDimensions,
 };
 use legion::*;
-use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
+use ultraviolet::{Mat4, Rotor3, Vec2, Vec3, Vec4};
 
 const TITLE_POSITION: Vec2 = Vec2::new(0.5, 1.0 / 6.0);
 const SKIRMISH_POSITION: Vec2 = Vec2::new(0.5, 3.0 / 4.0);
@@ -162,9 +162,9 @@ pub fn create_stars<R: rand::Rng>(rng: &mut R) -> Vec<ModelInstance> {
 
             ModelInstance {
                 transform: Mat4::from_translation(pos)
-                    // Not sure why we're inverting this or anything.
-                    * Mat4::look_at(Vec3::new(0.0, 0.0, 0.0), pos, Vec3::new(0.0, 1.0, 0.0))
-                        .inversed()
+                    * Rotor3::from_rotation_between(Vec3::new(0.0, 1.0, 0.0), pos)
+                        .into_matrix()
+                        .into_homogeneous()
                     * Mat4::from_scale(rng.gen_range(0.01, 0.05)),
                 flat_colour: Vec4::one(),
             }

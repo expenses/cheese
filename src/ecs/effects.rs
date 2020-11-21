@@ -3,7 +3,7 @@ use crate::renderer::{ModelBuffers, ModelInstance};
 use crate::resources::{DeltaTime, Gravity};
 use legion::{component, systems::CommandBuffer, Entity};
 use rand::Rng;
-use ultraviolet::{Mat4, Vec3, Vec4};
+use ultraviolet::{Mat4, Rotor3, Vec3, Vec4};
 
 #[legion::system(for_each)]
 pub fn apply_gravity(
@@ -52,13 +52,10 @@ pub fn render_cheese_droplets(
     #[resource] model_buffers: &mut ModelBuffers,
 ) {
     let translation = Mat4::from_translation(position.0);
-    let rotation = ultraviolet::Rotor3::from_rotation_between(
-        Vec3::new(0.0, -1.0, 0.0),
-        velocity.0.normalized(),
-    )
-    .into_matrix()
-    .into_homogeneous();
-    //Mat4::look_at(Vec3::zero(), velocity.0, Vec3::new(0.0, 1.0, 0.0));
+    let rotation =
+        Rotor3::from_rotation_between(Vec3::new(0.0, -1.0, 0.0), velocity.0.normalized())
+            .into_matrix()
+            .into_homogeneous();
     model_buffers.cheese_droplets.push(ModelInstance {
         transform: translation * rotation,
         flat_colour: Vec4::one(),

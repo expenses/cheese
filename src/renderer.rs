@@ -1093,6 +1093,8 @@ impl ShadowUniforms {
         let top_right = top_right - look_at;
         let bottom_right = bottom_right - look_at;
         // multiply the sun direction by a 10 so that we can view shadows from a greater distance.
+        // todo: this is hacky and doesn't produce great looking shadows on the pumps. It's probably
+        // a better solution to lower this down and not show shadows from above a certain height.
         let sun_direction_multiplied = SUN_DIRECTION * 10.0;
 
         // Using the camera distance from the ground is just a guesstimate that seems to work well here.

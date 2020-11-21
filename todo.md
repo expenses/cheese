@@ -1,6 +1,5 @@
 - Resources
-- Cheese wells on map
-- Units should not try to move to the sample spot, but the path locations should be spread out.
+- Units should not try to move to the same spot, but the path locations should be spread out.
 - AI
 - Fill out HUD (medium)
 - Pyschic units

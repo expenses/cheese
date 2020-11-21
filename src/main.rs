@@ -71,7 +71,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(PlayerSide(ecs::Side::Green));
     resources.insert(ControlGroups::default());
     resources.insert(titlescreen::TitlescreenMoon::default());
-    resources.insert(Mode::Playing);
+    resources.insert(Mode::Titlescreen);
     resources.insert(DebugControls::default());
     resources.insert(Gravity(5.0));
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
@@ -364,6 +364,7 @@ async fn run() -> anyhow::Result<()> {
                     drop(render_pass);
 
                     // First bloom pass
+                    // todo: setting to disable bloom
 
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
