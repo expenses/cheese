@@ -12,7 +12,7 @@ pub struct ModelPipelines {
     model_pipeline: wgpu::RenderPipeline,
     animated_pipeline: wgpu::RenderPipeline,
     transparent_animated_pipeline: wgpu::RenderPipeline,
-    transparent_textured_pipeline: wgpu::RenderPipeline,
+    transparent_textured_bloom_pipeline: wgpu::RenderPipeline,
     transparent_textured_no_depth_pipeline: wgpu::RenderPipeline,
     transparent_pipeline: wgpu::RenderPipeline,
     main_bind_group: Arc<wgpu::BindGroup>,
@@ -34,6 +34,12 @@ impl ModelPipelines {
             wgpu::include_spirv!("../../shaders/compiled/transparent_textured.frag.spv");
         let fs_transparent_textured_module =
             context.device.create_shader_module(fs_transparent_textured);
+
+        let fs_transparent_textured_bloom =
+            wgpu::include_spirv!("../../shaders/compiled/transparent_textured_bloom.frag.spv");
+        let fs_transparent_textured_bloom_module = context
+            .device
+            .create_shader_module(fs_transparent_textured_bloom);
 
         let model_pipeline = create_render_pipeline(
             &context.device,
@@ -75,7 +81,7 @@ impl ModelPipelines {
             true,
         );
 
-        let transparent_textured_pipeline = create_render_pipeline(
+        let transparent_textured_bloom_pipeline = create_render_pipeline(
             &context.device,
             &[
                 &context.main_bind_group_layout,
@@ -83,7 +89,7 @@ impl ModelPipelines {
             ],
             "Cheese transparent textured pipeline",
             &context.vs_transparent_module,
-            &fs_transparent_textured_module,
+            &fs_transparent_textured_bloom_module,
             true,
             true,
         );
@@ -115,7 +121,7 @@ impl ModelPipelines {
             model_pipeline,
             animated_pipeline,
             transparent_animated_pipeline,
-            transparent_textured_pipeline,
+            transparent_textured_bloom_pipeline,
             transparent_textured_no_depth_pipeline,
             transparent_pipeline,
             main_bind_group: context.main_bind_group.clone(),
@@ -218,7 +224,7 @@ impl ModelPipelines {
         }
     }
 
-    pub fn render_transparent_textured<'a>(
+    pub fn render_transparent_textured_with_bloom<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         instances: &'a DynamicBuffer<ModelInstance>,
@@ -226,7 +232,7 @@ impl ModelPipelines {
         model: &'a Model,
     ) {
         if let Some((slice, num)) = instances.get() {
-            render_pass.set_pipeline(&self.transparent_textured_pipeline);
+            render_pass.set_pipeline(&self.transparent_textured_bloom_pipeline);
             render_pass.set_bind_group(0, &self.main_bind_group, &[]);
             render_pass.set_bind_group(1, texture, &[]);
             draw_model(render_pass, model, slice, num);
@@ -294,7 +300,7 @@ fn create_render_pipeline(
 			..Default::default()
 		}),
 		primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-		color_states: &[colour_state_descriptor(alpha_blend)],
+		color_states: &[colour_state_descriptor(alpha_blend), colour_state_descriptor(alpha_blend)],
 		depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
 			format: DEPTH_FORMAT,
 			depth_write_enabled: write_depth,
@@ -351,7 +357,7 @@ fn create_animated_pipeline(
 			..Default::default()
 		}),
 		primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-		color_states: &[colour_state_descriptor(alpha_blend)],
+		color_states: &[colour_state_descriptor(alpha_blend), colour_state_descriptor(false)],
 		depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
 			format: DEPTH_FORMAT,
 			depth_write_enabled: true,

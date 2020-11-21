@@ -87,7 +87,7 @@ impl LinesPipeline {
             }),
             rasterization_state: Some(wgpu::RasterizationStateDescriptor::default()),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: &[colour_state_descriptor(true)],
+            color_states: &[colour_state_descriptor(true), colour_state_descriptor(false)],
             depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
                 format: DEPTH_FORMAT,
                 depth_write_enabled: false,

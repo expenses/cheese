@@ -49,7 +49,7 @@ impl TorusPipeline {
                 ..Default::default()
             }),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: &[colour_state_descriptor(false)],
+            color_states: &[colour_state_descriptor(false), colour_state_descriptor(false)],
             depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
                 format: DEPTH_FORMAT,
                 depth_write_enabled: true,

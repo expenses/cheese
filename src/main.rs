@@ -263,7 +263,8 @@ async fn run() -> anyhow::Result<()> {
                         },
                     );
 
-                    // shadow pass
+                    // Shadow pass
+
                     let mut shadow_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         color_attachments: &[],
                         depth_stencil_attachment: Some(
@@ -284,21 +285,37 @@ async fn run() -> anyhow::Result<()> {
 
                     drop(shadow_pass);
 
-                    // This is super messy and should be abstracted.
+                    // Main rendering pass
+
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: &render_context.framebuffer,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color {
-                                    r: 0.0,
-                                    g: 0.0,
-                                    b: 0.0,
-                                    a: 1.0,
-                                }),
-                                store: true,
+                        color_attachments: &[
+                            wgpu::RenderPassColorAttachmentDescriptor {
+                                attachment: &render_context.framebuffer,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                                        r: 0.0,
+                                        g: 0.0,
+                                        b: 0.0,
+                                        a: 1.0,
+                                    }),
+                                    store: true,
+                                },
                             },
-                        }],
+                            wgpu::RenderPassColorAttachmentDescriptor {
+                                attachment: &render_context.bloombuffer,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                                        r: 0.0,
+                                        g: 0.0,
+                                        b: 0.0,
+                                        a: 1.0,
+                                    }),
+                                    store: true,
+                                },
+                            },
+                        ],
                         depth_stencil_attachment: Some(
                             wgpu::RenderPassDepthStencilAttachmentDescriptor {
                                 attachment: &render_context.depth_texture,
@@ -344,8 +361,58 @@ async fn run() -> anyhow::Result<()> {
                         Mode::Quit => {}
                     }
 
-                    // We're done with this pass.
                     drop(render_pass);
+
+                    // First bloom pass
+
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                            attachment: &render_context.bloombuffer_after_vertical,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color {
+                                    r: 0.0,
+                                    g: 0.0,
+                                    b: 0.0,
+                                    a: 1.0,
+                                }),
+                                store: true,
+                            },
+                        }],
+                        depth_stencil_attachment: None,
+                    });
+
+                    render_pass.set_pipeline(&render_context.bloom_blur_pipeline);
+                    render_pass.set_bind_group(0, &render_context.bloom_first_pass_bind_group, &[]);
+                    render_pass.draw(0..3, 0..1);
+
+                    drop(render_pass);
+
+                    // Second bloom pass and composit onto framebuffer
+
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                            attachment: &render_context.framebuffer,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: true,
+                            },
+                        }],
+                        depth_stencil_attachment: None,
+                    });
+
+                    render_pass.set_pipeline(&render_context.bloom_blur_pipeline);
+                    render_pass.set_bind_group(
+                        0,
+                        &render_context.bloom_second_pass_bind_group,
+                        &[],
+                    );
+                    render_pass.draw(0..3, 0..1);
+
+                    drop(render_pass);
+
+                    // Post-processing pass
 
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -369,6 +436,8 @@ async fn run() -> anyhow::Result<()> {
                     render_pass.draw(0..3, 0..1);
 
                     drop(render_pass);
+
+                    // Text rendering pass
 
                     let size = render_context.window.inner_size();
                     let mut staging_belt = wgpu::util::StagingBelt::new(10);
@@ -465,7 +534,7 @@ fn render_playing<'a>(
         &assets.mouse_model,
         &model_buffers.mice_joints_bind_group,
     );
-    model_pipelines.render_transparent_textured(
+    model_pipelines.render_transparent_textured_with_bloom(
         &mut render_pass,
         &model_buffers.bullets,
         &assets.misc_texture,
