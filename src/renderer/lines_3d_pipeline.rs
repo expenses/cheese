@@ -115,6 +115,12 @@ impl Lines3dBuffer {
             colour,
         });
     }
+
+    pub fn draw_triangle(&mut self, a: Vec2, b: Vec2, c: Vec2, height: f32, colour: Vec4) {
+        self.draw_line(a, b, height, colour);
+        self.draw_line(b, c, height, colour);
+        self.draw_line(c, a, height, colour);
+    }
 }
 
 #[repr(C)]

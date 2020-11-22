@@ -29,9 +29,10 @@ use controls::{
     handle_stop_command_system, remove_dead_entities_from_control_groups_system,
 };
 use debugging::{
-    debug_specific_path_system, render_building_grid_system, render_debug_unit_pathfinding_system,
-    render_firing_ranges_system, render_pathfinding_map_system, render_unit_paths_system,
-    set_debug_pathfinding_start_system, spawn_debug_building_system,
+    debug_select_box_system, debug_specific_path_system, render_building_grid_system,
+    render_debug_unit_pathfinding_system, render_firing_ranges_system,
+    render_pathfinding_map_system, render_unit_paths_system, set_debug_pathfinding_start_system,
+    spawn_debug_building_system,
 };
 use effects::{
     apply_gravity_system, move_cheese_droplets_system, render_cheese_droplets_system,
@@ -119,6 +120,7 @@ pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
         .add_system(render_buildings_system())
         .add_system(render_building_plan_system())
         .add_system(render_cheese_droplets_system())
+        //.add_system(debug_select_box_system())
         //.add_system(debug_specific_path_system())
         // Cleanup
         .flush()
@@ -421,10 +423,10 @@ fn sort_points(a: Vec2, b: Vec2) -> (Vec2, Vec2) {
 }
 
 struct SelectBox {
-    top_left: Vec2,
-    top_right: Vec2,
-    bottom_left: Vec2,
-    bottom_right: Vec2,
+    pub top_left: Vec2,
+    pub top_right: Vec2,
+    pub bottom_left: Vec2,
+    pub bottom_right: Vec2,
 }
 
 impl SelectBox {
@@ -452,12 +454,12 @@ impl SelectBox {
         let bottom_left_point = vec2_to_ncollide_point(self.bottom_left);
         let bottom_right_point = vec2_to_ncollide_point(self.bottom_right);
 
-        ncollide3d::utils::is_point_in_triangle(
+        ncollide2d::utils::is_point_in_triangle(
             &point,
             &top_left_point,
             &top_right_point,
             &bottom_left_point,
-        ) || ncollide3d::utils::is_point_in_triangle(
+        ) || ncollide2d::utils::is_point_in_triangle(
             &point,
             &top_right_point,
             &bottom_left_point,
@@ -466,8 +468,8 @@ impl SelectBox {
     }
 }
 
-fn vec2_to_ncollide_point(point: Vec2) -> ncollide3d::math::Point<f32> {
-    ncollide3d::math::Point::new(point.x, 0.0, point.y)
+fn vec2_to_ncollide_point(point: Vec2) -> ncollide2d::math::Point<f32> {
+    ncollide2d::math::Point::new(point.x, point.y)
 }
 
 pub struct CheeseDropletPosition(Vec3);

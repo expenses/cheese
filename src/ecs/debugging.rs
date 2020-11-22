@@ -1,11 +1,13 @@
 use super::{
-    AnimationState, Building, CommandQueue, FiringRange, MovementDebugging, Position, Selected,
-    Side,
+    AnimationState, Building, CommandQueue, FiringRange, MovementDebugging, Position, SelectBox,
+    Selected, Side,
 };
 use crate::assets::ModelAnimations;
 use crate::pathfinding::Map;
 use crate::renderer::{Lines3dBuffer, TorusBuffer, TorusInstance};
-use crate::resources::{DebugControls, PlayerSide, RayCastLocation};
+use crate::resources::{
+    Camera, DebugControls, MouseState, PlayerSide, RayCastLocation, ScreenDimensions,
+};
 use legion::component;
 use legion::systems::CommandBuffer;
 use ultraviolet::{Vec2, Vec3, Vec4};
@@ -159,6 +161,26 @@ pub fn render_unit_paths(
 ) {
     if let Some(path) = commands.0.front().and_then(|command| command.path()) {
         render_path(position.0, path, lines_3d_buffer);
+    }
+}
+
+#[legion::system]
+pub fn debug_select_box(
+    #[resource] mouse_state: &MouseState,
+    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] camera: &Camera,
+    #[resource] lines_3d_buffer: &mut Lines3dBuffer,
+) {
+    if let Some(start) = mouse_state.left_state.is_being_dragged() {
+        let SelectBox {
+            top_left,
+            top_right,
+            bottom_left,
+            bottom_right,
+        } = SelectBox::new(camera, screen_dimensions, start, mouse_state.position);
+        let colour = Vec4::new(0.0, 0.0, 0.0, 1.0);
+        lines_3d_buffer.draw_triangle(top_left, top_right, bottom_left, 0.01, colour);
+        lines_3d_buffer.draw_triangle(top_right, bottom_left, bottom_right, 0.01, colour);
     }
 }
 

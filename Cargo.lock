@@ -240,6 +240,7 @@ dependencies = [
  "legion",
  "log",
  "lyon_tessellation",
+ "ncollide2d",
  "ncollide3d",
  "ordered-float 2.0.0",
  "pathfinding",
@@ -1403,6 +1404,25 @@ dependencies = [
  "rand_distr",
  "simba",
  "typenum",
+]
+
+[[package]]
+name = "ncollide2d"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ff7f14a414a36cf02af97e65c4d90c7056b0de5779e73488978d52c5c03aeb1"
+dependencies = [
+ "approx 0.4.0",
+ "bitflags",
+ "downcast-rs",
+ "either",
+ "nalgebra 0.23.0",
+ "num-traits",
+ "petgraph",
+ "simba",
+ "slab",
+ "slotmap",
+ "smallvec",
 ]
 
 [[package]]
