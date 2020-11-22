@@ -71,7 +71,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(PlayerSide(ecs::Side::Green));
     resources.insert(ControlGroups::default());
     resources.insert(titlescreen::TitlescreenMoon::default());
-    resources.insert(Mode::Titlescreen);
+    resources.insert(Mode::Playing);
     resources.insert(DebugControls::default());
     resources.insert(Gravity(5.0));
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
@@ -495,12 +495,20 @@ fn render_shadows<'a>(
         &assets.cheese_droplet_model,
         &model_buffers.cheese_droplets,
     );
+    // Marines
     shadow_pipeline.render_animated(
         shadow_pass,
         &assets.mouse_model,
         &model_buffers.mice_marines_joints.bind_group,
         &model_buffers.mice_marines,
     );
+    shadow_pipeline.render_animated(
+        shadow_pass,
+        &assets.blaster_model,
+        &model_buffers.mice_marines_joints.bind_group,
+        &model_buffers.mice_marines,
+    );
+    // Engineers
     shadow_pipeline.render_animated(
         shadow_pass,
         &assets.mouse_model,
@@ -555,6 +563,13 @@ fn render_playing<'a>(
         &assets.mouse_model,
         &model_buffers.mice_marines_joints.bind_group,
     );
+    model_pipelines.render_animated(
+        &mut render_pass,
+        &model_buffers.mice_marines,
+        &assets.blaster_texture,
+        &assets.blaster_model,
+        &model_buffers.mice_marines_joints.bind_group,
+    );
     // Mice engineers
     model_pipelines.render_animated(
         &mut render_pass,
@@ -596,6 +611,7 @@ fn render_playing<'a>(
         &assets.misc_texture,
         &assets.command_indicator_model,
     );
+    // Helmets
     model_pipelines.render_transparent_animated(
         &mut render_pass,
         &model_buffers.mice_marines,

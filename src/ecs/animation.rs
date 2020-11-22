@@ -17,7 +17,7 @@ pub fn progress_animations(
             if state.is_out_of_range() {
                 MouseAnimation::Walking
             } else {
-                MouseAnimation::Idle
+                MouseAnimation::Shoot
             }
         }
         None => MouseAnimation::Idle,

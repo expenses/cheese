@@ -338,7 +338,8 @@ pub fn render_bullets(
     facing: &Facing,
     #[resource] model_buffers: &mut ModelBuffers,
 ) {
-    let translation = Mat4::from_translation(Vec3::new(position.0.x, 1.0, position.0.y));
+    let gun_height = 1.8;
+    let translation = Mat4::from_translation(Vec3::new(position.0.x, gun_height, position.0.y));
     let rotation = Mat4::from_rotation_y(facing.0);
 
     model_buffers.bullets.push(ModelInstance {

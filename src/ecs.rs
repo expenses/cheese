@@ -339,7 +339,8 @@ pub struct UnitStats {
 enum MouseAnimation {
     Build = 0,
     Idle = 1,
-    Walking = 2,
+    Shoot = 2,
+    Walking = 3,
 }
 
 impl Unit {

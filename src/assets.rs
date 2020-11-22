@@ -17,6 +17,7 @@ pub struct Assets {
     pub pump_model: AnimatedModel,
     pub pump_static_model: Model,
     pub wrench_model: AnimatedModel,
+    pub blaster_model: AnimatedModel,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
@@ -25,6 +26,7 @@ pub struct Assets {
     pub misc_texture: wgpu::BindGroup,
     pub armoury_texture: wgpu::BindGroup,
     pub pump_texture: wgpu::BindGroup,
+    pub blaster_texture: wgpu::BindGroup,
 }
 
 #[derive(Default)]
@@ -74,6 +76,12 @@ impl Assets {
             device,
         )?;
 
+        let (blaster_model, _) = AnimatedModel::load_gltf(
+            include_bytes!("../models/blaster.gltf"),
+            "Cheese blaster model",
+            device,
+        )?;
+
         let (pump_model, pump_animation_info) = AnimatedModel::load_gltf(
             include_bytes!("../models/pump.gltf"),
             "Cheese pump model",
@@ -85,6 +93,7 @@ impl Assets {
             mouse_helmet_model,
             pump_model,
             wrench_model,
+            blaster_model,
             surface_model: Model::load_gltf(
                 include_bytes!("../models/surface.gltf"),
                 "Cheese surface model",
@@ -167,6 +176,13 @@ impl Assets {
             pump_texture: load_texture(
                 include_bytes!("../textures/pump.png"),
                 "Cheese pump texture",
+                &texture_bind_group_layout,
+                device,
+                &mut init_encoder,
+            )?,
+            blaster_texture: load_texture(
+                include_bytes!("../textures/blaster.png"),
+                "Cheese blaster texture",
                 &texture_bind_group_layout,
                 device,
                 &mut init_encoder,

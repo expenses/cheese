@@ -50,13 +50,13 @@ pub fn firing(
             facing.0 = vector.y.atan2(vector.x);
 
             buffer.push((
-                Position(position.0),
+                Position(position.0 + vector.normalized() * 0.5),
                 Bullet {
                     target: *target,
                     source: *entity,
                     target_position: target_position.0,
                 },
-                Facing(0.0),
+                Facing(vector.y.atan2(vector.x)),
                 MoveSpeed(20.0),
             ));
             cooldown.0 = 10;
