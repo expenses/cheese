@@ -51,7 +51,7 @@ pub fn spawn_debug_building(
     command_buffer: &mut CommandBuffer,
 ) {
     if debug_controls.spawn_building_pressed {
-        if let Some((pos, handle, building, radius, selectable, side, health)) =
+        if let Some((pos, handle, building, radius, selectable, side, health, completeness)) =
             Building::Pump.parts(ray_cast_location.0, Side::Purple, map)
         {
             let skin = animations.pump.skin.clone();
@@ -70,6 +70,7 @@ pub fn spawn_debug_building(
                 health,
                 skin,
                 animation_state,
+                completeness,
             ));
         }
     }

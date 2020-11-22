@@ -11,6 +11,7 @@ use ultraviolet::{Mat4, Vec2, Vec3};
 
 mod animation;
 mod combat;
+mod construction;
 mod controls;
 mod debugging;
 mod effects;
@@ -21,8 +22,9 @@ use crate::resources::DebugControls;
 use animation::{progress_animations_system, progress_building_animations_system};
 use combat::{
     add_attack_commands_system, apply_bullets_system, firing_system, handle_damaged_system,
-    reduce_cooldowns_system, stop_attacks_on_dead_entities_system,
+    reduce_cooldowns_system, stop_actions_on_dead_entities_system,
 };
+use construction::build_buildings_system;
 use controls::{
     cast_ray_system, control_camera_system, handle_control_groups_system,
     handle_drag_selection_system, handle_left_click_system, handle_right_click_system,
@@ -73,7 +75,7 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(reset_map_updated_system())
         .add_system(cast_ray_system())
         .add_system(remove_dead_entities_from_control_groups_system())
-        .add_system(stop_attacks_on_dead_entities_system())
+        .add_system(stop_actions_on_dead_entities_system())
         .add_system(control_camera_system())
         .add_system(handle_left_click_system())
         .add_system(handle_right_click_system())
@@ -82,6 +84,9 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(handle_control_groups_system())
         .add_system(avoidance_system())
         .add_system(add_attack_commands_system())
+        // Needed because a command could place a building using a command buffer, but the entity
+        // reference wouldn't be valid until the commands in the buffer have been executed.
+        .flush()
         .add_system(set_movement_paths_system())
         .add_system(reduce_cooldowns_system())
         .add_system(set_debug_pathfinding_start_system())
@@ -93,6 +98,7 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(move_units_system())
         .add_system(move_bullets_system())
         .add_system(apply_steering_system())
+        .add_system(build_buildings_system())
         .add_system(firing_system())
         .add_system(apply_bullets_system())
         .flush()
@@ -132,7 +138,7 @@ pub struct CheeseGuyser;
 #[derive(Debug)]
 pub struct Position(pub Vec2);
 pub struct Facing(pub f32);
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum Side {
     Green,
     Purple,
@@ -166,7 +172,11 @@ pub enum Command {
         // better to just switch targets than to chase. We set this to true initially and just 'and'
         // it with whether the unit is out of range.
         first_out_of_range: bool,
-        state: AttackState,
+        state: ActionState,
+    },
+    Build {
+        target: Entity,
+        state: ActionState,
     },
 }
 
@@ -176,14 +186,18 @@ impl Command {
             target,
             explicit,
             first_out_of_range: true,
-            state: AttackState::OutOfRange { path: Vec::new() },
+            state: ActionState::OutOfRange { path: Vec::new() },
         }
     }
 
     fn path(&self) -> Option<&Vec<Vec2>> {
         if let &Command::MoveTo { ref path, .. }
         | &Command::Attack {
-            state: AttackState::OutOfRange { ref path },
+            state: ActionState::OutOfRange { ref path },
+            ..
+        }
+        | &Command::Build {
+            state: ActionState::OutOfRange { ref path },
             ..
         } = self
         {
@@ -196,7 +210,11 @@ impl Command {
     fn path_mut(&mut self) -> Option<&mut Vec<Vec2>> {
         if let &mut Command::MoveTo { ref mut path, .. }
         | &mut Command::Attack {
-            state: AttackState::OutOfRange { ref mut path },
+            state: ActionState::OutOfRange { ref mut path },
+            ..
+        }
+        | &mut Command::Build {
+            state: ActionState::OutOfRange { ref mut path },
             ..
         } = self
         {
@@ -208,12 +226,12 @@ impl Command {
 }
 
 #[derive(Clone)]
-pub enum AttackState {
+pub enum ActionState {
     OutOfRange { path: Vec<Vec2> },
     InRange,
 }
 
-impl AttackState {
+impl ActionState {
     fn is_out_of_range(&self) -> bool {
         matches!(self, Self::OutOfRange { .. })
     }
@@ -223,6 +241,7 @@ impl AttackState {
 pub struct CommandQueue(VecDeque<Command>);
 
 pub struct Health(pub u16);
+pub struct BuildingCompleteness(pub u16);
 
 pub struct FiringRange(pub f32);
 pub struct MoveSpeed(pub f32);
@@ -278,7 +297,16 @@ impl Building {
         position: Vec2,
         side: Side,
         map: &mut Map,
-    ) -> Option<(Position, MapHandle, Self, Radius, Selectable, Side, Health)> {
+    ) -> Option<(
+        Position,
+        MapHandle,
+        Self,
+        Radius,
+        Selectable,
+        Side,
+        Health,
+        BuildingCompleteness,
+    )> {
         let BuildingStats {
             radius,
             dimensions,
@@ -294,7 +322,8 @@ impl Building {
             Radius(radius),
             Selectable,
             side,
-            Health(max_health),
+            Health(1),
+            BuildingCompleteness(1),
         ))
     }
 
@@ -400,9 +429,13 @@ impl Unit {
             // MovementDebugging::default(),
         ));
 
-        if let Some(animations) = animations {
-            let mut entry = world.entry(entity).unwrap();
+        let mut entry = world.entry(entity).unwrap();
 
+        if let Unit::Engineer = self {
+            entry.add_component(CanBuild);
+        }
+
+        if let Some(animations) = animations {
             entry.add_component(animations.mouse.skin.clone());
             entry.add_component(AnimationState {
                 animation: MouseAnimation::Idle as usize,
@@ -474,3 +507,4 @@ fn vec2_to_ncollide_point(point: Vec2) -> ncollide2d::math::Point<f32> {
 
 pub struct CheeseDropletPosition(Vec3);
 pub struct CheeseDropletVelocity(Vec3);
+pub struct CanBuild;

@@ -73,7 +73,7 @@ pub fn set_movement_paths(
         }) => {
             let (target_pos, building) = <(&Position, Option<&Building>)>::query()
                 .get(world, target)
-                .expect("We've cancelled attack commands on dead entities");
+                .expect("We've cancelled actions on dead entities");
 
             let vector = target_pos.0 - position.0;
 
@@ -93,14 +93,44 @@ pub fn set_movement_paths(
                 };
 
                 match map.pathfind(position.0, target_pos, radius.0, None, None) {
-                    Some(path) => *state = AttackState::OutOfRange { path },
+                    Some(path) => *state = ActionState::OutOfRange { path },
                     None => pop_front = true,
                 }
             } else if out_of_range {
                 pop_front = true;
             } else {
-                *state = AttackState::InRange;
+                *state = ActionState::InRange;
                 *first_out_of_range = false;
+            }
+        }
+        Some(&mut Command::Build {
+            target,
+            ref mut state,
+        }) => {
+            let (target_pos, building) = <(&Position, &Building)>::query()
+                .get(world, target)
+                .expect(
+                "We've cancelled actions on dead entities. Is a non-building unit being targetted?",
+            );
+
+            let target_pos = nearest_point_within_building(
+                position.0,
+                radius.0,
+                target_pos.0,
+                building.stats().dimensions,
+            );
+
+            let vector = target_pos - position.0;
+
+            let out_of_range = vector.mag_sq() > 0.1_f32.powi(2);
+
+            if out_of_range && (!state.is_out_of_range() || map.updated_this_tick) {
+                match map.pathfind(position.0, target_pos, radius.0, None, None) {
+                    Some(path) => *state = ActionState::OutOfRange { path },
+                    None => pop_front = true,
+                }
+            } else if !out_of_range {
+                *state = ActionState::InRange
             }
         }
         None => {}

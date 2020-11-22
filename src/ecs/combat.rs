@@ -2,12 +2,12 @@ use super::*;
 
 #[legion::system(for_each)]
 #[read_component(Position)]
-pub fn stop_attacks_on_dead_entities(commands: &mut CommandQueue, world: &SubWorld) {
+pub fn stop_actions_on_dead_entities(commands: &mut CommandQueue, world: &SubWorld) {
     while commands
         .0
         .front()
         .map(|command| {
-            if let Command::Attack { target, .. } = command {
+            if let Command::Attack { target, .. } | Command::Build { target, .. } = command {
                 world.entry_ref(*target).is_err()
             } else {
                 false
@@ -42,7 +42,7 @@ pub fn firing(
     if let Some(Command::Attack { target, .. }) = command_queue.0.front() {
         let target_position = <&Position>::query()
             .get(world, *target)
-            .expect("We've cancelled attack commands on dead entities");
+            .expect("We've cancelled actions on dead entities");
 
         let vector = target_position.0 - position.0;
 

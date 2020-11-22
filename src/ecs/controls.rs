@@ -65,6 +65,7 @@ pub fn cast_ray(
 #[read_component(Position)]
 #[read_component(Side)]
 #[read_component(Radius)]
+#[read_component(Building)]
 #[write_component(CommandQueue)]
 pub fn handle_left_click(
     #[resource] mouse_state: &MouseState,
@@ -118,8 +119,8 @@ pub fn handle_left_click(
             }
         }
         CommandMode::Construct => {
-            if let Some((pos, handle, building, radius, selectable, side, health)) =
-                Building::Pump.parts(ray_cast_location.0, Side::Purple, map)
+            if let Some((pos, handle, building, radius, selectable, side, health, completeness)) =
+                Building::Pump.parts(ray_cast_location.0, player_side.0, map)
             {
                 let skin = animations.pump.skin.clone();
                 let animation_state = AnimationState {
@@ -127,7 +128,7 @@ pub fn handle_left_click(
                     time: 0.0,
                     total_time: animations.pump.animations[0].total_time,
                 };
-                commands.push((
+                let building = commands.push((
                     pos,
                     handle,
                     building,
@@ -137,12 +138,34 @@ pub fn handle_left_click(
                     health,
                     skin,
                     animation_state,
+                    completeness,
                 ));
+
+                let command = Command::Build {
+                    target: building,
+                    // Kinda hacky? If we put `ActionState::OutOfRange` with an empty vec it
+                    // wouldn't get updated with the current `set_movement_paths` code.
+                    state: ActionState::InRange,
+                };
+
+                <(&mut CommandQueue, &Side)>::query()
+                    .filter(component::<Selected>() & component::<CanBuild>())
+                    .iter_mut(world)
+                    .filter(|(_, side)| **side == player_side.0)
+                    .for_each(|(commands, _)| {
+                        if !rts_controls.shift_held {
+                            commands.0.clear();
+                        }
+
+                        commands.0.push_back(command.clone());
+                    });
             }
         }
     }
 
-    rts_controls.mode = CommandMode::Normal;
+    if !rts_controls.shift_held {
+        rts_controls.mode = CommandMode::Normal;
+    }
 }
 
 #[legion::system]
@@ -150,6 +173,7 @@ pub fn handle_left_click(
 #[read_component(Position)]
 #[read_component(Side)]
 #[read_component(Radius)]
+#[read_component(Building)]
 #[write_component(CommandQueue)]
 pub fn handle_right_click(
     #[resource] mouse_state: &MouseState,
@@ -180,40 +204,64 @@ fn issue_command(
 ) {
     let position = ray_cast_location.0;
 
-    let enemy_entity_under_cursor = <(Entity, &Position, &Side, &Radius)>::query()
+    let entity_under_cursor = <(Entity, &Position, &Side, &Radius, Option<&Building>)>::query()
         .iter(world)
-        .filter(|(.., side, _)| **side != player_side.0)
-        .find(|(_, pos, _, radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
-        .map(|(entity, ..)| entity);
+        .find(|(_, pos, _, radius, _)| (position - pos.0).mag_sq() < radius.0.powi(2))
+        .map(|(entity, _, side, .., building)| {
+            (*entity, *side == player_side.0, building.is_some())
+        });
 
-    let command = match enemy_entity_under_cursor {
-        Some(entity) => Command::new_attack(*entity, true),
+    let command = match entity_under_cursor {
+        Some((entity, false, _)) => Some(Command::new_attack(entity, true)),
+        Some((entity, true, true)) => Some(Command::Build {
+            target: entity,
+            state: ActionState::InRange,
+        }),
+        Some((_, true, false)) => None,
         None => match rts_controls.mode {
-            CommandMode::Normal => Command::MoveTo {
+            CommandMode::Normal => Some(Command::MoveTo {
                 target: position,
                 path: Vec::new(),
                 attack_move: false,
-            },
-            CommandMode::AttackMove => Command::MoveTo {
+            }),
+            CommandMode::AttackMove => Some(Command::MoveTo {
                 target: position,
                 path: Vec::new(),
                 attack_move: true,
-            },
-            CommandMode::Construct => unimplemented!(),
+            }),
+            CommandMode::Construct => None,
         },
     };
 
-    <(&mut CommandQueue, &Side)>::query()
-        .filter(component::<Selected>())
-        .iter_mut(world)
-        .filter(|(_, side)| **side == player_side.0)
-        .for_each(|(commands, _)| {
-            if !rts_controls.shift_held {
-                commands.0.clear();
-            }
+    if let Some(command) = command {
+        if let Command::Build { .. } = command {
+            <(&mut CommandQueue, &Side)>::query()
+                .filter(component::<Selected>() & component::<CanBuild>())
+                .iter_mut(world)
+                .filter(|(_, side)| **side == player_side.0)
+                .for_each(|(commands, _)| {
+                    if !rts_controls.shift_held {
+                        commands.0.clear();
+                    }
 
-            commands.0.push_back(command.clone());
-        });
+                    commands.0.push_back(command.clone());
+                });
+        } else {
+            <(&mut CommandQueue, &Side)>::query()
+                .filter(component::<Selected>())
+                .iter_mut(world)
+                .filter(|(_, side)| **side == player_side.0)
+                .for_each(|(commands, _)| {
+                    if !rts_controls.shift_held {
+                        commands.0.clear();
+                    }
+
+                    commands.0.push_back(command.clone());
+                });
+        }
+    } else {
+        log::debug!("Ignoring command on {:?}", entity_under_cursor);
+    }
 }
 
 #[legion::system]

@@ -249,7 +249,14 @@ pub fn render_command_paths(
             } => {
                 let position = <&Position>::query()
                     .get(world, *target)
-                    .expect("We've cancelled attack commands on dead entities")
+                    .expect("We've cancelled actions on dead entities")
+                    .0;
+                Some(position)
+            }
+            Command::Build { target, .. } => {
+                let position = <&Position>::query()
+                    .get(world, *target)
+                    .expect("We've cancelled actions on dead entities")
                     .0;
                 Some(position)
             }
@@ -260,6 +267,7 @@ pub fn render_command_paths(
 
         let move_colour = Vec4::new(0.25, 0.25, 1.0, 1.0);
         let attack_colour = Vec4::new(1.0, 0.0, 0.0, 1.0);
+        let build_colour = Vec4::new(0.25, 1.0, 0.25, 1.0);
 
         let colour = match command {
             Command::MoveTo { attack_move, .. } => {
@@ -270,6 +278,7 @@ pub fn render_command_paths(
                 }
             }
             Command::Attack { .. } => attack_colour,
+            Command::Build { .. } => build_colour,
         };
 
         if let Some(position) = position {
@@ -299,6 +308,7 @@ pub fn render_command_paths(
 pub fn render_buildings(
     position: &Position,
     building: &Building,
+    building_completeness: &BuildingCompleteness,
     skin: Option<&Skin>,
     #[resource] model_buffers: &mut ModelBuffers,
 ) {
@@ -307,8 +317,11 @@ pub fn render_buildings(
         Building::Pump => &mut model_buffers.pumps,
     };
 
+    let scale = (building_completeness.0 as f32 / building.stats().max_health as f32).max(0.01);
+
     buffer.push(ModelInstance {
-        transform: Mat4::from_translation(Vec3::new(position.0.x, 0.0, position.0.y)),
+        transform: Mat4::from_translation(Vec3::new(position.0.x, 0.0, position.0.y))
+            * Mat4::from_nonuniform_scale(Vec3::new(1.0, scale, 1.0)),
         flat_colour: Vec4::new(1.0, 1.0, 1.0, 1.0),
     });
 
