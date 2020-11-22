@@ -12,8 +12,8 @@ use crate::renderer::{
     RenderContext, ShadowPipeline, TextBuffer, TitlescreenBuffer, TorusBuffer, TorusPipeline,
 };
 use crate::resources::{
-    Camera, CameraControls, CommandMode, ControlGroups, CursorIcon, DebugControls, DeltaTime,
-    DpiScaling, Gravity, Mode, MouseState, PlayerSide, RayCastLocation, RtsControls,
+    Camera, CameraControls, CheeseCoins, CommandMode, ControlGroups, CursorIcon, DebugControls,
+    DeltaTime, DpiScaling, Gravity, Mode, MouseState, PlayerSide, RayCastLocation, RtsControls,
     ScreenDimensions,
 };
 use legion::*;
@@ -74,6 +74,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(Mode::Playing);
     resources.insert(DebugControls::default());
     resources.insert(Gravity(5.0));
+    resources.insert(CheeseCoins(100));
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
@@ -82,65 +83,25 @@ async fn run() -> anyhow::Result<()> {
         render_context.window.scale_factor().round() as f32
     ));
 
-    for i in 0..10 {
-        ecs::Unit::MouseMarine.add_to_world(
-            &mut world,
-            Some(&animations),
-            Vec2::new(-10.0, i as f32 / 100.0),
-            ecs::Facing(1.0),
-            ecs::Side::Purple,
-        );
-    }
-
-    for i in 0..10 {
-        ecs::Unit::MouseMarine.add_to_world(
-            &mut world,
-            Some(&animations),
-            Vec2::new(10.0, i as f32 / 100.0),
-            ecs::Facing(1.0),
-            ecs::Side::Green,
-        );
-    }
+    ecs::Unit::Engineer.add_to_world(
+        &mut world,
+        Some(&animations),
+        Vec2::new(0.0, 0.0),
+        ecs::Facing(0.0),
+        ecs::Side::Green,
+    );
 
     ecs::Unit::Engineer.add_to_world(
         &mut world,
         Some(&animations),
-        Vec2::new(20.0, 0.0),
-        ecs::Facing(1.0),
+        Vec2::new(1.0, 1.0),
+        ecs::Facing(0.0),
         ecs::Side::Green,
     );
 
-    let mut map = pathfinding::Map::new();
+    let map = pathfinding::Map::new();
 
-    ecs::Building::Armoury
-        .add_to_world(
-            Vec2::new(-20.0, 10.0),
-            ecs::Side::Green,
-            &mut world,
-            &animations,
-            &mut map,
-        )
-        .unwrap();
-    ecs::Building::Pump
-        .add_to_world(
-            Vec2::new(-30.0, 40.0),
-            ecs::Side::Green,
-            &mut world,
-            &animations,
-            &mut map,
-        )
-        .unwrap();
-    ecs::Building::Pump
-        .add_to_world(
-            Vec2::new(0.0, 50.0),
-            ecs::Side::Green,
-            &mut world,
-            &animations,
-            &mut map,
-        )
-        .unwrap();
-
-    for _ in 0..10 {
+    for _ in 0..5 {
         world.push((
             ecs::Position(Vec2::new(
                 rng.gen_range(-100.0, 100.0),

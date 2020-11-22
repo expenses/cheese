@@ -10,8 +10,8 @@ use std::collections::VecDeque;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
 mod animation;
+mod buildings;
 mod combat;
-mod construction;
 mod controls;
 mod debugging;
 mod effects;
@@ -20,11 +20,11 @@ mod rendering;
 
 use crate::resources::DebugControls;
 use animation::{progress_animations_system, progress_building_animations_system};
+use buildings::{build_buildings_system, generate_cheese_coins_system};
 use combat::{
     add_attack_commands_system, apply_bullets_system, firing_system, handle_damaged_system,
     reduce_cooldowns_system, stop_actions_on_dead_entities_system,
 };
-use construction::build_buildings_system;
 use controls::{
     cast_ray_system, control_camera_system, handle_control_groups_system,
     handle_drag_selection_system, handle_left_click_system, handle_right_click_system,
@@ -72,6 +72,7 @@ pub fn cleanup_controls(
 
 pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
     builder
+        .add_system(generate_cheese_coins_system())
         .add_system(reset_map_updated_system())
         .add_system(cast_ray_system())
         .add_system(remove_dead_entities_from_control_groups_system())
@@ -262,9 +263,9 @@ pub struct Bullet {
     target_position: Vec2,
 }
 
-pub struct FiringCooldown(pub u8);
+pub struct Cooldown(pub f32);
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Building {
     Armoury,
     Pump,
@@ -421,7 +422,7 @@ impl Unit {
             Avoidable,
             Selectable,
             Health(max_health),
-            FiringCooldown(0),
+            Cooldown(0.0),
             FiringRange(firing_range),
             MoveSpeed(move_speed),
             Radius(radius),

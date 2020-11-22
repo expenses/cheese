@@ -139,6 +139,7 @@ pub fn handle_left_click(
                     skin,
                     animation_state,
                     completeness,
+                    Cooldown(0.0),
                 ));
 
                 let command = Command::Build {

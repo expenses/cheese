@@ -3,7 +3,7 @@ use crate::animation::Skin;
 use crate::renderer::{
     Font, LineBuffers, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance,
 };
-use crate::resources::{CommandMode, CursorIcon, DpiScaling, RayCastLocation};
+use crate::resources::{CheeseCoins, CommandMode, CursorIcon, DpiScaling, RayCastLocation};
 use ultraviolet::Vec4;
 
 const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
@@ -193,10 +193,12 @@ fn wgpu_to_screen(wgpu: Vec2, width: f32, height: f32) -> Vec2 {
 pub fn render_ui(
     #[resource] rts_controls: &RtsControls,
     #[resource] dpi_scaling: &DpiScaling,
+    #[resource] cheese_coins: &CheeseCoins,
     #[resource] text_buffer: &mut TextBuffer,
     world: &SubWorld,
 ) {
-    let mode = Some(format!("Mode: {:?}\n", rts_controls.mode)).into_iter();
+    let coins = std::iter::once(format!("Cheese coins: {}\n", cheese_coins.0));
+    let mode = std::iter::once(format!("Mode: {:?}\n", rts_controls.mode));
 
     let mut query = <(Entity, &Health)>::query().filter(component::<Selected>());
 
@@ -204,7 +206,7 @@ pub fn render_ui(
         .iter(world)
         .map(|(entity, health)| format!("{:?}: Health: {}\n", entity, health.0));
 
-    let text: String = mode.chain(unit_info).collect();
+    let text: String = coins.chain(mode).chain(unit_info).collect();
 
     text_buffer.render_text(
         Vec2::new(10.0, 10.0),

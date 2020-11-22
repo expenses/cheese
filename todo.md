@@ -1,8 +1,7 @@
-- Resources
 - Units should not try to move to the same spot, but the path locations should be spread out.
 - AI
 - Fill out HUD (medium)
 - Pyschic units
-- Engineer units
 - Helmets should increase opacity when in combat
 - Map crevasses
+- Don't tie things to framerate!

@@ -224,3 +224,4 @@ pub enum Mode {
 }
 
 pub struct Gravity(pub f32);
+pub struct CheeseCoins(pub u32);

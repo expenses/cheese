@@ -1,4 +1,5 @@
 use super::*;
+use crate::resources::DeltaTime;
 
 #[legion::system(for_each)]
 #[read_component(Position)]
@@ -25,13 +26,13 @@ pub fn stop_actions_on_dead_entities(commands: &mut CommandQueue, world: &SubWor
 pub fn firing(
     entity: &Entity,
     facing: &mut Facing,
-    cooldown: &mut FiringCooldown,
+    cooldown: &mut Cooldown,
     firing_range: &FiringRange,
     command_queue: &CommandQueue,
     world: &SubWorld,
     buffer: &mut CommandBuffer,
 ) {
-    if cooldown.0 != 0 {
+    if cooldown.0 != 0.0 {
         return;
     }
 
@@ -59,7 +60,7 @@ pub fn firing(
                 Facing(vector.y.atan2(vector.x)),
                 MoveSpeed(20.0),
             ));
-            cooldown.0 = 10;
+            cooldown.0 = 10.0 / 60.0;
         }
     }
 }
@@ -149,6 +150,6 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
 }
 
 #[legion::system(for_each)]
-pub fn reduce_cooldowns(cooldown: &mut FiringCooldown) {
-    cooldown.0 = cooldown.0.saturating_sub(1);
+pub fn reduce_cooldowns(cooldown: &mut Cooldown, #[resource] delta_time: &DeltaTime) {
+    cooldown.0 = (cooldown.0 - delta_time.0).max(0.0);
 }
