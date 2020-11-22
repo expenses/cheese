@@ -974,6 +974,10 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
             None
         }
     }
+
+    pub fn len_waiting(&self) -> usize {
+        self.waiting.len()
+    }
 }
 
 pub struct TextBuffer {

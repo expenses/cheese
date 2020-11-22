@@ -227,6 +227,8 @@ impl LineBuffers {
             &mut BuffersBuilder::new(&mut self.lyon_buffers, Constructor { colour }),
         )
         .unwrap();
+
+        self.buffer();
     }
 
     pub fn draw_rect(&mut self, top_left: Vec2, bottom_right: Vec2, dpi_scaling: f32) {
@@ -246,17 +248,23 @@ impl LineBuffers {
             ),
         )
         .unwrap();
+
+        self.buffer();
     }
 
-    pub fn upload(&mut self, context: &RenderContext) {
+    fn buffer(&mut self) {
+        let num_vertices = self.vertices.len_waiting();
+
         for vertex in self.lyon_buffers.vertices.drain(..) {
             self.vertices.push(vertex);
         }
 
         for index in self.lyon_buffers.indices.drain(..) {
-            self.indices.push(index as u32);
+            self.indices.push(index as u32 + num_vertices as u32);
         }
+    }
 
+    pub fn upload(&mut self, context: &RenderContext) {
         self.vertices.upload(context);
         self.indices.upload(context);
     }

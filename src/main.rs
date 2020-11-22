@@ -99,6 +99,14 @@ async fn run() -> anyhow::Result<()> {
         ecs::Side::Green,
     );
 
+    ecs::Unit::Engineer.add_to_world(
+        &mut world,
+        Some(&animations),
+        Vec2::new(10.0, 0.0),
+        ecs::Facing(0.0),
+        ecs::Side::Purple,
+    );
+
     let map = pathfinding::Map::new();
 
     for _ in 0..5 {
