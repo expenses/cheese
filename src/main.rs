@@ -14,7 +14,7 @@ use crate::renderer::{
 use crate::resources::{
     Camera, CameraControls, CheeseCoins, CommandMode, ControlGroups, CursorIcon, DebugControls,
     DeltaTime, DpiScaling, Gravity, Mode, MouseState, PlayerSide, RayCastLocation, RtsControls,
-    ScreenDimensions,
+    ScreenDimensions, SelectedUnitsAbilities,
 };
 use legion::*;
 use rand::{Rng, SeedableRng};
@@ -75,6 +75,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(DebugControls::default());
     resources.insert(Gravity(5.0));
     resources.insert(CheeseCoins(100));
+    resources.insert(SelectedUnitsAbilities::default());
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
@@ -159,6 +160,9 @@ async fn run() -> anyhow::Result<()> {
                     let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
                     let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
                     let mut debug_controls = resources.get_mut::<DebugControls>().unwrap();
+                    let selected_unit_abilities =
+                        resources.get::<SelectedUnitsAbilities>().unwrap();
+                    let cheese_coins = resources.get::<CheeseCoins>().unwrap();
 
                     handle_key(
                         *virtual_keycode,
@@ -168,6 +172,8 @@ async fn run() -> anyhow::Result<()> {
                         &mut rts_controls,
                         &mut debug_controls,
                         control_flow,
+                        &selected_unit_abilities,
+                        &cheese_coins,
                     );
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
@@ -621,10 +627,28 @@ fn handle_key(
     rts_controls: &mut RtsControls,
     debug_controls: &mut DebugControls,
     control_flow: &mut ControlFlow,
+    selected_units_abilities: &SelectedUnitsAbilities,
+    cheese_coins: &CheeseCoins,
 ) {
     log::trace!("{:?} (scancode: {}) pressed: {}", code, scancode, pressed);
 
     if let Some(code) = code {
+        if pressed {
+            for ability in selected_units_abilities.0.iter() {
+                if code == ability.hotkey {
+                    match ability.ability_type {
+                        ecs::AbilityType::Build(building) => {
+                            //if building.stats().cost <= cheese_coins.0 {
+                            rts_controls.mode = CommandMode::Construct(building);
+                            //} else {
+                            // Todo: play sound: meep merp (like from dota).
+                            //}
+                        }
+                    }
+                }
+            }
+        }
+
         match code {
             VirtualKeyCode::Up => camera_controls.up = pressed,
             VirtualKeyCode::Down => camera_controls.down = pressed,
@@ -634,9 +658,8 @@ fn handle_key(
             VirtualKeyCode::LControl => rts_controls.control_held = pressed,
             VirtualKeyCode::S if pressed => rts_controls.stop_pressed = true,
             VirtualKeyCode::A if pressed => rts_controls.mode = CommandMode::AttackMove,
-            VirtualKeyCode::B if pressed => rts_controls.mode = CommandMode::Construct,
             VirtualKeyCode::T if pressed => debug_controls.set_pathfinding_start_pressed = true,
-            VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
+            VirtualKeyCode::Escape if pressed => rts_controls.mode = CommandMode::Normal,
 
             VirtualKeyCode::Key0 if pressed => rts_controls.control_group_key_pressed[0] = true,
             VirtualKeyCode::Key1 if pressed => rts_controls.control_group_key_pressed[1] = true,

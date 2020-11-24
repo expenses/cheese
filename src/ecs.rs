@@ -9,6 +9,7 @@ use legion::world::SubWorld;
 use legion::*;
 use std::collections::VecDeque;
 use ultraviolet::{Mat4, Vec2, Vec3};
+use winit::event::VirtualKeyCode;
 
 mod animation;
 mod buildings;
@@ -30,6 +31,7 @@ use controls::{
     cast_ray_system, control_camera_system, handle_control_groups_system,
     handle_drag_selection_system, handle_left_click_system, handle_right_click_system,
     handle_stop_command_system, remove_dead_entities_from_control_groups_system,
+    update_selected_units_abilities_system,
 };
 use debugging::{
     debug_select_box_system, debug_specific_path_system, render_building_grid_system,
@@ -86,6 +88,7 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(handle_control_groups_system())
         .add_system(avoidance_system())
         .add_system(add_attack_commands_system())
+        .add_system(update_selected_units_abilities_system())
         // Needed because a command could place a building using a command buffer, but the entity
         // reference wouldn't be valid until the commands in the buffer have been executed.
         .flush()
@@ -138,8 +141,8 @@ pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Ability {
-    ability_type: AbilityType,
-    hotkey: char,
+    pub ability_type: AbilityType,
+    pub hotkey: VirtualKeyCode,
 }
 
 impl Ability {
@@ -159,11 +162,11 @@ pub enum AbilityType {
 const ABILITIES_LIST: [Ability; 2] = [
     Ability {
         ability_type: AbilityType::Build(Building::Pump),
-        hotkey: 'p',
+        hotkey: VirtualKeyCode::P,
     },
     Ability {
         ability_type: AbilityType::Build(Building::Armoury),
-        hotkey: 'a',
+        hotkey: VirtualKeyCode::R,
     },
 ];
 
@@ -306,7 +309,7 @@ pub enum Building {
     Pump,
 }
 
-struct BuildingStats {
+pub struct BuildingStats {
     pub radius: f32,
     pub dimensions: Vec2,
     pub max_health: u16,
@@ -314,7 +317,7 @@ struct BuildingStats {
 }
 
 impl Building {
-    fn stats(self) -> BuildingStats {
+    pub fn stats(self) -> BuildingStats {
         match self {
             Self::Armoury => BuildingStats {
                 radius: 6.0,

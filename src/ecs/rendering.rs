@@ -4,7 +4,9 @@ use crate::renderer::{
     Font, LineBuffers, ModelBuffers, ModelInstance, TextAlignment, TextBuffer, TorusBuffer,
     TorusInstance,
 };
-use crate::resources::{CheeseCoins, CommandMode, CursorIcon, DpiScaling, RayCastLocation};
+use crate::resources::{
+    CheeseCoins, CommandMode, CursorIcon, DpiScaling, RayCastLocation, SelectedUnitsAbilities,
+};
 use ultraviolet::Vec4;
 
 const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
@@ -19,24 +21,30 @@ fn mix(colour_a: Vec3, colour_b: Vec3, factor: f32) -> Vec3 {
 pub fn render_building_plan(
     #[resource] ray_cast_location: &RayCastLocation,
     #[resource] rts_controls: &RtsControls,
+    #[resource] cheese_coins: &CheeseCoins,
     #[resource] model_buffers: &mut ModelBuffers,
 ) {
-    if rts_controls.mode != CommandMode::Construct {
-        model_buffers.building_plan.clear();
-        return;
-    }
+    if let CommandMode::Construct(building) = rts_controls.mode {
+        let colour = if building.stats().cost <= cheese_coins.0 {
+            Vec4::new(0.0, 1.0, 0.0, 0.25)
+        } else {
+            Vec4::new(1.0, 0.0, 0.0, 1.0 / 3.0)
+        };
 
-    model_buffers.building_plan.set(
-        Building::Pump,
-        ModelInstance {
-            transform: Mat4::from_translation(Vec3::new(
-                ray_cast_location.0.x,
-                0.0,
-                ray_cast_location.0.y,
-            )),
-            flat_colour: Vec4::new(0.0, 1.0, 0.0, 0.25),
-        },
-    );
+        model_buffers.building_plan.set(
+            building,
+            ModelInstance {
+                transform: Mat4::from_translation(Vec3::new(
+                    ray_cast_location.0.x,
+                    0.0,
+                    ray_cast_location.0.y,
+                )),
+                flat_colour: colour,
+            },
+        );
+    } else {
+        model_buffers.building_plan.clear();
+    }
 }
 
 #[legion::system(for_each)]
@@ -393,8 +401,6 @@ fn unit_under_cursor(ray_cast_location: &RayCastLocation, world: &SubWorld) -> O
 }
 
 #[legion::system]
-#[read_component(Abilities)]
-#[read_component(Side)]
 pub fn render_abilities(
     #[resource] player_side: &PlayerSide,
     #[resource] dpi_scaling: &DpiScaling,
@@ -402,23 +408,15 @@ pub fn render_abilities(
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] cheese_coins: &CheeseCoins,
     #[resource] text_buffer: &mut TextBuffer,
-    world: &SubWorld,
+    #[resource] selected_units_abilities: &SelectedUnitsAbilities,
 ) {
-    use std::collections::BTreeSet;
-    let abilities: BTreeSet<&Ability> = <(&Abilities, &Side)>::query()
-        .filter(component::<Selected>())
-        .iter(world)
-        .filter(|(_, side)| **side == player_side.0)
-        .flat_map(|(abilities, _)| abilities.0.iter().cloned())
-        .collect();
-
     let dims = screen_dimensions.as_vec();
     let ability_size = 64.0 * 1.5;
 
     let gap = 10.0;
     let border = 2.0;
 
-    let offset = abilities.len() as f32 * ((ability_size + gap) / 2.0);
+    let offset = selected_units_abilities.0.len() as f32 * ((ability_size + gap) / 2.0);
 
     let position = |i| {
         Vec2::new(
@@ -427,7 +425,7 @@ pub fn render_abilities(
         )
     };
 
-    for (i, ability) in abilities.iter().enumerate() {
+    for (i, ability) in selected_units_abilities.0.iter().enumerate() {
         line_buffers.draw_filled_rect(
             position(i),
             Vec2::new(ability_size + border * 2.0, ability_size + border * 2.0),
@@ -451,7 +449,7 @@ pub fn render_abilities(
 
         text_buffer.render_text(
             position(i) - Vec2::new(ability_size, ability_size) / 2.0 + nudge,
-            &format!("{}", ability.hotkey.to_ascii_uppercase()),
+            &format!("{:?}", ability.hotkey),
             Font::Ui,
             1.0,
             dpi_scaling.0,
