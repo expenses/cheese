@@ -332,7 +332,7 @@ async fn run() -> anyhow::Result<()> {
                                 &titlescreen_buffer.stars,
                                 titlescreen_buffer.num_stars,
                             );
-                            lines_pipeline.render(&mut render_pass, &line_buffers);
+                            lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
                         }
                         Mode::Quit => {}
                     }
@@ -609,8 +609,8 @@ fn render_playing<'a>(
     }
 
     // Render 2D items.
-    lines_pipeline.render(&mut render_pass, &line_buffers);
-    lines_pipeline.render_hud(&mut render_pass, &assets);
+    lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
+    //lines_pipeline.render_hud(&mut render_pass, &assets);
 }
 
 fn handle_key(

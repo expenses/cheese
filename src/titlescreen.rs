@@ -1,4 +1,6 @@
-use crate::renderer::{Font, LineBuffers, ModelInstance, TextBuffer, TitlescreenBuffer};
+use crate::renderer::{
+    Font, LineBuffers, ModelInstance, TextAlignment, TextBuffer, TitlescreenBuffer,
+};
 use crate::resources::{
     Camera, CursorIcon, DeltaTime, DpiScaling, Mode, MouseState, ScreenDimensions,
 };
@@ -63,7 +65,7 @@ fn render_text(
         Font::Title,
         1.5,
         dpi_scaling.0,
-        true,
+        TextAlignment::Center,
         colour,
     );
 
@@ -83,7 +85,7 @@ fn render_text(
             Font::Title,
             1.0,
             dpi_scaling.0,
-            true,
+            TextAlignment::Center,
             if selected { selected_colour } else { colour },
         );
     }

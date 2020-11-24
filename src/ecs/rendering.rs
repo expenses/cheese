@@ -1,7 +1,8 @@
 use super::*;
 use crate::animation::Skin;
 use crate::renderer::{
-    Font, LineBuffers, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance,
+    Font, LineBuffers, ModelBuffers, ModelInstance, TextAlignment, TextBuffer, TorusBuffer,
+    TorusInstance,
 };
 use crate::resources::{CheeseCoins, CommandMode, CursorIcon, DpiScaling, RayCastLocation};
 use ultraviolet::Vec4;
@@ -214,7 +215,7 @@ pub fn render_ui(
         Font::Ui,
         1.0,
         dpi_scaling.0,
-        false,
+        TextAlignment::Default,
         Vec4::one(),
     );
 }
@@ -389,4 +390,88 @@ fn unit_under_cursor(ray_cast_location: &RayCastLocation, world: &SubWorld) -> O
         .iter(world)
         .find(|(pos, radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
         .map(|(pos, radius)| (pos.0, radius.0))
+}
+
+#[legion::system]
+#[read_component(Abilities)]
+#[read_component(Side)]
+pub fn render_abilities(
+    #[resource] player_side: &PlayerSide,
+    #[resource] dpi_scaling: &DpiScaling,
+    #[resource] line_buffers: &mut LineBuffers,
+    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] cheese_coins: &CheeseCoins,
+    #[resource] text_buffer: &mut TextBuffer,
+    world: &SubWorld,
+) {
+    use std::collections::BTreeSet;
+    let abilities: BTreeSet<&Ability> = <(&Abilities, &Side)>::query()
+        .filter(component::<Selected>())
+        .iter(world)
+        .filter(|(_, side)| **side == player_side.0)
+        .flat_map(|(abilities, _)| abilities.0.iter().cloned())
+        .collect();
+
+    let dims = screen_dimensions.as_vec();
+    let ability_size = 64.0 * 1.5;
+
+    let gap = 10.0;
+    let border = 2.0;
+
+    let offset = abilities.len() as f32 * ((ability_size + gap) / 2.0);
+
+    let position = |i| {
+        Vec2::new(
+            (dims.x as f32 / 2.0) - offset + (i as f32 * (ability_size + gap)),
+            dims.y as f32 - ability_size / 2.0 - (gap - border),
+        )
+    };
+
+    for (i, ability) in abilities.iter().enumerate() {
+        line_buffers.draw_filled_rect(
+            position(i),
+            Vec2::new(ability_size + border * 2.0, ability_size + border * 2.0),
+            Vec3::zero(),
+            dpi_scaling.0,
+        );
+
+        let can_use = match ability.ability_type {
+            AbilityType::Build(building) => building.stats().cost <= cheese_coins.0,
+        };
+
+        line_buffers.draw_button(
+            position(i),
+            Vec2::new(ability_size, ability_size),
+            ability.button(),
+            !can_use,
+            dpi_scaling.0,
+        );
+
+        let nudge = Vec2::new(2.0, -2.0);
+
+        text_buffer.render_text(
+            position(i) - Vec2::new(ability_size, ability_size) / 2.0 + nudge,
+            &format!("{}", ability.hotkey.to_ascii_uppercase()),
+            Font::Ui,
+            1.0,
+            dpi_scaling.0,
+            TextAlignment::Default,
+            Vec4::new(0.0, 0.0, 0.0, 1.0),
+        );
+
+        if let AbilityType::Build(building) = ability.ability_type {
+            let cost = building.stats().cost;
+            let nudge = Vec2::new(-2.0, -2.0);
+
+            text_buffer.render_text(
+                position(i) - Vec2::new(-ability_size, ability_size) / 2.0 + nudge,
+                &format!("{}", cost),
+                Font::Ui,
+                1.0,
+                dpi_scaling.0,
+                TextAlignment::HorizontalRight,
+                Vec4::new(0.0, 0.0, 0.0, 1.0),
+            );
+        }
+    }
 }

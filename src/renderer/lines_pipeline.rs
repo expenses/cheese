@@ -130,22 +130,24 @@ impl LinesPipeline {
         );
     }
 
-    pub fn render_hud<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, assets: &'a Assets) {
+    /*pub fn render_hud<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, assets: &'a Assets) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.set_bind_group(1, &assets.misc_texture, &[]);
         render_pass.set_vertex_buffer(0, self.hud_buffer.slice(..));
         render_pass.draw(0..6, 0..1);
-    }
+    }*/
 
     pub fn render<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         line_buffers: &'a LineBuffers,
+        assets: &'a Assets,
     ) {
         if let Some((vertices, indices, num_indices)) = line_buffers.get() {
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_bind_group(0, &self.bind_group, &[]);
+            render_pass.set_bind_group(1, &assets.buttons_texture, &[]);
             render_pass.set_vertex_buffer(0, vertices);
             render_pass.set_index_buffer(indices);
             render_pass.draw_indexed(0..num_indices, 0, 0..1);
@@ -170,7 +172,7 @@ impl StrokeVertexConstructor<Vertex> for Constructor {
             position: Vec2::new(point.x, point.y),
             uv: Vec2::new(0.0, 0.0),
             colour: self.colour,
-            textured: false as i32,
+            mode: Mode::SolidColour as i32,
         }
     }
 }
@@ -181,7 +183,7 @@ impl BasicVertexConstructor<Vertex> for Constructor {
             position: Vec2::new(point.x, point.y),
             uv: Vec2::new(0.0, 0.0),
             colour: self.colour,
-            textured: false as i32,
+            mode: Mode::SolidColour as i32,
         }
     }
 }
@@ -190,6 +192,20 @@ pub struct LineBuffers {
     vertices: DynamicBuffer<Vertex>,
     indices: DynamicBuffer<u32>,
     lyon_buffers: VertexBuffers<Vertex, u16>,
+}
+
+pub enum Button {
+    BuildPump,
+    BuildArmoury,
+}
+
+impl Button {
+    fn uv(&self) -> (Vec2, Vec2) {
+        match self {
+            Self::BuildPump => (Vec2::zero(), Vec2::new(0.5, 0.5)),
+            Self::BuildArmoury => (Vec2::new(0.5, 0.0), Vec2::new(0.5, 0.5)),
+        }
+    }
 }
 
 impl LineBuffers {
@@ -229,6 +245,51 @@ impl LineBuffers {
         .unwrap();
 
         self.buffer();
+    }
+
+    pub fn draw_button(
+        &mut self,
+        center: Vec2,
+        mut dimensions: Vec2,
+        button: Button,
+        greyscale: bool,
+        dpi_scaling: f32,
+    ) {
+        dimensions *= dpi_scaling;
+        let top_left = center - dimensions / 2.0;
+
+        let (uv_top_left, uv_dimensions) = button.uv();
+
+        let num_vertices = self.vertices.len_waiting();
+
+        let vertices = [
+            Vertex::new_textured(top_left, uv_top_left, greyscale),
+            Vertex::new_textured(
+                top_left + Vec2::new(dimensions.x, 0.0),
+                uv_top_left + Vec2::new(uv_dimensions.x, 0.0),
+                greyscale,
+            ),
+            Vertex::new_textured(
+                top_left + Vec2::new(0.0, dimensions.y),
+                uv_top_left + Vec2::new(0.0, uv_dimensions.y),
+                greyscale,
+            ),
+            Vertex::new_textured(
+                top_left + dimensions,
+                uv_top_left + uv_dimensions,
+                greyscale,
+            ),
+        ];
+
+        let indices = [0, 1, 2, 1, 2, 3];
+
+        for vertex in &vertices {
+            self.vertices.push(*vertex);
+        }
+
+        for index in &indices {
+            self.indices.push(*index + num_vertices as u32);
+        }
     }
 
     pub fn draw_rect(&mut self, top_left: Vec2, bottom_right: Vec2, dpi_scaling: f32) {
@@ -279,13 +340,34 @@ impl LineBuffers {
     }
 }
 
+enum Mode {
+    SolidColour = 0,
+    Textured = 1,
+    Greyscale = 2,
+}
+
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
 struct Vertex {
     position: Vec2,
     uv: Vec2,
     colour: Vec3,
-    textured: i32,
+    mode: i32,
+}
+
+impl Vertex {
+    fn new_textured(position: Vec2, uv: Vec2, greyscale: bool) -> Self {
+        Self {
+            position,
+            uv,
+            colour: Vec3::one(),
+            mode: if greyscale {
+                Mode::Greyscale
+            } else {
+                Mode::Textured
+            } as i32,
+        }
+    }
 }
 
 fn generate_hud_vertices(screen_width: u32, screen_height: u32) -> [Vertex; 6] {
@@ -293,7 +375,7 @@ fn generate_hud_vertices(screen_width: u32, screen_height: u32) -> [Vertex; 6] {
         position: Vec2::new(x as f32, y as f32),
         uv: Vec2::new(u as f32, v),
         colour: Vec3::new(0.0, 0.0, 0.0),
-        textured: true as i32,
+        mode: Mode::Textured as i32,
     };
 
     let screen_height = screen_height as f32;

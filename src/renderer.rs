@@ -14,7 +14,7 @@ mod shadow_pipeline;
 mod torus_pipeline;
 
 pub use lines_3d_pipeline::{Lines3dBuffer, Lines3dPipeline};
-pub use lines_pipeline::{LineBuffers, LinesPipeline};
+pub use lines_pipeline::{Button, LineBuffers, LinesPipeline};
 pub use model_pipelines::{ModelBuffers, ModelInstance, ModelPipelines, TitlescreenBuffer};
 pub use shadow_pipeline::ShadowPipeline;
 pub use torus_pipeline::{TorusBuffer, TorusInstance, TorusPipeline};
@@ -998,6 +998,12 @@ impl Font {
     }
 }
 
+pub enum TextAlignment {
+    Default,
+    Center,
+    HorizontalRight,
+}
+
 impl TextBuffer {
     pub fn new(device: &wgpu::Device) -> anyhow::Result<Self> {
         let fonts = vec![
@@ -1022,15 +1028,17 @@ impl TextBuffer {
         font: Font,
         scale_multiplier: f32,
         dpi_scaling: f32,
-        center: bool,
+        alignment: TextAlignment,
         colour: Vec4,
     ) {
-        let layout = if center {
-            wgpu_glyph::Layout::default()
+        let layout = match alignment {
+            TextAlignment::Default => wgpu_glyph::Layout::default(),
+            TextAlignment::Center => wgpu_glyph::Layout::default()
                 .h_align(wgpu_glyph::HorizontalAlign::Center)
-                .v_align(wgpu_glyph::VerticalAlign::Center)
-        } else {
-            wgpu_glyph::Layout::default()
+                .v_align(wgpu_glyph::VerticalAlign::Center),
+            TextAlignment::HorizontalRight => {
+                wgpu_glyph::Layout::default().h_align(wgpu_glyph::HorizontalAlign::Right)
+            }
         };
 
         let scale = font.scale();

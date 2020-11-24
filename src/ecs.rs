@@ -1,5 +1,6 @@
 use crate::assets::ModelAnimations;
 use crate::pathfinding::{Map, MapHandle};
+use crate::renderer::Button;
 use crate::resources::{
     Camera, CameraControls, MouseState, PlayerSide, RtsControls, ScreenDimensions,
 };
@@ -45,10 +46,10 @@ use movement::{
     reset_map_updated_system, set_movement_paths_system, Avoidable, Avoids,
 };
 use rendering::{
-    render_building_plan_system, render_buildings_system, render_bullets_system,
-    render_command_paths_system, render_drag_box_system, render_health_bars_system,
-    render_selections_system, render_ui_system, render_under_select_box_system,
-    render_unit_under_cursor_system, render_units_system,
+    render_abilities_system, render_building_plan_system, render_buildings_system,
+    render_bullets_system, render_command_paths_system, render_drag_box_system,
+    render_health_bars_system, render_selections_system, render_ui_system,
+    render_under_select_box_system, render_unit_under_cursor_system, render_units_system,
 };
 
 #[legion::system]
@@ -127,12 +128,46 @@ pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
         .add_system(render_buildings_system())
         .add_system(render_building_plan_system())
         .add_system(render_cheese_droplets_system())
+        .add_system(render_abilities_system())
         //.add_system(debug_select_box_system())
         //.add_system(debug_specific_path_system())
         // Cleanup
         .flush()
         .add_system(cleanup_controls_system());
 }
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct Ability {
+    ability_type: AbilityType,
+    hotkey: char,
+}
+
+impl Ability {
+    fn button(&self) -> Button {
+        match self.ability_type {
+            AbilityType::Build(Building::Armoury) => Button::BuildArmoury,
+            AbilityType::Build(Building::Pump) => Button::BuildPump,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum AbilityType {
+    Build(Building),
+}
+
+const ABILITIES_LIST: [Ability; 2] = [
+    Ability {
+        ability_type: AbilityType::Build(Building::Pump),
+        hotkey: 'p',
+    },
+    Ability {
+        ability_type: AbilityType::Build(Building::Armoury),
+        hotkey: 'a',
+    },
+];
+
+pub struct Abilities(pub Vec<&'static Ability>);
 
 pub struct CheeseGuyser;
 
@@ -265,7 +300,7 @@ pub struct Bullet {
 
 pub struct Cooldown(pub f32);
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum Building {
     Armoury,
     Pump,
@@ -275,6 +310,7 @@ struct BuildingStats {
     pub radius: f32,
     pub dimensions: Vec2,
     pub max_health: u16,
+    pub cost: u32,
 }
 
 impl Building {
@@ -284,11 +320,13 @@ impl Building {
                 radius: 6.0,
                 dimensions: Vec2::new(6.0, 10.0),
                 max_health: 500,
+                cost: 200,
             },
             Self::Pump => BuildingStats {
                 radius: 3.0,
                 dimensions: Vec2::new(4.0, 4.0),
                 max_health: 200,
+                cost: 50,
             },
         }
     }
@@ -312,6 +350,7 @@ impl Building {
             radius,
             dimensions,
             max_health,
+            cost: _,
         } = self.stats();
 
         let handle = map.insert(position, dimensions)?;
@@ -434,6 +473,7 @@ impl Unit {
 
         if let Unit::Engineer = self {
             entry.add_component(CanBuild);
+            entry.add_component(Abilities(vec![&ABILITIES_LIST[0], &ABILITIES_LIST[1]]));
         }
 
         if let Some(animations) = animations {
