@@ -6,3 +6,4 @@ animation/*.gltf
 animation/*.png
 animation/*.blend
 perf.data*
+wasm/pkg

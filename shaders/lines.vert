@@ -7,7 +7,7 @@ layout(location = 3) in int textured;
 
 layout(location = 0) out vec2 out_uv;
 layout(location = 1) out vec3 out_colour;
-layout(location = 2) out int out_textured;
+layout(location = 2) out flat int out_textured;
 
 layout(set = 0, binding = 0) uniform Uniforms {
     vec2 screen_dimensions;

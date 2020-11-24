@@ -44,7 +44,7 @@ impl Lines3dPipeline {
                 primitive_topology: wgpu::PrimitiveTopology::LineList,
                 color_states: &[
                     colour_state_descriptor(true),
-                    colour_state_descriptor(false),
+                    //colour_state_descriptor(false),
                 ],
                 depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
                     format: DEPTH_FORMAT,

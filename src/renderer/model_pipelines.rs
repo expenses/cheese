@@ -424,11 +424,19 @@ fn create_joint_bind_group(
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::Buffer(joint_buffer.buffer.slice(..)),
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &joint_buffer.buffer,
+                        offset: 0,
+                        size: None,
+                    },
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Buffer(model.joint_uniforms.slice(..)),
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &model.joint_uniforms,
+                        offset: 0,
+                        size: None,
+                    },
                 },
             ],
         })

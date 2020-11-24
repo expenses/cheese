@@ -27,14 +27,25 @@ use winit::{
     },
     event_loop::{ControlFlow, EventLoop},
 };
+use futures::FutureExt;
 
 fn main() -> anyhow::Result<()> {
-    futures::executor::block_on(run())
+    #[cfg(feature = "wasm")]
+    {
+        console_log::init_with_level(log::Level::Trace);
+        console_error_panic_hook::set_once();
+        wasm_bindgen_futures::spawn_local(run().map(drop));
+    }
+    #[cfg(not(feature = "wasm"))]
+    {
+        env_logger::init();
+        futures::executor::block_on(run())?;
+    }
+
+    Ok(())
 }
 
 async fn run() -> anyhow::Result<()> {
-    env_logger::init();
-
     let event_loop = EventLoop::new();
 
     let mut rng = rand::rngs::SmallRng::from_entropy();
@@ -122,7 +133,7 @@ async fn run() -> anyhow::Result<()> {
     ecs::add_rendering_systems(&mut builder);
     let mut schedule = builder.build();
 
-    let mut time = std::time::Instant::now();
+    //let mut time = std::time::Instant::now();
 
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -188,10 +199,10 @@ async fn run() -> anyhow::Result<()> {
                 _ => {}
             },
             Event::MainEventsCleared => {
-                let now = std::time::Instant::now();
-                let elapsed = (now - time).as_secs_f32();
-                time = now;
-                resources.insert(DeltaTime(elapsed));
+                //let now = std::time::Instant::now();
+                //let elapsed = (now - time).as_secs_f32();
+                //time = now;
+                resources.insert(DeltaTime(1.0 / 60.0));
                 resources.insert(CursorIcon(winit::window::CursorIcon::default()));
 
                 let mode = *resources.get::<Mode>().unwrap();
@@ -406,6 +417,7 @@ async fn run() -> anyhow::Result<()> {
 
                     drop(render_pass);
 
+                    /*
                     // Text rendering pass
 
                     let size = render_context.window.inner_size();
@@ -428,7 +440,7 @@ async fn run() -> anyhow::Result<()> {
 
                     // Do I need to do this?
                     // staging_belt.recall();
-
+                    */
                     render_context.queue.submit(Some(encoder.finish()));
                 }
             }

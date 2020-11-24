@@ -219,7 +219,7 @@ pub fn avoidance(world: &SubWorld, command_buffer: &mut CommandBuffer) {
 
     <(Entity, &Position, &Radius)>::query()
         .filter(component::<Avoids>())
-        .par_for_each(world, |(entity, position, radius)| {
+        .for_each(world, |(entity, position, radius)| {
             let mut avoidance_direction = Vec2::new(0.0, 0.0);
             let mut count = 0;
 

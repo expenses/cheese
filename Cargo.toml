@@ -4,8 +4,6 @@ version = "0.1.0"
 authors = ["Ashley Ruglys <ashley.ruglys@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1.0.34"
 arrayvec = "0.5.2"
@@ -26,12 +24,24 @@ spade = "1.8.2"
 rand = { version = "0.7.3", default-features = false, features = ["small_rng"] }
 ultraviolet = { version = "0.7.5", features = ["bytemuck"] }
 wgpu = "0.6.0"
-wgpu_glyph = "0.10.0"
+#wgpu_glyph = "0.10.0"
 winit = "0.23.0"
 ncollide2d = "0.26.1"
+web-sys = { version = "=0.3.45", optional = true }
+wasm-bindgen-futures = { version = "0.4.18", optional = true }
+console_log = "0.2.0"
+console_error_panic_hook = { version = "0.1.6", optional = true }
 
 [features]
 default = ["multithreading"]
 # I want to be able to toggle this because wasm is (currently) only single threaded so being able to
-# test it with a single thread is useful in case I make a web version.
+# test it with a single threaded is useful in case I make a web version.
 multithreading = ["legion/parallel"]
+wasm = ["web-sys", "winit/web-sys", "wasm-bindgen-futures", "rand/wasm-bindgen", "console_error_panic_hook"]
+native = []
+
+[patch.crates-io]
+wgpu = { git = "https://github.com/grovesNL/wgpu-rs", branch = "update-web-backend-nov-7" }
+web-sys = { git = "https://github.com/rustwasm/wasm-bindgen" }
+wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen" }
+js-sys = { git = "https://github.com/rustwasm/wasm-bindgen" }

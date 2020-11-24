@@ -48,9 +48,10 @@ impl LinesPipeline {
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: wgpu::BindingResource::Buffer(
-                            context.screen_dimension_uniform_buffer.slice(..),
-                        ),
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &context.screen_dimension_uniform_buffer,
+                            offset: 0, size: None,
+                        },
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,

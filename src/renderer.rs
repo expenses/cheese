@@ -19,8 +19,16 @@ pub use model_pipelines::{ModelBuffers, ModelInstance, ModelPipelines, Titlescre
 pub use shadow_pipeline::ShadowPipeline;
 pub use torus_pipeline::{TorusBuffer, TorusInstance, TorusPipeline};
 
+#[cfg(feature = "wasm")]
+const DISPLAY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
+#[cfg(not(feature = "wasm"))]
 const DISPLAY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
+
+#[cfg(feature = "wasm")]
 pub const TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+#[cfg(not(feature = "wasm"))]
+pub const TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 const INDEX_FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint32;
 
@@ -54,8 +62,6 @@ pub struct RenderContext {
     bloom_bind_group_layout: wgpu::BindGroupLayout,
     pub bloom_blur_pipeline: wgpu::RenderPipeline,
 
-    pub shadow_texture: wgpu::TextureView,
-
     sampler: wgpu::Sampler,
 
     perspective_buffer: wgpu::Buffer,
@@ -70,6 +76,7 @@ pub struct RenderContext {
 
     pub identity_instance_buffer: Arc<wgpu::Buffer>,
 
+    pub shadow_texture: wgpu::TextureView,
     pub shadow_uniform_bind_group: Arc<wgpu::BindGroup>,
     pub shadow_uniform_bind_group_layout: wgpu::BindGroupLayout,
     shadow_uniform_buffer: wgpu::Buffer,
@@ -78,8 +85,21 @@ pub struct RenderContext {
 impl RenderContext {
     pub async fn new(event_loop: &EventLoop<()>) -> anyhow::Result<Self> {
         let window = WindowBuilder::new()
-            .with_title("Cheese (working title)")
+            //.with_title("Cheese (working title)")
             .build(event_loop)?;
+
+        #[cfg(feature = "wasm")]
+        {
+            use winit::platform::web::WindowExtWebSys;
+            web_sys::window()
+                .and_then(|win| win.document())
+                .and_then(|doc| doc.body())
+                .and_then(|body| {
+                    body.append_child(&web_sys::Element::from(window.canvas()))
+                        .ok()
+                })
+                .expect("couldn't append canvas to document body");
+        }
 
         let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
         let surface = unsafe { instance.create_surface(&window) };
@@ -227,7 +247,7 @@ impl RenderContext {
             1024,
             1024,
             DEPTH_FORMAT,
-            wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
 
         let main_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -235,15 +255,27 @@ impl RenderContext {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::Buffer(perspective_buffer.slice(..)),
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &perspective_buffer,
+                        offset: 0,
+                        size: None,
+                    },
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Buffer(view_buffer.slice(..)),
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &view_buffer,
+                        offset: 0,
+                        size: None,
+                    },
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::Buffer(sun_buffer.slice(..)),
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &sun_buffer,
+                        offset: 0,
+                        size: None,
+                    },
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
@@ -264,7 +296,7 @@ impl RenderContext {
         // Create the swap chain.
 
         let swap_chain_desc = wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
             format: DISPLAY_FORMAT,
             width: window_size.width,
             height: window_size.height,
@@ -278,7 +310,7 @@ impl RenderContext {
             window_size.width,
             window_size.height,
             DEPTH_FORMAT,
-            wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            wgpu::TextureUsage::RENDER_ATTACHMENT,
         );
 
         let framebuffer_bind_group_layout =
@@ -424,7 +456,11 @@ impl RenderContext {
             layout: &shadow_uniform_bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::Buffer(shadow_uniform_buffer.slice(..)),
+                resource: wgpu::BindingResource::Buffer {
+                    buffer: &shadow_uniform_buffer,
+                    offset: 0,
+                    size: None,
+                },
             }],
         });
 
@@ -488,7 +524,7 @@ impl RenderContext {
             window_size.width,
             window_size.height,
             DISPLAY_FORMAT,
-            wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
         let bloombuffer_after_vertical = create_texture(
             &device,
@@ -496,7 +532,7 @@ impl RenderContext {
             window_size.width,
             window_size.height,
             DISPLAY_FORMAT,
-            wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
         let bloom_first_pass_bind_group = create_bloom_blur_pass(
             &device,
@@ -607,7 +643,7 @@ impl RenderContext {
             width,
             height,
             DEPTH_FORMAT,
-            wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            wgpu::TextureUsage::RENDER_ATTACHMENT,
         );
         let (framebuffer, framebuffer_bind_group) = create_framebuffer(
             &self.device,
@@ -625,7 +661,7 @@ impl RenderContext {
             width,
             height,
             DISPLAY_FORMAT,
-            wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
         self.bloombuffer_after_vertical = create_texture(
             &self.device,
@@ -633,7 +669,7 @@ impl RenderContext {
             width,
             height,
             DISPLAY_FORMAT,
-            wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
         self.bloom_first_pass_bind_group = create_bloom_blur_pass(
             &self.device,
@@ -742,7 +778,11 @@ fn create_bloom_blur_pass(
             },
             wgpu::BindGroupEntry {
                 binding: 2,
-                resource: wgpu::BindingResource::Buffer(direction.slice(..)),
+                resource: wgpu::BindingResource::Buffer {
+                    buffer: &direction,
+                    offset: 0,
+                    size: None,
+                },
             },
         ],
     })
@@ -761,7 +801,7 @@ fn create_framebuffer(
         width,
         height,
         DISPLAY_FORMAT,
-        wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
     );
 
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -977,7 +1017,7 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
 }
 
 pub struct TextBuffer {
-    pub glyph_brush: wgpu_glyph::GlyphBrush<(), wgpu_glyph::ab_glyph::FontRef<'static>>,
+    //pub glyph_brush: wgpu_glyph::GlyphBrush<(), wgpu_glyph::ab_glyph::FontRef<'static>>,
 }
 
 pub enum Font {
@@ -996,7 +1036,7 @@ impl Font {
 
 impl TextBuffer {
     pub fn new(device: &wgpu::Device) -> anyhow::Result<Self> {
-        let fonts = vec![
+        /*let fonts = vec![
             wgpu_glyph::ab_glyph::FontRef::try_from_slice(include_bytes!(
                 "../fonts/Roboto_Mono/RobotoMono-Bold.ttf"
             ))?,
@@ -1008,7 +1048,8 @@ impl TextBuffer {
         let glyph_brush =
             wgpu_glyph::GlyphBrushBuilder::using_fonts(fonts).build(&device, DISPLAY_FORMAT);
 
-        Ok(Self { glyph_brush })
+        Ok(Self { glyph_brush })*/
+        Ok(Self {})
     }
 
     pub fn render_text(
@@ -1021,7 +1062,7 @@ impl TextBuffer {
         center: bool,
         colour: Vec4,
     ) {
-        let layout = if center {
+        /*let layout = if center {
             wgpu_glyph::Layout::default()
                 .h_align(wgpu_glyph::HorizontalAlign::Center)
                 .v_align(wgpu_glyph::VerticalAlign::Center)
@@ -1043,7 +1084,7 @@ impl TextBuffer {
                         .with_font_id(wgpu_glyph::FontId(id))
                         .with_scale(scale * scale_multiplier * dpi_scaling),
                 ),
-        );
+        );*/
     }
 }
 
