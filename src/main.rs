@@ -94,25 +94,65 @@ async fn run() -> anyhow::Result<()> {
         render_context.window.scale_factor().round() as f32
     ));
 
+    for i in 0..10 {
+        ecs::Unit::MouseMarine.add_to_world(
+        &mut world,
+        Some(&animations),
+            Vec2::new(-10.0, i as f32 / 100.0),
+            ecs::Facing(1.0),
+            ecs::Side::Purple,
+        );
+    }
+
+    for i in 0..10 {
+        ecs::Unit::MouseMarine.add_to_world(
+            &mut world,
+            Some(&animations),
+            Vec2::new(10.0, i as f32 / 100.0),
+            ecs::Facing(1.0),
+        ecs::Side::Green,
+    );
+    }
+
     ecs::Unit::Engineer.add_to_world(
         &mut world,
         Some(&animations),
-        Vec2::new(0.0, 0.0),
-        ecs::Facing(0.0),
+        Vec2::new(20.0, 0.0),
+        ecs::Facing(1.0),
         ecs::Side::Green,
     );
 
-    ecs::Unit::Engineer.add_to_world(
-        &mut world,
-        Some(&animations),
-        Vec2::new(1.0, 1.0),
-        ecs::Facing(0.0),
-        ecs::Side::Green,
-    );
+    let mut map = pathfinding::Map::new();
 
-    let map = pathfinding::Map::new();
+    ecs::Building::Armoury
+        .add_to_world_finished(
+            Vec2::new(-20.0, 10.0),
+            ecs::Side::Green,
+            &mut world,
+            &animations,
+            &mut map,
+        )
+        .unwrap();
+    ecs::Building::Pump
+        .add_to_world_finished(
+            Vec2::new(-30.0, 40.0),
+            ecs::Side::Green,
+            &mut world,
+            &animations,
+            &mut map,
+        )
+        .unwrap();
+    ecs::Building::Pump
+        .add_to_world_finished(
+            Vec2::new(0.0, 50.0),
+            ecs::Side::Green,
+            &mut world,
+            &animations,
+            &mut map,
+        )
+        .unwrap();
 
-    for _ in 0..5 {
+    for _ in 0..10 {
         world.push((
             ecs::Position(Vec2::new(
                 rng.gen_range(-100.0, 100.0),

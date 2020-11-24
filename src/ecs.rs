@@ -328,7 +328,7 @@ impl Building {
         ))
     }
 
-    pub fn add_to_world(
+    pub fn add_to_world_finished(
         self,
         position: Vec2,
         side: Side,
@@ -336,7 +336,10 @@ impl Building {
         animations: &ModelAnimations,
         map: &mut Map,
     ) -> Option<Entity> {
-        let parts = self.parts(position, side, map)?;
+        let mut parts = self.parts(position, side, map)?;
+        let max_health = self.stats().max_health;
+        parts.6 = Health(max_health);
+        parts.7 = BuildingCompleteness(max_health);
         let entity = world.push(parts);
 
         if let Building::Pump = self {
