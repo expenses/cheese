@@ -161,25 +161,42 @@ fn build_building_command(
     {
         cheese_coins.0 -= building.stats().cost;
 
-        let skin = animations.pump.skin.clone();
-        let animation_state = AnimationState {
-            animation: 0,
-            time: 0.0,
-            total_time: animations.pump.animations[0].total_time,
+        let building = match building {
+            Building::Pump => {
+                let skin = animations.pump.skin.clone();
+                let animation_state = AnimationState {
+                    animation: 0,
+                    time: 0.0,
+                    total_time: animations.pump.animations[0].total_time,
+                };
+                commands.push((
+                    pos,
+                    handle,
+                    building,
+                    radius,
+                    selectable,
+                    side,
+                    health,
+                    skin,
+                    animation_state,
+                    completeness,
+                    Cooldown(0.0),
+                ))
+            }
+            Building::Armoury => commands.push((
+                pos,
+                handle,
+                building,
+                radius,
+                selectable,
+                side,
+                health,
+                completeness,
+                Abilities(vec![&ABILITIES_LIST[2], &ABILITIES_LIST[3]]),
+                RecruitmentQueue::default(),
+                Cooldown(0.0),
+            )),
         };
-        let building = commands.push((
-            pos,
-            handle,
-            building,
-            radius,
-            selectable,
-            side,
-            health,
-            skin,
-            animation_state,
-            completeness,
-            Cooldown(0.0),
-        ));
 
         let command = Command::Build {
             target: building,
@@ -407,13 +424,21 @@ pub fn update_selected_units_abilities(
     world: &SubWorld,
 ) {
     selected_units_abilities.0.clear();
-    selected_units_abilities.0.extend(
-        <(&Abilities, &Side)>::query()
-            .filter(component::<Selected>())
-            .iter(world)
-            .filter(|(_, side)| **side == player_side.0)
-            .flat_map(|(abilities, _)| abilities.0.iter().cloned()),
-    );
+
+    <(Entity, &Abilities, &Side)>::query()
+        .filter(component::<Selected>())
+        .iter(world)
+        .filter(|(.., side)| **side == player_side.0)
+        .flat_map(|(entity, abilities, _)| {
+            abilities.0.iter().map(move |ability| (entity, *ability))
+        })
+        .for_each(|(entity, ability)| {
+            selected_units_abilities
+                .0
+                .entry(ability)
+                .or_insert_with(Vec::new)
+                .push(*entity);
+        });
 }
 
 fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {

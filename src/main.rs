@@ -108,7 +108,15 @@ async fn run() -> anyhow::Result<()> {
         ecs::Side::Purple,
     );
 
-    let map = pathfinding::Map::new();
+    let mut map = pathfinding::Map::new();
+
+    ecs::Building::Armoury.add_to_world_fully_built(
+        &mut world,
+        Vec2::new(-50.0, 0.0),
+        ecs::Side::Green,
+        &animations,
+        &mut map,
+    );
 
     for _ in 0..5 {
         world.push((
@@ -162,7 +170,7 @@ async fn run() -> anyhow::Result<()> {
                     let mut debug_controls = resources.get_mut::<DebugControls>().unwrap();
                     let selected_unit_abilities =
                         resources.get::<SelectedUnitsAbilities>().unwrap();
-                    let cheese_coins = resources.get::<CheeseCoins>().unwrap();
+                    let mut cheese_coins = resources.get_mut::<CheeseCoins>().unwrap();
 
                     handle_key(
                         *virtual_keycode,
@@ -173,7 +181,8 @@ async fn run() -> anyhow::Result<()> {
                         &mut debug_controls,
                         control_flow,
                         &selected_unit_abilities,
-                        &cheese_coins,
+                        &mut cheese_coins,
+                        &mut world,
                     );
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
@@ -628,13 +637,14 @@ fn handle_key(
     debug_controls: &mut DebugControls,
     control_flow: &mut ControlFlow,
     selected_units_abilities: &SelectedUnitsAbilities,
-    cheese_coins: &CheeseCoins,
+    cheese_coins: &mut CheeseCoins,
+    world: &mut World,
 ) {
     log::trace!("{:?} (scancode: {}) pressed: {}", code, scancode, pressed);
 
     if let Some(code) = code {
         if pressed {
-            for ability in selected_units_abilities.0.iter() {
+            for (ability, casters) in selected_units_abilities.0.iter() {
                 if code == ability.hotkey {
                     match ability.ability_type {
                         ecs::AbilityType::Build(building) => {
@@ -643,6 +653,31 @@ fn handle_key(
                             //} else {
                             // Todo: play sound: meep merp (like from dota).
                             //}
+                        }
+                        ecs::AbilityType::Recruit(unit) => {
+                            if unit.stats().cost <= cheese_coins.0 {
+                                cheese_coins.0 -= unit.stats().cost;
+
+                                let entity_with_shortest_recruitment_queue = casters
+                                    .iter()
+                                    .map(|caster| {
+                                        let queue_len = <&ecs::RecruitmentQueue>::query()
+                                            .get(world, *caster)
+                                            .unwrap()
+                                            .queue
+                                            .len();
+                                        (caster, queue_len)
+                                    })
+                                    .min_by_key(|(_, queue_len)| *queue_len)
+                                    .map(|(entity, _)| *entity)
+                                    .unwrap();
+
+                                <&mut ecs::RecruitmentQueue>::query()
+                                    .get_mut(world, entity_with_shortest_recruitment_queue)
+                                    .unwrap()
+                                    .queue
+                                    .push_back(unit);
+                            }
                         }
                     }
                 }

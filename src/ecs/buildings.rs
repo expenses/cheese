@@ -66,7 +66,7 @@ pub fn generate_cheese_coins(
         && completeness.0 == building.stats().max_health
         && side == &player_side.0
     {
-        cheese_coins.0 += 10;
-        cooldown.0 = 1.0;
+        cheese_coins.0 += 2;
+        cooldown.0 = 0.5;
     }
 }

@@ -150,6 +150,8 @@ impl Ability {
         match self.ability_type {
             AbilityType::Build(Building::Armoury) => Button::BuildArmoury,
             AbilityType::Build(Building::Pump) => Button::BuildPump,
+            AbilityType::Recruit(Unit::Engineer) => Button::RecruitEngineer,
+            AbilityType::Recruit(Unit::MouseMarine) => Button::RecruitMouseMarine,
         }
     }
 }
@@ -157,9 +159,10 @@ impl Ability {
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum AbilityType {
     Build(Building),
+    Recruit(Unit),
 }
 
-const ABILITIES_LIST: [Ability; 2] = [
+const ABILITIES_LIST: [Ability; 4] = [
     Ability {
         ability_type: AbilityType::Build(Building::Pump),
         hotkey: VirtualKeyCode::P,
@@ -167,6 +170,14 @@ const ABILITIES_LIST: [Ability; 2] = [
     Ability {
         ability_type: AbilityType::Build(Building::Armoury),
         hotkey: VirtualKeyCode::R,
+    },
+    Ability {
+        ability_type: AbilityType::Recruit(Unit::Engineer),
+        hotkey: VirtualKeyCode::E,
+    },
+    Ability {
+        ability_type: AbilityType::Recruit(Unit::MouseMarine),
+        hotkey: VirtualKeyCode::M,
     },
 ];
 
@@ -370,33 +381,47 @@ impl Building {
         ))
     }
 
-    pub fn add_to_world(
+    pub fn add_to_world_fully_built(
         self,
+        world: &mut World,
         position: Vec2,
         side: Side,
-        world: &mut World,
         animations: &ModelAnimations,
         map: &mut Map,
     ) -> Option<Entity> {
-        let parts = self.parts(position, side, map)?;
+        let mut parts = self.parts(position, side, map)?;
+        parts.6 = Health(self.stats().max_health);
+        parts.7 = BuildingCompleteness(self.stats().max_health);
         let entity = world.push(parts);
 
-        if let Building::Pump = self {
-            let mut entry = world.entry(entity).unwrap();
+        let mut entry = world.entry(entity).unwrap();
 
-            entry.add_component(animations.pump.skin.clone());
-            entry.add_component(AnimationState {
-                animation: 0,
-                time: 0.0,
-                total_time: animations.pump.animations[0].total_time,
-            });
+        match self {
+            Building::Pump => {
+                entry.add_component(animations.pump.skin.clone());
+                entry.add_component(AnimationState {
+                    animation: 0,
+                    time: 0.0,
+                    total_time: animations.pump.animations[0].total_time,
+                });
+            }
+            Building::Armoury => {
+                entry.add_component(Abilities(vec![&ABILITIES_LIST[2], &ABILITIES_LIST[3]]));
+                entry.add_component(RecruitmentQueue::default());
+            }
         }
 
         Some(entity)
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Default)]
+pub struct RecruitmentQueue {
+    progress: f32,
+    pub queue: VecDeque<Unit>,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum Unit {
     MouseMarine,
     Engineer,
@@ -408,6 +433,7 @@ pub struct UnitStats {
     pub radius: f32,
     pub firing_range: f32,
     pub health_bar_height: f32,
+    pub cost: u32,
 }
 
 enum MouseAnimation {
@@ -418,7 +444,7 @@ enum MouseAnimation {
 }
 
 impl Unit {
-    fn stats(self) -> UnitStats {
+    pub fn stats(self) -> UnitStats {
         match self {
             Self::MouseMarine => UnitStats {
                 max_health: 50,
@@ -426,6 +452,7 @@ impl Unit {
                 move_speed: 6.0,
                 radius: 1.0,
                 health_bar_height: 3.0,
+                cost: 100,
             },
             Self::Engineer => UnitStats {
                 max_health: 40,
@@ -433,6 +460,7 @@ impl Unit {
                 move_speed: 6.0,
                 radius: 1.0,
                 health_bar_height: 3.0,
+                cost: 50,
             },
         }
     }
@@ -452,6 +480,7 @@ impl Unit {
             radius,
             firing_range,
             health_bar_height: _,
+            cost: _,
         } = self.stats();
 
         let entity = world.push((

@@ -425,7 +425,7 @@ pub fn render_abilities(
         )
     };
 
-    for (i, ability) in selected_units_abilities.0.iter().enumerate() {
+    for (i, (ability, _)) in selected_units_abilities.0.iter().enumerate() {
         line_buffers.draw_filled_rect(
             position(i),
             Vec2::new(ability_size + border * 2.0, ability_size + border * 2.0),
@@ -435,6 +435,7 @@ pub fn render_abilities(
 
         let can_use = match ability.ability_type {
             AbilityType::Build(building) => building.stats().cost <= cheese_coins.0,
+            AbilityType::Recruit(unit) => unit.stats().cost <= cheese_coins.0,
         };
 
         line_buffers.draw_button(
@@ -457,8 +458,12 @@ pub fn render_abilities(
             Vec4::new(0.0, 0.0, 0.0, 1.0),
         );
 
-        if let AbilityType::Build(building) = ability.ability_type {
-            let cost = building.stats().cost;
+        let cost = match ability.ability_type {
+            AbilityType::Build(building) => Some(building.stats().cost),
+            AbilityType::Recruit(unit) => Some(unit.stats().cost),
+        };
+
+        if let Some(cost) = cost {
             let nudge = Vec2::new(-2.0, -2.0);
 
             text_buffer.render_text(
