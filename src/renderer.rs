@@ -51,7 +51,8 @@ pub struct RenderContext {
     pub framebuffer: wgpu::TextureView,
     pub framebuffer_sampler: wgpu::Sampler,
     pub screen_dimension_uniform_buffer: wgpu::Buffer,
-    pub post_processing_pipeline: wgpu::RenderPipeline,
+    pub gamma_correction_pipeline: wgpu::RenderPipeline,
+    pub copy_to_swapchain_frame_pipeline: wgpu::RenderPipeline,
 
     pub bloombuffer: wgpu::TextureView,
     pub bloombuffer_after_vertical: wgpu::TextureView,
@@ -85,11 +86,13 @@ pub struct RenderContext {
 impl RenderContext {
     pub async fn new(event_loop: &EventLoop<()>) -> anyhow::Result<Self> {
         let window = WindowBuilder::new()
-            //.with_title("Cheese (working title)")
+            .with_title("Cheese (working title)")
             .build(event_loop)?;
 
         #[cfg(feature = "wasm")]
         {
+            window.set_inner_size(winit::dpi::LogicalSize::new(1920.0 - 50.0, 1080.0 - 50.0));
+
             use winit::platform::web::WindowExtWebSys;
             web_sys::window()
                 .and_then(|win| win.document())
@@ -115,6 +118,7 @@ impl RenderContext {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
+                    label: Some("Cheese device"),
                     features: wgpu::Features::empty(),
                     limits: wgpu::Limits::default(),
                     shader_validation: true,
@@ -343,37 +347,26 @@ impl RenderContext {
                 push_constant_ranges: &[],
             });
 
-        let vs_full_screen_quad =
-            wgpu::include_spirv!("../shaders/compiled/full_screen_quad.vert.spv");
-        let vs_full_screen_quad_module = device.create_shader_module(vs_full_screen_quad);
-        let fs_post_processing =
-            wgpu::include_spirv!("../shaders/compiled/post_processing.frag.spv");
-        let fs_post_processing_module = device.create_shader_module(fs_post_processing);
+        let vs_full_screen_tri =
+            wgpu::include_spirv!("../shaders/compiled/full_screen_tri.vert.spv");
+        let vs_full_screen_tri_module = device.create_shader_module(vs_full_screen_tri);
+        let fs_gamma_correction =
+            wgpu::include_spirv!("../shaders/compiled/gamma_correction.frag.spv");
+        let fs_gamma_correction_module = device.create_shader_module(fs_gamma_correction);
 
-        let post_processing_pipeline =
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("Cheese post-processing pipeline"),
-                layout: Some(&post_processing_pipeline_layout),
-                vertex_stage: wgpu::ProgrammableStageDescriptor {
-                    module: &vs_full_screen_quad_module,
-                    entry_point: "main",
-                },
-                fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-                    module: &fs_post_processing_module,
-                    entry_point: "main",
-                }),
-                rasterization_state: Some(wgpu::RasterizationStateDescriptor::default()),
-                primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-                color_states: &[colour_state_descriptor(false)],
-                depth_stencil_state: None,
-                vertex_state: wgpu::VertexStateDescriptor {
-                    index_format: INDEX_FORMAT,
-                    vertex_buffers: &[],
-                },
-                sample_count: 1,
-                sample_mask: !0,
-                alpha_to_coverage_enabled: false,
-            });
+        let fs_copy_to_swapchain_frame =
+            wgpu::include_spirv!("../shaders/compiled/copy_to_swapchain_frame.frag.spv");
+        let fs_copy_to_swapchain_frame_module = device.create_shader_module(fs_copy_to_swapchain_frame);
+
+        let gamma_correction_pipeline = create_post_processing_pipeline(
+            &device, "Cheese gamma correction pipeline", &post_processing_pipeline_layout,
+            &vs_full_screen_tri_module,  &fs_gamma_correction_module,
+        );
+
+        let copy_to_swapchain_frame_pipeline = create_post_processing_pipeline(
+            &device, "Cheese copy to swapchain frame pipeline", &post_processing_pipeline_layout,
+            &vs_full_screen_tri_module,  &fs_copy_to_swapchain_frame_module,
+        );
 
         let (framebuffer, framebuffer_bind_group) = create_framebuffer(
             &device,
@@ -565,7 +558,7 @@ impl RenderContext {
             label: Some("Cheese bloom blur pipeline"),
             layout: Some(&bloom_blur_pipeline_layout),
             vertex_stage: wgpu::ProgrammableStageDescriptor {
-                module: &vs_full_screen_quad_module,
+                module: &vs_full_screen_tri_module,
                 entry_point: "main",
             },
             fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
@@ -605,7 +598,8 @@ impl RenderContext {
             framebuffer_bind_group,
             framebuffer_bind_group_layout,
             framebuffer_sampler,
-            post_processing_pipeline,
+            gamma_correction_pipeline,
+            copy_to_swapchain_frame_pipeline,
             screen_dimension_uniform_buffer,
             shadow_texture,
             identity_instance_buffer: Arc::new(identity_instance_buffer),
@@ -754,6 +748,35 @@ pub fn create_perspective_mat4(window_width: u32, window_height: u32) -> Mat4 {
         0.1,
         250.0,
     )
+}
+
+fn create_post_processing_pipeline(
+    device: &wgpu::Device, label: &str, layout: &wgpu::PipelineLayout,
+    vertex_stage: &wgpu::ShaderModule, frag_stage: &wgpu::ShaderModule,
+) -> wgpu::RenderPipeline {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some(label),
+        layout: Some(layout),
+        vertex_stage: wgpu::ProgrammableStageDescriptor {
+            module: vertex_stage,
+            entry_point: "main",
+        },
+        fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+            module: frag_stage,
+            entry_point: "main",
+        }),
+        rasterization_state: Some(wgpu::RasterizationStateDescriptor::default()),
+        primitive_topology: wgpu::PrimitiveTopology::TriangleList,
+        color_states: &[colour_state_descriptor(false)],
+        depth_stencil_state: None,
+        vertex_state: wgpu::VertexStateDescriptor {
+            index_format: INDEX_FORMAT,
+            vertex_buffers: &[],
+        },
+        sample_count: 1,
+        sample_mask: !0,
+        alpha_to_coverage_enabled: false,
+    })
 }
 
 fn create_bloom_blur_pass(

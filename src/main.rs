@@ -32,7 +32,7 @@ use futures::FutureExt;
 fn main() -> anyhow::Result<()> {
     #[cfg(feature = "wasm")]
     {
-        console_log::init_with_level(log::Level::Trace);
+        console_log::init_with_level(log::Level::Info);
         console_error_panic_hook::set_once();
         wasm_bindgen_futures::spawn_local(run().map(drop));
     }
@@ -392,8 +392,6 @@ async fn run() -> anyhow::Result<()> {
 
                     drop(render_pass);
 
-                    // Post-processing pass
-
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                             attachment: &frame.output.view,
@@ -411,7 +409,11 @@ async fn run() -> anyhow::Result<()> {
                         depth_stencil_attachment: None,
                     });
 
-                    render_pass.set_pipeline(&render_context.post_processing_pipeline);
+                    // We only do gamma correction on wasm because we use srgb on native.
+                    #[cfg(feature = "wasm")]
+                    render_pass.set_pipeline(&render_context.gamma_correction_pipeline);
+                    #[cfg(not(feature = "wasm"))]
+                    render_pass.set_pipeline(&render_context.copy_to_swapchain_frame_pipeline);
                     render_pass.set_bind_group(0, &render_context.framebuffer_bind_group, &[]);
                     render_pass.draw(0..3, 0..1);
 

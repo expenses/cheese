@@ -10,10 +10,10 @@ arrayvec = "0.5.2"
 base64 = "0.13.0"
 bytemuck = { version = "1.4.1", features = ["derive"] }
 cgmath = "0.17.0"
-env_logger = "0.8.1"
-futures = "0.3.7"
+env_logger = "0.8.2"
+futures = "0.3.8"
 gltf = { version = "0.15.2", default-features = false, features = ["utils", "names"] }
-image = { version = "0.23.11", default-features = false, features = ["png"] }
+image = { version = "0.23.12", default-features = false, features = ["png"] }
 legion = { version = "0.3.1", default-features = false, features = ["codegen", "extended-tuple-impls"] }
 log = "0.4.11"
 lyon_tessellation = "0.16.2"
@@ -27,7 +27,7 @@ wgpu = "0.6.0"
 #wgpu_glyph = "0.10.0"
 winit = "0.23.0"
 ncollide2d = "0.26.1"
-web-sys = { version = "=0.3.45", optional = true }
+web-sys = { version = "0.3.45", optional = true }
 wasm-bindgen-futures = { version = "0.4.18", optional = true }
 console_log = "0.2.0"
 console_error_panic_hook = { version = "0.1.6", optional = true }
@@ -41,7 +41,7 @@ wasm = ["web-sys", "winit/web-sys", "wasm-bindgen-futures", "rand/wasm-bindgen",
 native = []
 
 [patch.crates-io]
-wgpu = { git = "https://github.com/grovesNL/wgpu-rs", branch = "update-web-backend-nov-7" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs" }
 web-sys = { git = "https://github.com/rustwasm/wasm-bindgen" }
 wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen" }
 js-sys = { git = "https://github.com/rustwasm/wasm-bindgen" }

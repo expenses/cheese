@@ -5,6 +5,8 @@ layout(location = 1) in vec3 in_colour;
 layout(location = 2) in flat int textured;
 
 layout(location = 0) out vec4 out_colour;
+// Not sure if we need this. Was getting a wgpu error otherwise.
+layout(location = 1) out vec4 out_bloom;
 
 layout(set = 0, binding = 1) uniform sampler u_sampler;
 layout(set = 1, binding = 0) uniform texture2D u_texture;
@@ -15,4 +17,6 @@ void main() {
     } else {
         out_colour = vec4(in_colour, 1.0);
     }
+
+    out_bloom = vec4(0.0);
 }
