@@ -89,6 +89,8 @@ impl RenderContext {
             .with_title("Cheese (working title)")
             .build(event_loop)?;
 
+        log::info!("Window scale factor: {}", window.scale_factor());
+
         #[cfg(feature = "wasm")]
         {
             window.set_inner_size(winit::dpi::LogicalSize::new(1920.0 - 50.0, 1080.0 - 50.0));
