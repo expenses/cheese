@@ -74,7 +74,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(Mode::Playing);
     resources.insert(DebugControls::default());
     resources.insert(Gravity(5.0));
-    resources.insert(CheeseCoins(100));
+    resources.insert(CheeseCoins(100_000));
     resources.insert(SelectedUnitsAbilities::default());
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
@@ -84,29 +84,37 @@ async fn run() -> anyhow::Result<()> {
         render_context.window.scale_factor().round() as f32
     ));
 
+    let mut command_buffer = legion::systems::CommandBuffer::new(&world);
+
     ecs::Unit::Engineer.add_to_world(
-        &mut world,
+        &mut command_buffer,
         Some(&animations),
         Vec2::new(0.0, 0.0),
         ecs::Facing(0.0),
         ecs::Side::Green,
+        None,
     );
 
     ecs::Unit::Engineer.add_to_world(
-        &mut world,
+        &mut command_buffer,
         Some(&animations),
         Vec2::new(1.0, 1.0),
         ecs::Facing(0.0),
         ecs::Side::Green,
+        None,
     );
 
     ecs::Unit::Engineer.add_to_world(
-        &mut world,
+        &mut command_buffer,
         Some(&animations),
         Vec2::new(10.0, 0.0),
         ecs::Facing(0.0),
         ecs::Side::Purple,
+        None,
     );
+
+    command_buffer.flush(&mut world);
+    drop(command_buffer);
 
     let mut map = pathfinding::Map::new();
 
@@ -647,6 +655,9 @@ fn handle_key(
             for (ability, casters) in selected_units_abilities.0.iter() {
                 if code == ability.hotkey {
                     match ability.ability_type {
+                        ecs::AbilityType::SetRecruitmentWaypoint => {
+                            rts_controls.mode = CommandMode::SetRecruitmentWaypoint;
+                        }
                         ecs::AbilityType::Build(building) => {
                             //if building.stats().cost <= cheese_coins.0 {
                             rts_controls.mode = CommandMode::Construct(building);

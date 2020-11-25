@@ -1,9 +1,10 @@
 use super::{
-    ActionState, Building, BuildingCompleteness, Command, CommandQueue, Cooldown, Facing, Health,
-    Position, Side,
+    nearest_point_within_building, ActionState, Building, BuildingCompleteness, Command,
+    CommandQueue, Cooldown, Facing, Health, Position, RecruitmentQueue, Side,
 };
-use crate::resources::{CheeseCoins, PlayerSide};
-use legion::{component, world::SubWorld, Entity, IntoQuery};
+use crate::assets::ModelAnimations;
+use crate::resources::{CheeseCoins, DeltaTime, PlayerSide};
+use legion::{component, systems::CommandBuffer, world::SubWorld, Entity, IntoQuery};
 
 #[legion::system(for_each)]
 #[filter(component::<Position>())]
@@ -68,5 +69,50 @@ pub fn generate_cheese_coins(
     {
         cheese_coins.0 += 2;
         cooldown.0 = 0.5;
+    }
+}
+
+#[legion::system(for_each)]
+pub fn progress_recruitment_queue(
+    building_position: &Position,
+    building: &Building,
+    recruitment_queue: &mut RecruitmentQueue,
+    side: &Side,
+    #[resource] animations: &ModelAnimations,
+    #[resource] delta_time: &DeltaTime,
+    buffer: &mut CommandBuffer,
+) {
+    if let Some(unit) = recruitment_queue.queue.front().cloned() {
+        let recruitment_time = unit.stats().recruitment_time;
+        recruitment_queue.progress += delta_time.0;
+        if recruitment_queue.progress > recruitment_time {
+            recruitment_queue.progress -= recruitment_time;
+            recruitment_queue.queue.pop_front();
+
+            let start_point = nearest_point_within_building(
+                recruitment_queue.waypoint,
+                unit.stats().radius,
+                building_position.0,
+                building.stats().dimensions,
+            );
+
+            let command = Command::MoveTo {
+                target: recruitment_queue.waypoint,
+                attack_move: true,
+                path: Vec::new(),
+            };
+            unit.add_to_world(
+                buffer,
+                Some(animations),
+                start_point,
+                Facing(0.0),
+                *side,
+                Some(command),
+            );
+        }
+    } else {
+        // If a unit just finished off the queue and there are no more units in the queue,
+        // we don't want to keep the carry-over progress from the last unit around.
+        recruitment_queue.progress = 0.0;
     }
 }

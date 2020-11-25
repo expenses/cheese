@@ -33,6 +33,7 @@ pub enum CommandMode {
     Normal,
     AttackMove,
     Construct(ecs::Building),
+    SetRecruitmentWaypoint,
 }
 
 impl Default for CommandMode {

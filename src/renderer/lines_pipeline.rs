@@ -199,15 +199,17 @@ pub enum Button {
     BuildArmoury,
     RecruitEngineer,
     RecruitMouseMarine,
+    SetRecruitmentWaypoint,
 }
 
 impl Button {
     fn uv(&self) -> (Vec2, Vec2) {
         match self {
-            Self::BuildPump => (Vec2::new(0.0, 0.0), Vec2::new(0.5, 0.5)),
-            Self::BuildArmoury => (Vec2::new(0.5, 0.0), Vec2::new(0.5, 0.5)),
-            Self::RecruitEngineer => (Vec2::new(0.0, 0.5), Vec2::new(0.5, 0.5)),
-            Self::RecruitMouseMarine => (Vec2::new(0.5, 0.5), Vec2::new(0.5, 0.5)),
+            Self::BuildPump => (Vec2::new(0.0, 0.0), Vec2::new(0.25, 0.5)),
+            Self::BuildArmoury => (Vec2::new(0.25, 0.0), Vec2::new(0.25, 0.5)),
+            Self::RecruitEngineer => (Vec2::new(0.0, 0.5), Vec2::new(0.25, 0.5)),
+            Self::RecruitMouseMarine => (Vec2::new(0.25, 0.5), Vec2::new(0.25, 0.5)),
+            Self::SetRecruitmentWaypoint => (Vec2::new(0.5, 0.0), Vec2::new(0.25, 0.5)),
         }
     }
 }

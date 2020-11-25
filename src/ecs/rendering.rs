@@ -229,6 +229,41 @@ pub fn render_ui(
 }
 
 #[legion::system(for_each)]
+#[filter(component::<Selected>())]
+pub fn render_recruitment_waypoints(
+    position: &Position,
+    recruitment_queue: &RecruitmentQueue,
+    side: &Side,
+    #[resource] player_side: &PlayerSide,
+    #[resource] model_buffers: &mut ModelBuffers,
+) {
+    if *side != player_side.0 {
+        return;
+    }
+
+    let colour = Vec4::new(0.125, 0.5, 0.125, 1.0);
+
+    let waypoint = recruitment_queue.waypoint;
+
+    model_buffers.command_indicators.push(ModelInstance {
+        transform: Mat4::from_translation(Vec3::new(waypoint.x, 0.01, waypoint.y)),
+        flat_colour: colour,
+    });
+
+    let center = (waypoint + position.0) / 2.0;
+    let vector = waypoint - position.0;
+    let rotation = vector.y.atan2(vector.x);
+    let scale = vector.mag();
+
+    model_buffers.command_paths.push(ModelInstance {
+        transform: Mat4::from_translation(Vec3::new(center.x, 0.005, center.y))
+            * Mat4::from_rotation_y(rotation)
+            * Mat4::from_nonuniform_scale(Vec3::new(scale, 1.0, 1.0)),
+        flat_colour: colour,
+    });
+}
+
+#[legion::system(for_each)]
 #[filter(component::<Selected>() & component::<Position>())]
 #[read_component(Position)]
 pub fn render_command_paths(
@@ -402,7 +437,6 @@ fn unit_under_cursor(ray_cast_location: &RayCastLocation, world: &SubWorld) -> O
 
 #[legion::system]
 pub fn render_abilities(
-    #[resource] player_side: &PlayerSide,
     #[resource] dpi_scaling: &DpiScaling,
     #[resource] line_buffers: &mut LineBuffers,
     #[resource] screen_dimensions: &ScreenDimensions,
@@ -436,6 +470,7 @@ pub fn render_abilities(
         let can_use = match ability.ability_type {
             AbilityType::Build(building) => building.stats().cost <= cheese_coins.0,
             AbilityType::Recruit(unit) => unit.stats().cost <= cheese_coins.0,
+            AbilityType::SetRecruitmentWaypoint => true,
         };
 
         line_buffers.draw_button(
@@ -461,6 +496,7 @@ pub fn render_abilities(
         let cost = match ability.ability_type {
             AbilityType::Build(building) => Some(building.stats().cost),
             AbilityType::Recruit(unit) => Some(unit.stats().cost),
+            AbilityType::SetRecruitmentWaypoint => None,
         };
 
         if let Some(cost) = cost {

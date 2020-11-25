@@ -69,6 +69,7 @@ pub fn cast_ray(
 #[read_component(Radius)]
 #[read_component(Building)]
 #[write_component(CommandQueue)]
+#[write_component(RecruitmentQueue)]
 pub fn handle_left_click(
     #[resource] mouse_state: &MouseState,
     #[resource] ray_cast_location: &RayCastLocation,
@@ -134,6 +135,17 @@ pub fn handle_left_click(
                 cheese_coins,
             );
         }
+        CommandMode::SetRecruitmentWaypoint => {
+            let position = ray_cast_location.0;
+
+            <(&mut RecruitmentQueue, &Side)>::query()
+                .filter(component::<Selected>())
+                .iter_mut(world)
+                .filter(|(_, side)| **side == player_side.0)
+                .for_each(|(queue, _)| {
+                    queue.waypoint = position;
+                })
+        }
     }
 
     if !rts_controls.shift_held {
@@ -192,7 +204,11 @@ fn build_building_command(
                 side,
                 health,
                 completeness,
-                Abilities(vec![&ABILITIES_LIST[2], &ABILITIES_LIST[3]]),
+                Abilities(vec![
+                    &Ability::RECRUIT_MOUSE_MARINE,
+                    &Ability::RECRUIT_ENGINEER,
+                    &Ability::SET_RECRUITMENT_WAYPOINT,
+                ]),
                 RecruitmentQueue::default(),
                 Cooldown(0.0),
             )),
@@ -281,6 +297,7 @@ fn issue_command(
                 attack_move: true,
             }),
             CommandMode::Construct(_) => None,
+            CommandMode::SetRecruitmentWaypoint => None,
         },
     };
 
