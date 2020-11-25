@@ -23,8 +23,8 @@ pathfinding = "2.0.4"
 spade = "1.8.2"
 rand = { version = "0.7.3", default-features = false, features = ["small_rng"] }
 ultraviolet = { version = "0.7.5", features = ["bytemuck"] }
-wgpu = "0.6.0"
-#wgpu_glyph = "0.10.0"
+wgpu = "=0.6.0"
+wgpu_glyph = "0.10.0"
 winit = "0.23.0"
 ncollide2d = "0.26.1"
 web-sys = { version = "0.3.45", optional = true }
@@ -45,3 +45,4 @@ wgpu = { git = "https://github.com/gfx-rs/wgpu-rs" }
 web-sys = { git = "https://github.com/rustwasm/wasm-bindgen" }
 wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen" }
 js-sys = { git = "https://github.com/rustwasm/wasm-bindgen" }
+wgpu_glyph = { git = "https://github.com/expenses/wgpu_glyph", branch = "update-to-wgpu-0.6-master" }

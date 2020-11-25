@@ -140,34 +140,6 @@ pub fn set_movement_paths(
     }
 }
 
-fn nearest_point_within_building(
-    unit_pos: Vec2,
-    unit_radius: f32,
-    building_pos: Vec2,
-    building_dims: Vec2,
-) -> Vec2 {
-    let point = unit_pos - building_pos;
-    let bounding_box = building_dims / 2.0;
-
-    let x = if point.x > -bounding_box.x && point.x < bounding_box.y {
-        point.x
-    } else if point.x > 0.0 {
-        bounding_box.x + unit_radius
-    } else {
-        -(bounding_box.x + unit_radius)
-    };
-
-    let y = if point.y > -bounding_box.y && point.y < bounding_box.y {
-        point.y
-    } else if point.y > 0.0 {
-        bounding_box.y + unit_radius
-    } else {
-        -(bounding_box.y + unit_radius)
-    };
-
-    building_pos + Vec2::new(x, y)
-}
-
 #[legion::system(for_each)]
 pub fn move_units(
     position: &mut Position,

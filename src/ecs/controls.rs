@@ -1,6 +1,8 @@
 use super::*;
 use crate::assets::ModelAnimations;
-use crate::resources::{CommandMode, ControlGroups, RayCastLocation};
+use crate::resources::{
+    CheeseCoins, CommandMode, ControlGroups, RayCastLocation, SelectedUnitsAbilities,
+};
 
 #[legion::system]
 pub fn control_camera(
@@ -67,6 +69,7 @@ pub fn cast_ray(
 #[read_component(Radius)]
 #[read_component(Building)]
 #[write_component(CommandQueue)]
+#[write_component(RecruitmentQueue)]
 pub fn handle_left_click(
     #[resource] mouse_state: &MouseState,
     #[resource] ray_cast_location: &RayCastLocation,
@@ -74,6 +77,7 @@ pub fn handle_left_click(
     #[resource] player_side: &PlayerSide,
     #[resource] map: &mut Map,
     #[resource] animations: &ModelAnimations,
+    #[resource] cheese_coins: &mut CheeseCoins,
     world: &mut SubWorld,
     commands: &mut CommandBuffer,
 ) {
@@ -118,17 +122,66 @@ pub fn handle_left_click(
                 }
             }
         }
-        CommandMode::Construct => {
-            if let Some((pos, handle, building, radius, selectable, side, health, completeness)) =
-                Building::Pump.parts(ray_cast_location.0, player_side.0, map)
-            {
+        CommandMode::Construct(building) => {
+            build_building_command(
+                building,
+                ray_cast_location,
+                player_side,
+                map,
+                animations,
+                commands,
+                world,
+                rts_controls,
+                cheese_coins,
+            );
+        }
+        CommandMode::SetRecruitmentWaypoint => {
+            let position = ray_cast_location.0;
+
+            <(&mut RecruitmentQueue, &Side)>::query()
+                .filter(component::<Selected>())
+                .iter_mut(world)
+                .filter(|(_, side)| **side == player_side.0)
+                .for_each(|(queue, _)| {
+                    queue.waypoint = position;
+                })
+        }
+    }
+
+    if !rts_controls.shift_held {
+        rts_controls.mode = CommandMode::Normal;
+    }
+}
+
+fn build_building_command(
+    building: Building,
+    ray_cast_location: &RayCastLocation,
+    player_side: &PlayerSide,
+    map: &mut Map,
+    animations: &ModelAnimations,
+    commands: &mut CommandBuffer,
+    world: &mut SubWorld,
+    rts_controls: &RtsControls,
+    cheese_coins: &mut CheeseCoins,
+) {
+    if building.stats().cost > cheese_coins.0 {
+        return;
+    }
+
+    if let Some((pos, handle, building, radius, selectable, side, health, completeness)) =
+        building.parts(ray_cast_location.0, player_side.0, map)
+    {
+        cheese_coins.0 -= building.stats().cost;
+
+        let building = match building {
+            Building::Pump => {
                 let skin = animations.pump.skin.clone();
                 let animation_state = AnimationState {
                     animation: 0,
                     time: 0.0,
                     total_time: animations.pump.animations[0].total_time,
                 };
-                let building = commands.push((
+                commands.push((
                     pos,
                     handle,
                     building,
@@ -140,32 +193,45 @@ pub fn handle_left_click(
                     animation_state,
                     completeness,
                     Cooldown(0.0),
-                ));
-
-                let command = Command::Build {
-                    target: building,
-                    // Kinda hacky? If we put `ActionState::OutOfRange` with an empty vec it
-                    // wouldn't get updated with the current `set_movement_paths` code.
-                    state: ActionState::InRange,
-                };
-
-                <(&mut CommandQueue, &Side)>::query()
-                    .filter(component::<Selected>() & component::<CanBuild>())
-                    .iter_mut(world)
-                    .filter(|(_, side)| **side == player_side.0)
-                    .for_each(|(commands, _)| {
-                        if !rts_controls.shift_held {
-                            commands.0.clear();
-                        }
-
-                        commands.0.push_back(command.clone());
-                    });
+                ))
             }
-        }
-    }
+            Building::Armoury => commands.push((
+                pos,
+                handle,
+                building,
+                radius,
+                selectable,
+                side,
+                health,
+                completeness,
+                Abilities(vec![
+                    &Ability::RECRUIT_MOUSE_MARINE,
+                    &Ability::RECRUIT_ENGINEER,
+                    &Ability::SET_RECRUITMENT_WAYPOINT,
+                ]),
+                RecruitmentQueue::default(),
+                Cooldown(0.0),
+            )),
+        };
 
-    if !rts_controls.shift_held {
-        rts_controls.mode = CommandMode::Normal;
+        let command = Command::Build {
+            target: building,
+            // Kinda hacky? If we put `ActionState::OutOfRange` with an empty vec it
+            // wouldn't get updated with the current `set_movement_paths` code.
+            state: ActionState::InRange,
+        };
+
+        <(&mut CommandQueue, &Side)>::query()
+            .filter(component::<Selected>() & component::<CanBuild>())
+            .iter_mut(world)
+            .filter(|(_, side)| **side == player_side.0)
+            .for_each(|(commands, _)| {
+                if !rts_controls.shift_held {
+                    commands.0.clear();
+                }
+
+                commands.0.push_back(command.clone());
+            });
     }
 }
 
@@ -230,7 +296,8 @@ fn issue_command(
                 path: Vec::new(),
                 attack_move: true,
             }),
-            CommandMode::Construct => None,
+            CommandMode::Construct(_) => None,
+            CommandMode::SetRecruitmentWaypoint => None,
         },
     };
 
@@ -352,6 +419,10 @@ pub fn handle_control_groups(
                     .for_each(world, |entity| {
                         control_groups.0[i].push(*entity);
                     });
+
+                for entity in control_groups.0[i].iter() {
+                    command_buffer.add_component(*entity, Selected);
+                }
             } else {
                 if !control_groups.0[i].is_empty() {
                     deselect_all(world, command_buffer);
@@ -363,6 +434,32 @@ pub fn handle_control_groups(
             }
         }
     }
+}
+
+#[legion::system]
+#[read_component(Abilities)]
+#[read_component(Side)]
+pub fn update_selected_units_abilities(
+    #[resource] player_side: &PlayerSide,
+    #[resource] selected_units_abilities: &mut SelectedUnitsAbilities,
+    world: &SubWorld,
+) {
+    selected_units_abilities.0.clear();
+
+    <(Entity, &Abilities, &Side)>::query()
+        .filter(component::<Selected>())
+        .iter(world)
+        .filter(|(.., side)| **side == player_side.0)
+        .flat_map(|(entity, abilities, _)| {
+            abilities.0.iter().map(move |ability| (entity, *ability))
+        })
+        .for_each(|(entity, ability)| {
+            selected_units_abilities
+                .0
+                .entry(ability)
+                .or_insert_with(Vec::new)
+                .push(*entity);
+        });
 }
 
 fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {

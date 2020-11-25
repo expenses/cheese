@@ -27,6 +27,7 @@ pub struct Assets {
     pub armoury_texture: wgpu::BindGroup,
     pub pump_texture: wgpu::BindGroup,
     pub blaster_texture: wgpu::BindGroup,
+    pub buttons_texture: wgpu::BindGroup,
 }
 
 #[derive(Default)]
@@ -183,6 +184,13 @@ impl Assets {
             blaster_texture: load_texture(
                 include_bytes!("../textures/blaster.png"),
                 "Cheese blaster texture",
+                &texture_bind_group_layout,
+                device,
+                &mut init_encoder,
+            )?,
+            buttons_texture: load_texture(
+                include_bytes!("../textures/buttons.png"),
+                "Cheese buttons texture",
                 &texture_bind_group_layout,
                 device,
                 &mut init_encoder,

@@ -14,7 +14,7 @@ mod shadow_pipeline;
 mod torus_pipeline;
 
 pub use lines_3d_pipeline::{Lines3dBuffer, Lines3dPipeline};
-pub use lines_pipeline::{LineBuffers, LinesPipeline};
+pub use lines_pipeline::{Button, LineBuffers, LinesPipeline};
 pub use model_pipelines::{ModelBuffers, ModelInstance, ModelPipelines, TitlescreenBuffer};
 pub use shadow_pipeline::ShadowPipeline;
 pub use torus_pipeline::{TorusBuffer, TorusInstance, TorusPipeline};
@@ -358,16 +358,23 @@ impl RenderContext {
 
         let fs_copy_to_swapchain_frame =
             wgpu::include_spirv!("../shaders/compiled/copy_to_swapchain_frame.frag.spv");
-        let fs_copy_to_swapchain_frame_module = device.create_shader_module(fs_copy_to_swapchain_frame);
+        let fs_copy_to_swapchain_frame_module =
+            device.create_shader_module(fs_copy_to_swapchain_frame);
 
         let gamma_correction_pipeline = create_post_processing_pipeline(
-            &device, "Cheese gamma correction pipeline", &post_processing_pipeline_layout,
-            &vs_full_screen_tri_module,  &fs_gamma_correction_module,
+            &device,
+            "Cheese gamma correction pipeline",
+            &post_processing_pipeline_layout,
+            &vs_full_screen_tri_module,
+            &fs_gamma_correction_module,
         );
 
         let copy_to_swapchain_frame_pipeline = create_post_processing_pipeline(
-            &device, "Cheese copy to swapchain frame pipeline", &post_processing_pipeline_layout,
-            &vs_full_screen_tri_module,  &fs_copy_to_swapchain_frame_module,
+            &device,
+            "Cheese copy to swapchain frame pipeline",
+            &post_processing_pipeline_layout,
+            &vs_full_screen_tri_module,
+            &fs_copy_to_swapchain_frame_module,
         );
 
         let (framebuffer, framebuffer_bind_group) = create_framebuffer(
@@ -753,8 +760,11 @@ pub fn create_perspective_mat4(window_width: u32, window_height: u32) -> Mat4 {
 }
 
 fn create_post_processing_pipeline(
-    device: &wgpu::Device, label: &str, layout: &wgpu::PipelineLayout,
-    vertex_stage: &wgpu::ShaderModule, frag_stage: &wgpu::ShaderModule,
+    device: &wgpu::Device,
+    label: &str,
+    layout: &wgpu::PipelineLayout,
+    vertex_stage: &wgpu::ShaderModule,
+    frag_stage: &wgpu::ShaderModule,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some(label),
@@ -1039,10 +1049,14 @@ impl<T: bytemuck::Pod> DynamicBuffer<T> {
             None
         }
     }
+
+    pub fn len_waiting(&self) -> usize {
+        self.waiting.len()
+    }
 }
 
 pub struct TextBuffer {
-    //pub glyph_brush: wgpu_glyph::GlyphBrush<(), wgpu_glyph::ab_glyph::FontRef<'static>>,
+    pub glyph_brush: wgpu_glyph::GlyphBrush<(), wgpu_glyph::ab_glyph::FontRef<'static>>,
 }
 
 pub enum Font {
@@ -1059,9 +1073,15 @@ impl Font {
     }
 }
 
+pub enum TextAlignment {
+    Default,
+    Center,
+    HorizontalRight,
+}
+
 impl TextBuffer {
     pub fn new(device: &wgpu::Device) -> anyhow::Result<Self> {
-        /*let fonts = vec![
+        let fonts = vec![
             wgpu_glyph::ab_glyph::FontRef::try_from_slice(include_bytes!(
                 "../fonts/Roboto_Mono/RobotoMono-Bold.ttf"
             ))?,
@@ -1073,8 +1093,7 @@ impl TextBuffer {
         let glyph_brush =
             wgpu_glyph::GlyphBrushBuilder::using_fonts(fonts).build(&device, DISPLAY_FORMAT);
 
-        Ok(Self { glyph_brush })*/
-        Ok(Self {})
+        Ok(Self { glyph_brush })
     }
 
     pub fn render_text(
@@ -1084,15 +1103,17 @@ impl TextBuffer {
         font: Font,
         scale_multiplier: f32,
         dpi_scaling: f32,
-        center: bool,
+        alignment: TextAlignment,
         colour: Vec4,
     ) {
-        /*let layout = if center {
-            wgpu_glyph::Layout::default()
+        let layout = match alignment {
+            TextAlignment::Default => wgpu_glyph::Layout::default(),
+            TextAlignment::Center => wgpu_glyph::Layout::default()
                 .h_align(wgpu_glyph::HorizontalAlign::Center)
-                .v_align(wgpu_glyph::VerticalAlign::Center)
-        } else {
-            wgpu_glyph::Layout::default()
+                .v_align(wgpu_glyph::VerticalAlign::Center),
+            TextAlignment::HorizontalRight => {
+                wgpu_glyph::Layout::default().h_align(wgpu_glyph::HorizontalAlign::Right)
+            }
         };
 
         let scale = font.scale();
@@ -1109,7 +1130,7 @@ impl TextBuffer {
                         .with_font_id(wgpu_glyph::FontId(id))
                         .with_scale(scale * scale_multiplier * dpi_scaling),
                 ),
-        );*/
+        );
     }
 }
 

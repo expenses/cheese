@@ -1,9 +1,12 @@
 use super::*;
 use crate::animation::Skin;
 use crate::renderer::{
-    Font, LineBuffers, ModelBuffers, ModelInstance, TextBuffer, TorusBuffer, TorusInstance,
+    Font, LineBuffers, ModelBuffers, ModelInstance, TextAlignment, TextBuffer, TorusBuffer,
+    TorusInstance,
 };
-use crate::resources::{CheeseCoins, CommandMode, CursorIcon, DpiScaling, RayCastLocation};
+use crate::resources::{
+    CheeseCoins, CommandMode, CursorIcon, DpiScaling, RayCastLocation, SelectedUnitsAbilities,
+};
 use ultraviolet::Vec4;
 
 const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
@@ -18,24 +21,30 @@ fn mix(colour_a: Vec3, colour_b: Vec3, factor: f32) -> Vec3 {
 pub fn render_building_plan(
     #[resource] ray_cast_location: &RayCastLocation,
     #[resource] rts_controls: &RtsControls,
+    #[resource] cheese_coins: &CheeseCoins,
     #[resource] model_buffers: &mut ModelBuffers,
 ) {
-    if rts_controls.mode != CommandMode::Construct {
-        model_buffers.building_plan.clear();
-        return;
-    }
+    if let CommandMode::Construct(building) = rts_controls.mode {
+        let colour = if building.stats().cost <= cheese_coins.0 {
+            Vec4::new(0.0, 1.0, 0.0, 0.25)
+        } else {
+            Vec4::new(1.0, 0.0, 0.0, 1.0 / 3.0)
+        };
 
-    model_buffers.building_plan.set(
-        Building::Pump,
-        ModelInstance {
-            transform: Mat4::from_translation(Vec3::new(
-                ray_cast_location.0.x,
-                0.0,
-                ray_cast_location.0.y,
-            )),
-            flat_colour: Vec4::new(0.0, 1.0, 0.0, 0.25),
-        },
-    );
+        model_buffers.building_plan.set(
+            building,
+            ModelInstance {
+                transform: Mat4::from_translation(Vec3::new(
+                    ray_cast_location.0.x,
+                    0.0,
+                    ray_cast_location.0.y,
+                )),
+                flat_colour: colour,
+            },
+        );
+    } else {
+        model_buffers.building_plan.clear();
+    }
 }
 
 #[legion::system(for_each)]
@@ -188,25 +197,26 @@ fn wgpu_to_screen(wgpu: Vec2, width: f32, height: f32) -> Vec2 {
 }
 
 #[legion::system]
-#[read_component(Entity)]
-#[read_component(Health)]
+#[read_component(RecruitmentQueue)]
+#[read_component(Side)]
 pub fn render_ui(
     #[resource] rts_controls: &RtsControls,
     #[resource] dpi_scaling: &DpiScaling,
     #[resource] cheese_coins: &CheeseCoins,
     #[resource] text_buffer: &mut TextBuffer,
+    #[resource] player_side: &PlayerSide,
     world: &SubWorld,
 ) {
     let coins = std::iter::once(format!("Cheese coins: {}\n", cheese_coins.0));
     let mode = std::iter::once(format!("Mode: {:?}\n", rts_controls.mode));
 
-    let mut query = <(Entity, &Health)>::query().filter(component::<Selected>());
-
-    let unit_info = query
+    let mut query = <(&RecruitmentQueue, &Side)>::query();
+    let queue_infos = query
         .iter(world)
-        .map(|(entity, health)| format!("{:?}: Health: {}\n", entity, health.0));
+        .filter(|(_, side)| **side == player_side.0)
+        .map(|(queue, _)| format!("Queue progress: {}\n", queue.progress));
 
-    let text: String = coins.chain(mode).chain(unit_info).collect();
+    let text: String = coins.chain(mode).chain(queue_infos).collect();
 
     text_buffer.render_text(
         Vec2::new(10.0, 10.0),
@@ -214,9 +224,44 @@ pub fn render_ui(
         Font::Ui,
         1.0,
         dpi_scaling.0,
-        false,
+        TextAlignment::Default,
         Vec4::one(),
     );
+}
+
+#[legion::system(for_each)]
+#[filter(component::<Selected>())]
+pub fn render_recruitment_waypoints(
+    position: &Position,
+    recruitment_queue: &RecruitmentQueue,
+    side: &Side,
+    #[resource] player_side: &PlayerSide,
+    #[resource] model_buffers: &mut ModelBuffers,
+) {
+    if *side != player_side.0 {
+        return;
+    }
+
+    let colour = Vec4::new(0.125, 0.5, 0.125, 1.0);
+
+    let waypoint = recruitment_queue.waypoint;
+
+    model_buffers.command_indicators.push(ModelInstance {
+        transform: Mat4::from_translation(Vec3::new(waypoint.x, 0.01, waypoint.y)),
+        flat_colour: colour,
+    });
+
+    let center = (waypoint + position.0) / 2.0;
+    let vector = waypoint - position.0;
+    let rotation = vector.y.atan2(vector.x);
+    let scale = vector.mag();
+
+    model_buffers.command_paths.push(ModelInstance {
+        transform: Mat4::from_translation(Vec3::new(center.x, 0.005, center.y))
+            * Mat4::from_rotation_y(rotation)
+            * Mat4::from_nonuniform_scale(Vec3::new(scale, 1.0, 1.0)),
+        flat_colour: colour,
+    });
 }
 
 #[legion::system(for_each)]
@@ -389,4 +434,84 @@ fn unit_under_cursor(ray_cast_location: &RayCastLocation, world: &SubWorld) -> O
         .iter(world)
         .find(|(pos, radius)| (position - pos.0).mag_sq() < radius.0.powi(2))
         .map(|(pos, radius)| (pos.0, radius.0))
+}
+
+#[legion::system]
+pub fn render_abilities(
+    #[resource] dpi_scaling: &DpiScaling,
+    #[resource] line_buffers: &mut LineBuffers,
+    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] cheese_coins: &CheeseCoins,
+    #[resource] text_buffer: &mut TextBuffer,
+    #[resource] selected_units_abilities: &SelectedUnitsAbilities,
+) {
+    let dims = screen_dimensions.as_vec();
+    let ability_size = 64.0 * 1.5;
+
+    let gap = 10.0;
+    let border = 2.0;
+
+    let offset = selected_units_abilities.0.len() as f32 * ((ability_size + gap) / 2.0);
+
+    let position = |i| {
+        Vec2::new(
+            (dims.x as f32 / 2.0) - offset + (i as f32 * (ability_size + gap)),
+            dims.y as f32 - ability_size / 2.0 - (gap - border),
+        )
+    };
+
+    for (i, (ability, _)) in selected_units_abilities.0.iter().enumerate() {
+        line_buffers.draw_filled_rect(
+            position(i),
+            Vec2::new(ability_size + border * 2.0, ability_size + border * 2.0),
+            Vec3::zero(),
+            dpi_scaling.0,
+        );
+
+        let can_use = match ability.ability_type {
+            AbilityType::Build(building) => building.stats().cost <= cheese_coins.0,
+            AbilityType::Recruit(unit) => unit.stats().cost <= cheese_coins.0,
+            AbilityType::SetRecruitmentWaypoint => true,
+        };
+
+        line_buffers.draw_button(
+            position(i),
+            Vec2::new(ability_size, ability_size),
+            ability.button(),
+            !can_use,
+            dpi_scaling.0,
+        );
+
+        let nudge = Vec2::new(2.0, -2.0);
+
+        text_buffer.render_text(
+            position(i) - Vec2::new(ability_size, ability_size) / 2.0 + nudge,
+            &format!("{:?}", ability.hotkey),
+            Font::Ui,
+            1.0,
+            dpi_scaling.0,
+            TextAlignment::Default,
+            Vec4::new(0.0, 0.0, 0.0, 1.0),
+        );
+
+        let cost = match ability.ability_type {
+            AbilityType::Build(building) => Some(building.stats().cost),
+            AbilityType::Recruit(unit) => Some(unit.stats().cost),
+            AbilityType::SetRecruitmentWaypoint => None,
+        };
+
+        if let Some(cost) = cost {
+            let nudge = Vec2::new(-2.0, -2.0);
+
+            text_buffer.render_text(
+                position(i) - Vec2::new(-ability_size, ability_size) / 2.0 + nudge,
+                &format!("{}", cost),
+                Font::Ui,
+                1.0,
+                dpi_scaling.0,
+                TextAlignment::HorizontalRight,
+                Vec4::new(0.0, 0.0, 0.0, 1.0),
+            );
+        }
+    }
 }

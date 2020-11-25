@@ -1,4 +1,6 @@
 use crate::ecs;
+use legion::Entity;
+use std::collections::BTreeMap;
 use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
 
 #[derive(Default)]
@@ -30,7 +32,8 @@ pub struct DebugControls {
 pub enum CommandMode {
     Normal,
     AttackMove,
-    Construct,
+    Construct(ecs::Building),
+    SetRecruitmentWaypoint,
 }
 
 impl Default for CommandMode {
@@ -225,3 +228,5 @@ pub enum Mode {
 
 pub struct Gravity(pub f32);
 pub struct CheeseCoins(pub u32);
+#[derive(Default)]
+pub struct SelectedUnitsAbilities(pub BTreeMap<&'static ecs::Ability, Vec<Entity>>);

@@ -14,8 +14,9 @@ use crate::renderer::{
 use crate::resources::{
     Camera, CameraControls, CheeseCoins, CommandMode, ControlGroups, CursorIcon, DebugControls,
     DeltaTime, DpiScaling, Gravity, Mode, MouseState, PlayerSide, RayCastLocation, RtsControls,
-    ScreenDimensions,
+    ScreenDimensions, SelectedUnitsAbilities,
 };
+use futures::FutureExt;
 use legion::*;
 use rand::{Rng, SeedableRng};
 use ultraviolet::Vec2;
@@ -27,7 +28,6 @@ use winit::{
     },
     event_loop::{ControlFlow, EventLoop},
 };
-use futures::FutureExt;
 
 fn main() -> anyhow::Result<()> {
     #[cfg(feature = "wasm")]
@@ -85,7 +85,8 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(Mode::Playing);
     resources.insert(DebugControls::default());
     resources.insert(Gravity(5.0));
-    resources.insert(CheeseCoins(100));
+    resources.insert(CheeseCoins(100_000));
+    resources.insert(SelectedUnitsAbilities::default());
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
@@ -94,65 +95,49 @@ async fn run() -> anyhow::Result<()> {
         render_context.window.scale_factor().round() as f32
     ));
 
-    for i in 0..10 {
-        ecs::Unit::MouseMarine.add_to_world(
-        &mut world,
-        Some(&animations),
-            Vec2::new(-10.0, i as f32 / 100.0),
-            ecs::Facing(1.0),
-            ecs::Side::Purple,
-        );
-    }
-
-    for i in 0..10 {
-        ecs::Unit::MouseMarine.add_to_world(
-            &mut world,
-            Some(&animations),
-            Vec2::new(10.0, i as f32 / 100.0),
-            ecs::Facing(1.0),
-        ecs::Side::Green,
-    );
-    }
+    let mut command_buffer = legion::systems::CommandBuffer::new(&world);
 
     ecs::Unit::Engineer.add_to_world(
-        &mut world,
+        &mut command_buffer,
         Some(&animations),
-        Vec2::new(20.0, 0.0),
-        ecs::Facing(1.0),
+        Vec2::new(0.0, 0.0),
+        ecs::Facing(0.0),
         ecs::Side::Green,
+        None,
     );
+
+    ecs::Unit::Engineer.add_to_world(
+        &mut command_buffer,
+        Some(&animations),
+        Vec2::new(1.0, 1.0),
+        ecs::Facing(0.0),
+        ecs::Side::Green,
+        None,
+    );
+
+    ecs::Unit::Engineer.add_to_world(
+        &mut command_buffer,
+        Some(&animations),
+        Vec2::new(10.0, 0.0),
+        ecs::Facing(0.0),
+        ecs::Side::Purple,
+        None,
+    );
+
+    command_buffer.flush(&mut world);
+    drop(command_buffer);
 
     let mut map = pathfinding::Map::new();
 
-    ecs::Building::Armoury
-        .add_to_world_finished(
-            Vec2::new(-20.0, 10.0),
-            ecs::Side::Green,
-            &mut world,
-            &animations,
-            &mut map,
-        )
-        .unwrap();
-    ecs::Building::Pump
-        .add_to_world_finished(
-            Vec2::new(-30.0, 40.0),
-            ecs::Side::Green,
-            &mut world,
-            &animations,
-            &mut map,
-        )
-        .unwrap();
-    ecs::Building::Pump
-        .add_to_world_finished(
-            Vec2::new(0.0, 50.0),
-            ecs::Side::Green,
-            &mut world,
-            &animations,
-            &mut map,
-        )
-        .unwrap();
+    ecs::Building::Armoury.add_to_world_fully_built(
+        &mut world,
+        Vec2::new(-50.0, 0.0),
+        ecs::Side::Green,
+        &animations,
+        &mut map,
+    );
 
-    for _ in 0..10 {
+    for _ in 0..5 {
         world.push((
             ecs::Position(Vec2::new(
                 rng.gen_range(-100.0, 100.0),
@@ -202,6 +187,9 @@ async fn run() -> anyhow::Result<()> {
                     let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
                     let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
                     let mut debug_controls = resources.get_mut::<DebugControls>().unwrap();
+                    let selected_unit_abilities =
+                        resources.get::<SelectedUnitsAbilities>().unwrap();
+                    let mut cheese_coins = resources.get_mut::<CheeseCoins>().unwrap();
 
                     handle_key(
                         *virtual_keycode,
@@ -211,6 +199,9 @@ async fn run() -> anyhow::Result<()> {
                         &mut rts_controls,
                         &mut debug_controls,
                         control_flow,
+                        &selected_unit_abilities,
+                        &mut cheese_coins,
+                        &mut world,
                     );
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
@@ -375,7 +366,7 @@ async fn run() -> anyhow::Result<()> {
                                 &titlescreen_buffer.stars,
                                 titlescreen_buffer.num_stars,
                             );
-                            lines_pipeline.render(&mut render_pass, &line_buffers);
+                            lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
                         }
                         Mode::Quit => {}
                     }
@@ -459,13 +450,11 @@ async fn run() -> anyhow::Result<()> {
 
                     drop(render_pass);
 
-                    /*
                     // Text rendering pass
 
                     let size = render_context.window.inner_size();
                     let mut staging_belt = wgpu::util::StagingBelt::new(10);
 
-                    // Now render all the text to a seperate render pass.
                     text_buffer
                         .glyph_brush
                         .draw_queued(
@@ -482,7 +471,7 @@ async fn run() -> anyhow::Result<()> {
 
                     // Do I need to do this?
                     // staging_belt.recall();
-                    */
+
                     render_context.queue.submit(Some(encoder.finish()));
                 }
             }
@@ -655,8 +644,8 @@ fn render_playing<'a>(
     }
 
     // Render 2D items.
-    lines_pipeline.render(&mut render_pass, &line_buffers);
-    lines_pipeline.render_hud(&mut render_pass, &assets);
+    lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
+    //lines_pipeline.render_hud(&mut render_pass, &assets);
 }
 
 fn handle_key(
@@ -667,10 +656,57 @@ fn handle_key(
     rts_controls: &mut RtsControls,
     debug_controls: &mut DebugControls,
     control_flow: &mut ControlFlow,
+    selected_units_abilities: &SelectedUnitsAbilities,
+    cheese_coins: &mut CheeseCoins,
+    world: &mut World,
 ) {
     log::trace!("{:?} (scancode: {}) pressed: {}", code, scancode, pressed);
 
     if let Some(code) = code {
+        if pressed {
+            for (ability, casters) in selected_units_abilities.0.iter() {
+                if code == ability.hotkey {
+                    match ability.ability_type {
+                        ecs::AbilityType::SetRecruitmentWaypoint => {
+                            rts_controls.mode = CommandMode::SetRecruitmentWaypoint;
+                        }
+                        ecs::AbilityType::Build(building) => {
+                            //if building.stats().cost <= cheese_coins.0 {
+                            rts_controls.mode = CommandMode::Construct(building);
+                            //} else {
+                            // Todo: play sound: meep merp (like from dota).
+                            //}
+                        }
+                        ecs::AbilityType::Recruit(unit) => {
+                            if unit.stats().cost <= cheese_coins.0 {
+                                cheese_coins.0 -= unit.stats().cost;
+
+                                let entity_with_shortest_recruitment_queue = casters
+                                    .iter()
+                                    .map(|caster| {
+                                        let queue_len = <&ecs::RecruitmentQueue>::query()
+                                            .get(world, *caster)
+                                            .unwrap()
+                                            .queue
+                                            .len();
+                                        (caster, queue_len)
+                                    })
+                                    .min_by_key(|(_, queue_len)| *queue_len)
+                                    .map(|(entity, _)| *entity)
+                                    .unwrap();
+
+                                <&mut ecs::RecruitmentQueue>::query()
+                                    .get_mut(world, entity_with_shortest_recruitment_queue)
+                                    .unwrap()
+                                    .queue
+                                    .push_back(unit);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         match code {
             VirtualKeyCode::Up => camera_controls.up = pressed,
             VirtualKeyCode::Down => camera_controls.down = pressed,
@@ -680,9 +716,8 @@ fn handle_key(
             VirtualKeyCode::LControl => rts_controls.control_held = pressed,
             VirtualKeyCode::S if pressed => rts_controls.stop_pressed = true,
             VirtualKeyCode::A if pressed => rts_controls.mode = CommandMode::AttackMove,
-            VirtualKeyCode::B if pressed => rts_controls.mode = CommandMode::Construct,
             VirtualKeyCode::T if pressed => debug_controls.set_pathfinding_start_pressed = true,
-            VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
+            VirtualKeyCode::Escape if pressed => rts_controls.mode = CommandMode::Normal,
 
             VirtualKeyCode::Key0 if pressed => rts_controls.control_group_key_pressed[0] = true,
             VirtualKeyCode::Key1 if pressed => rts_controls.control_group_key_pressed[1] = true,
@@ -701,16 +736,16 @@ fn handle_key(
 
     // Pressing shift + a number key doesn't output a virtualkeycode so we have to use scancodes instead.
     match scancode {
-        2 if pressed => rts_controls.control_group_key_pressed[0] = true,
-        3 if pressed => rts_controls.control_group_key_pressed[1] = true,
-        4 if pressed => rts_controls.control_group_key_pressed[2] = true,
-        5 if pressed => rts_controls.control_group_key_pressed[3] = true,
-        6 if pressed => rts_controls.control_group_key_pressed[4] = true,
-        7 if pressed => rts_controls.control_group_key_pressed[5] = true,
-        8 if pressed => rts_controls.control_group_key_pressed[6] = true,
-        9 if pressed => rts_controls.control_group_key_pressed[7] = true,
-        10 if pressed => rts_controls.control_group_key_pressed[8] = true,
-        11 if pressed => rts_controls.control_group_key_pressed[9] = true,
+        11 if pressed => rts_controls.control_group_key_pressed[0] = true,
+        2 if pressed => rts_controls.control_group_key_pressed[1] = true,
+        3 if pressed => rts_controls.control_group_key_pressed[2] = true,
+        4 if pressed => rts_controls.control_group_key_pressed[3] = true,
+        5 if pressed => rts_controls.control_group_key_pressed[4] = true,
+        6 if pressed => rts_controls.control_group_key_pressed[5] = true,
+        7 if pressed => rts_controls.control_group_key_pressed[6] = true,
+        8 if pressed => rts_controls.control_group_key_pressed[7] = true,
+        9 if pressed => rts_controls.control_group_key_pressed[8] = true,
+        10 if pressed => rts_controls.control_group_key_pressed[9] = true,
         _ => {}
     }
 }

@@ -1,5 +1,6 @@
 use crate::assets::ModelAnimations;
 use crate::pathfinding::{Map, MapHandle};
+use crate::renderer::Button;
 use crate::resources::{
     Camera, CameraControls, MouseState, PlayerSide, RtsControls, ScreenDimensions,
 };
@@ -8,6 +9,7 @@ use legion::world::SubWorld;
 use legion::*;
 use std::collections::VecDeque;
 use ultraviolet::{Mat4, Vec2, Vec3};
+use winit::event::VirtualKeyCode;
 
 mod animation;
 mod buildings;
@@ -20,7 +22,9 @@ mod rendering;
 
 use crate::resources::DebugControls;
 use animation::{progress_animations_system, progress_building_animations_system};
-use buildings::{build_buildings_system, generate_cheese_coins_system};
+use buildings::{
+    build_buildings_system, generate_cheese_coins_system, progress_recruitment_queue_system,
+};
 use combat::{
     add_attack_commands_system, apply_bullets_system, firing_system, handle_damaged_system,
     reduce_cooldowns_system, stop_actions_on_dead_entities_system,
@@ -29,6 +33,7 @@ use controls::{
     cast_ray_system, control_camera_system, handle_control_groups_system,
     handle_drag_selection_system, handle_left_click_system, handle_right_click_system,
     handle_stop_command_system, remove_dead_entities_from_control_groups_system,
+    update_selected_units_abilities_system,
 };
 use debugging::{
     debug_select_box_system, debug_specific_path_system, render_building_grid_system,
@@ -45,10 +50,11 @@ use movement::{
     reset_map_updated_system, set_movement_paths_system, Avoidable, Avoids,
 };
 use rendering::{
-    render_building_plan_system, render_buildings_system, render_bullets_system,
-    render_command_paths_system, render_drag_box_system, render_health_bars_system,
-    render_selections_system, render_ui_system, render_under_select_box_system,
-    render_unit_under_cursor_system, render_units_system,
+    render_abilities_system, render_building_plan_system, render_buildings_system,
+    render_bullets_system, render_command_paths_system, render_drag_box_system,
+    render_health_bars_system, render_recruitment_waypoints_system, render_selections_system,
+    render_ui_system, render_under_select_box_system, render_unit_under_cursor_system,
+    render_units_system,
 };
 
 #[legion::system]
@@ -73,6 +79,7 @@ pub fn cleanup_controls(
 pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
     builder
         .add_system(generate_cheese_coins_system())
+        .add_system(progress_recruitment_queue_system())
         .add_system(reset_map_updated_system())
         .add_system(cast_ray_system())
         .add_system(remove_dead_entities_from_control_groups_system())
@@ -85,6 +92,7 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(handle_control_groups_system())
         .add_system(avoidance_system())
         .add_system(add_attack_commands_system())
+        .add_system(update_selected_units_abilities_system())
         // Needed because a command could place a building using a command buffer, but the entity
         // reference wouldn't be valid until the commands in the buffer have been executed.
         .flush()
@@ -127,12 +135,66 @@ pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
         .add_system(render_buildings_system())
         .add_system(render_building_plan_system())
         .add_system(render_cheese_droplets_system())
+        .add_system(render_abilities_system())
+        .add_system(render_recruitment_waypoints_system())
         //.add_system(debug_select_box_system())
         //.add_system(debug_specific_path_system())
         // Cleanup
         .flush()
         .add_system(cleanup_controls_system());
 }
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct Ability {
+    pub ability_type: AbilityType,
+    pub hotkey: VirtualKeyCode,
+}
+
+impl Ability {
+    const BUILD_PUMP: Self = Self {
+        ability_type: AbilityType::Build(Building::Pump),
+        hotkey: VirtualKeyCode::P,
+    };
+
+    const BUILD_ARMOURY: Self = Self {
+        ability_type: AbilityType::Build(Building::Armoury),
+        hotkey: VirtualKeyCode::R,
+    };
+
+    const RECRUIT_ENGINEER: Self = Self {
+        ability_type: AbilityType::Recruit(Unit::Engineer),
+        hotkey: VirtualKeyCode::E,
+    };
+
+    const RECRUIT_MOUSE_MARINE: Self = Self {
+        ability_type: AbilityType::Recruit(Unit::MouseMarine),
+        hotkey: VirtualKeyCode::M,
+    };
+
+    const SET_RECRUITMENT_WAYPOINT: Self = Self {
+        ability_type: AbilityType::SetRecruitmentWaypoint,
+        hotkey: VirtualKeyCode::W,
+    };
+
+    fn button(&self) -> Button {
+        match self.ability_type {
+            AbilityType::Build(Building::Armoury) => Button::BuildArmoury,
+            AbilityType::Build(Building::Pump) => Button::BuildPump,
+            AbilityType::Recruit(Unit::Engineer) => Button::RecruitEngineer,
+            AbilityType::Recruit(Unit::MouseMarine) => Button::RecruitMouseMarine,
+            AbilityType::SetRecruitmentWaypoint => Button::SetRecruitmentWaypoint,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum AbilityType {
+    Build(Building),
+    Recruit(Unit),
+    SetRecruitmentWaypoint,
+}
+
+pub struct Abilities(pub Vec<&'static Ability>);
 
 pub struct CheeseGuyser;
 
@@ -265,30 +327,33 @@ pub struct Bullet {
 
 pub struct Cooldown(pub f32);
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum Building {
     Armoury,
     Pump,
 }
 
-struct BuildingStats {
+pub struct BuildingStats {
     pub radius: f32,
     pub dimensions: Vec2,
     pub max_health: u16,
+    pub cost: u32,
 }
 
 impl Building {
-    fn stats(self) -> BuildingStats {
+    pub fn stats(self) -> BuildingStats {
         match self {
             Self::Armoury => BuildingStats {
                 radius: 6.0,
                 dimensions: Vec2::new(6.0, 10.0),
                 max_health: 500,
+                cost: 200,
             },
             Self::Pump => BuildingStats {
                 radius: 3.0,
                 dimensions: Vec2::new(4.0, 4.0),
                 max_health: 200,
+                cost: 50,
             },
         }
     }
@@ -311,7 +376,8 @@ impl Building {
         let BuildingStats {
             radius,
             dimensions,
-            max_health,
+            max_health: _,
+            cost: _,
         } = self.stats();
 
         let handle = map.insert(position, dimensions)?;
@@ -328,36 +394,52 @@ impl Building {
         ))
     }
 
-    pub fn add_to_world_finished(
+    pub fn add_to_world_fully_built(
         self,
+        world: &mut World,
         position: Vec2,
         side: Side,
-        world: &mut World,
         animations: &ModelAnimations,
         map: &mut Map,
     ) -> Option<Entity> {
         let mut parts = self.parts(position, side, map)?;
-        let max_health = self.stats().max_health;
-        parts.6 = Health(max_health);
-        parts.7 = BuildingCompleteness(max_health);
+        parts.6 = Health(self.stats().max_health);
+        parts.7 = BuildingCompleteness(self.stats().max_health);
         let entity = world.push(parts);
 
-        if let Building::Pump = self {
-            let mut entry = world.entry(entity).unwrap();
+        let mut entry = world.entry(entity).unwrap();
 
-            entry.add_component(animations.pump.skin.clone());
-            entry.add_component(AnimationState {
-                animation: 0,
-                time: 0.0,
-                total_time: animations.pump.animations[0].total_time,
-            });
+        match self {
+            Building::Pump => {
+                entry.add_component(animations.pump.skin.clone());
+                entry.add_component(AnimationState {
+                    animation: 0,
+                    time: 0.0,
+                    total_time: animations.pump.animations[0].total_time,
+                });
+            }
+            Building::Armoury => {
+                entry.add_component(Abilities(vec![
+                    &Ability::RECRUIT_MOUSE_MARINE,
+                    &Ability::RECRUIT_ENGINEER,
+                    &Ability::SET_RECRUITMENT_WAYPOINT,
+                ]));
+                entry.add_component(RecruitmentQueue::default());
+            }
         }
 
         Some(entity)
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Default)]
+pub struct RecruitmentQueue {
+    progress: f32,
+    pub queue: VecDeque<Unit>,
+    waypoint: Vec2,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum Unit {
     MouseMarine,
     Engineer,
@@ -369,6 +451,8 @@ pub struct UnitStats {
     pub radius: f32,
     pub firing_range: f32,
     pub health_bar_height: f32,
+    pub cost: u32,
+    pub recruitment_time: f32,
 }
 
 enum MouseAnimation {
@@ -379,7 +463,7 @@ enum MouseAnimation {
 }
 
 impl Unit {
-    fn stats(self) -> UnitStats {
+    pub fn stats(self) -> UnitStats {
         match self {
             Self::MouseMarine => UnitStats {
                 max_health: 50,
@@ -387,6 +471,8 @@ impl Unit {
                 move_speed: 6.0,
                 radius: 1.0,
                 health_bar_height: 3.0,
+                cost: 100,
+                recruitment_time: 10.0,
             },
             Self::Engineer => UnitStats {
                 max_health: 40,
@@ -394,18 +480,21 @@ impl Unit {
                 move_speed: 6.0,
                 radius: 1.0,
                 health_bar_height: 3.0,
+                cost: 50,
+                recruitment_time: 5.0,
             },
         }
     }
 
     pub fn add_to_world(
         self,
-        world: &mut World,
+        buffer: &mut CommandBuffer,
         // This is only `None` when being run in a test
         animations: Option<&ModelAnimations>,
         position: Vec2,
         facing: Facing,
         side: Side,
+        starting_command: Option<Command>,
     ) -> Entity {
         let UnitStats {
             max_health,
@@ -413,14 +502,21 @@ impl Unit {
             radius,
             firing_range,
             health_bar_height: _,
+            cost: _,
+            recruitment_time: _,
         } = self.stats();
 
-        let entity = world.push((
+        let mut command_queue = CommandQueue::default();
+        if let Some(starting_command) = starting_command {
+            command_queue.0.push_back(starting_command);
+        }
+
+        let entity = buffer.push((
             Position(position),
             facing,
             side,
             self,
-            CommandQueue::default(),
+            command_queue,
             Avoids,
             Avoidable,
             Selectable,
@@ -433,19 +529,25 @@ impl Unit {
             // MovementDebugging::default(),
         ));
 
-        let mut entry = world.entry(entity).unwrap();
-
         if let Unit::Engineer = self {
-            entry.add_component(CanBuild);
+            buffer.add_component(entity, CanBuild);
+            buffer.add_component(
+                entity,
+                Abilities(vec![&Ability::BUILD_PUMP, &Ability::BUILD_ARMOURY]),
+            );
         }
 
         if let Some(animations) = animations {
-            entry.add_component(animations.mouse.skin.clone());
-            entry.add_component(AnimationState {
-                animation: MouseAnimation::Idle as usize,
-                time: 0.0,
-                total_time: animations.mouse.animations[MouseAnimation::Idle as usize].total_time,
-            });
+            buffer.add_component(entity, animations.mouse.skin.clone());
+            buffer.add_component(
+                entity,
+                AnimationState {
+                    animation: MouseAnimation::Idle as usize,
+                    time: 0.0,
+                    total_time: animations.mouse.animations[MouseAnimation::Idle as usize]
+                        .total_time,
+                },
+            );
         }
 
         entity
@@ -512,3 +614,31 @@ fn vec2_to_ncollide_point(point: Vec2) -> ncollide2d::math::Point<f32> {
 pub struct CheeseDropletPosition(Vec3);
 pub struct CheeseDropletVelocity(Vec3);
 pub struct CanBuild;
+
+fn nearest_point_within_building(
+    unit_pos: Vec2,
+    unit_radius: f32,
+    building_pos: Vec2,
+    building_dims: Vec2,
+) -> Vec2 {
+    let point = unit_pos - building_pos;
+    let bounding_box = building_dims / 2.0;
+
+    let x = if point.x > -bounding_box.x && point.x < bounding_box.y {
+        point.x
+    } else if point.x > 0.0 {
+        bounding_box.x + unit_radius
+    } else {
+        -(bounding_box.x + unit_radius)
+    };
+
+    let y = if point.y > -bounding_box.y && point.y < bounding_box.y {
+        point.y
+    } else if point.y > 0.0 {
+        bounding_box.y + unit_radius
+    } else {
+        -(bounding_box.y + unit_radius)
+    };
+
+    building_pos + Vec2::new(x, y)
+}
