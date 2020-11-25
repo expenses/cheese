@@ -724,16 +724,16 @@ fn handle_key(
 
     // Pressing shift + a number key doesn't output a virtualkeycode so we have to use scancodes instead.
     match scancode {
-        2 if pressed => rts_controls.control_group_key_pressed[0] = true,
-        3 if pressed => rts_controls.control_group_key_pressed[1] = true,
-        4 if pressed => rts_controls.control_group_key_pressed[2] = true,
-        5 if pressed => rts_controls.control_group_key_pressed[3] = true,
-        6 if pressed => rts_controls.control_group_key_pressed[4] = true,
-        7 if pressed => rts_controls.control_group_key_pressed[5] = true,
-        8 if pressed => rts_controls.control_group_key_pressed[6] = true,
-        9 if pressed => rts_controls.control_group_key_pressed[7] = true,
-        10 if pressed => rts_controls.control_group_key_pressed[8] = true,
-        11 if pressed => rts_controls.control_group_key_pressed[9] = true,
+        11 if pressed => rts_controls.control_group_key_pressed[0] = true,
+        2 if pressed => rts_controls.control_group_key_pressed[1] = true,
+        3 if pressed => rts_controls.control_group_key_pressed[2] = true,
+        4 if pressed => rts_controls.control_group_key_pressed[3] = true,
+        5 if pressed => rts_controls.control_group_key_pressed[4] = true,
+        6 if pressed => rts_controls.control_group_key_pressed[5] = true,
+        7 if pressed => rts_controls.control_group_key_pressed[6] = true,
+        8 if pressed => rts_controls.control_group_key_pressed[7] = true,
+        9 if pressed => rts_controls.control_group_key_pressed[8] = true,
+        10 if pressed => rts_controls.control_group_key_pressed[9] = true,
         _ => {}
     }
 }

@@ -419,6 +419,10 @@ pub fn handle_control_groups(
                     .for_each(world, |entity| {
                         control_groups.0[i].push(*entity);
                     });
+
+                for entity in control_groups.0[i].iter() {
+                    command_buffer.add_component(*entity, Selected);
+                }
             } else {
                 if !control_groups.0[i].is_empty() {
                     deselect_all(world, command_buffer);
