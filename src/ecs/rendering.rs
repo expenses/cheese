@@ -197,25 +197,26 @@ fn wgpu_to_screen(wgpu: Vec2, width: f32, height: f32) -> Vec2 {
 }
 
 #[legion::system]
-#[read_component(Entity)]
-#[read_component(Health)]
+#[read_component(RecruitmentQueue)]
+#[read_component(Side)]
 pub fn render_ui(
     #[resource] rts_controls: &RtsControls,
     #[resource] dpi_scaling: &DpiScaling,
     #[resource] cheese_coins: &CheeseCoins,
     #[resource] text_buffer: &mut TextBuffer,
+    #[resource] player_side: &PlayerSide,
     world: &SubWorld,
 ) {
     let coins = std::iter::once(format!("Cheese coins: {}\n", cheese_coins.0));
     let mode = std::iter::once(format!("Mode: {:?}\n", rts_controls.mode));
 
-    let mut query = <(Entity, &Health)>::query().filter(component::<Selected>());
-
-    let unit_info = query
+    let mut query = <(&RecruitmentQueue, &Side)>::query();
+    let queue_infos = query
         .iter(world)
-        .map(|(entity, health)| format!("{:?}: Health: {}\n", entity, health.0));
+        .filter(|(_, side)| **side == player_side.0)
+        .map(|(queue, _)| format!("Queue progress: {}\n", queue.progress));
 
-    let text: String = coins.chain(mode).chain(unit_info).collect();
+    let text: String = coins.chain(mode).chain(queue_infos).collect();
 
     text_buffer.render_text(
         Vec2::new(10.0, 10.0),
