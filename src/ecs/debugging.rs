@@ -38,7 +38,7 @@ pub fn set_debug_pathfinding_start(
     #[resource] ray_cast_location: &RayCastLocation,
 ) {
     if debug_controls.set_pathfinding_start_pressed {
-        debug_controls.pathfinding_start = ray_cast_location.0;
+        debug_controls.pathfinding_start = ray_cast_location.pos;
     }
 }
 
@@ -52,7 +52,7 @@ pub fn spawn_debug_building(
 ) {
     if debug_controls.spawn_building_pressed {
         if let Some((pos, handle, building, radius, selectable, side, health, completeness)) =
-            Building::Pump.parts(ray_cast_location.0, Side::Purple, map)
+            Building::Pump.parts(ray_cast_location.pos, Side::Purple, map)
         {
             let skin = animations.pump.skin.clone();
             let animation_state = AnimationState {

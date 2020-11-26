@@ -102,10 +102,10 @@ async fn run() -> anyhow::Result<()> {
         None,
     );
 
-    ecs::Unit::Engineer.add_to_world(
+    ecs::Unit::MouseMarine.add_to_world(
         &mut command_buffer,
         Some(&animations),
-        Vec2::new(10.0, 0.0),
+        Vec2::new(20.0, 0.0),
         ecs::Facing(0.0),
         ecs::Side::Purple,
         None,

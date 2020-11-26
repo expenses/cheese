@@ -33,7 +33,7 @@ pub struct DebugControls {
 pub enum CommandMode {
     Normal,
     AttackMove,
-    Construct(ecs::Building),
+    Construct { building: ecs::Building },
     SetRecruitmentWaypoint,
 }
 
@@ -214,7 +214,10 @@ pub struct PlayerSide(pub ecs::Side);
 pub struct DeltaTime(pub f32);
 pub struct CursorIcon(pub winit::window::CursorIcon);
 #[derive(Default)]
-pub struct RayCastLocation(pub Vec2);
+pub struct RayCastLocation {
+    pub pos: Vec2,
+    pub snapped_to_guyser: Option<Entity>,
+}
 pub struct DpiScaling(pub f32);
 
 #[derive(Default)]

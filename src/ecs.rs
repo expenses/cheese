@@ -23,7 +23,8 @@ mod rendering;
 use crate::resources::DebugControls;
 use animation::{progress_animations_system, progress_building_animations_system};
 use buildings::{
-    build_buildings_system, generate_cheese_coins_system, progress_recruitment_queue_system,
+    build_buildings_system, free_up_cheese_guysers_system, generate_cheese_coins_system,
+    progress_recruitment_queue_system,
 };
 use combat::{
     add_attack_commands_system, apply_bullets_system, firing_system, handle_damaged_system,
@@ -83,6 +84,7 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(progress_recruitment_queue_system())
         .add_system(reset_map_updated_system())
         .add_system(cast_ray_system())
+        .add_system(free_up_cheese_guysers_system())
         .add_system(remove_dead_entities_from_control_groups_system())
         .add_system(stop_actions_on_dead_entities_system())
         .add_system(control_camera_system())
@@ -198,6 +200,9 @@ pub enum AbilityType {
 pub struct Abilities(pub Vec<&'static Ability>);
 
 pub struct CheeseGuyser;
+pub struct CheeseGuyserBuiltOn {
+    pump: Entity,
+}
 
 #[derive(Debug)]
 pub struct Position(pub Vec2);

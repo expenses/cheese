@@ -13,6 +13,7 @@ pub fn handle_keypresses(
     #[resource] rts_controls: &mut RtsControls,
     #[resource] debug_controls: &mut DebugControls,
     #[resource] cheese_coins: &mut CheeseCoins,
+    #[resource] player_side: &mut PlayerSide,
     #[resource] selected_units_abilities: &SelectedUnitsAbilities,
     world: &mut SubWorld,
 ) {
@@ -34,7 +35,7 @@ pub fn handle_keypresses(
                             }
                             AbilityType::Build(building) => {
                                 //if building.stats().cost <= cheese_coins.0 {
-                                rts_controls.mode = CommandMode::Construct(building);
+                                rts_controls.mode = CommandMode::Construct { building };
                                 //} else {
                                 // Todo: play sound: meep merp (like from dota).
                                 //}
@@ -70,6 +71,7 @@ pub fn handle_keypresses(
             }
 
             match code {
+                //VirtualKeyCode::X if pressed => player_side.0 = Side::Purple,
                 VirtualKeyCode::Up => camera_controls.up = pressed,
                 VirtualKeyCode::Down => camera_controls.down = pressed,
                 VirtualKeyCode::Left => camera_controls.left = pressed,
@@ -161,13 +163,32 @@ pub fn control_camera(
 }
 
 #[legion::system]
+#[read_component(Entity)]
+#[read_component(Position)]
 pub fn cast_ray(
     #[resource] camera: &Camera,
     #[resource] mouse_state: &MouseState,
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] ray_cast_location: &mut RayCastLocation,
+    #[resource] rts_controls: &RtsControls,
+    world: &SubWorld,
 ) {
-    ray_cast_location.0 = camera.cast_ray(mouse_state.position, screen_dimensions);
+    ray_cast_location.pos = camera.cast_ray(mouse_state.position, screen_dimensions);
+    ray_cast_location.snapped_to_guyser = None;
+    if let CommandMode::Construct {
+        building: Building::Pump,
+    } = rts_controls.mode
+    {
+        let snap_guyser = <(Entity, &Position)>::query()
+            .filter(component::<CheeseGuyser>() & !component::<CheeseGuyserBuiltOn>())
+            .iter(world)
+            .find(|(_, pos)| (ray_cast_location.pos - pos.0).mag_sq() <= 4.0_f32.powi(2));
+
+        if let Some((entity, pos)) = snap_guyser {
+            ray_cast_location.pos = pos.0;
+            ray_cast_location.snapped_to_guyser = Some(*entity);
+        }
+    }
 }
 
 #[legion::system]
@@ -199,7 +220,7 @@ pub fn handle_left_click(
             issue_command(ray_cast_location, rts_controls, player_side, world);
         }
         CommandMode::Normal => {
-            let position = ray_cast_location.0;
+            let position = ray_cast_location.pos;
 
             let entity = <(Entity, &Position, Option<&Selected>, &Side, &Radius)>::query()
                 .filter(component::<Selectable>())
@@ -231,7 +252,7 @@ pub fn handle_left_click(
                 }
             }
         }
-        CommandMode::Construct(building) => {
+        CommandMode::Construct { building } => {
             build_building_command(
                 building,
                 ray_cast_location,
@@ -245,7 +266,7 @@ pub fn handle_left_click(
             );
         }
         CommandMode::SetRecruitmentWaypoint => {
-            let position = ray_cast_location.0;
+            let position = ray_cast_location.pos;
 
             <(&mut RecruitmentQueue, &Side)>::query()
                 .filter(component::<Selected>())
@@ -273,16 +294,18 @@ fn build_building_command(
     rts_controls: &RtsControls,
     cheese_coins: &mut CheeseCoins,
 ) {
-    if building.stats().cost > cheese_coins.0 {
+    if building.stats().cost > cheese_coins.0
+        || (building == Building::Pump && ray_cast_location.snapped_to_guyser.is_none())
+    {
         return;
     }
 
     if let Some((pos, handle, building, radius, selectable, side, health, completeness)) =
-        building.parts(ray_cast_location.0, player_side.0, map)
+        building.parts(ray_cast_location.pos, player_side.0, map)
     {
         cheese_coins.0 -= building.stats().cost;
 
-        let building = match building {
+        let building_entity = match building {
             Building::Pump => {
                 let skin = animations.pump.skin.clone();
                 let animation_state = AnimationState {
@@ -323,8 +346,18 @@ fn build_building_command(
             )),
         };
 
+        if let Building::Pump = building {
+            let guyser_entity = ray_cast_location.snapped_to_guyser.unwrap();
+            commands.add_component(
+                guyser_entity,
+                CheeseGuyserBuiltOn {
+                    pump: building_entity,
+                },
+            );
+        }
+
         let command = Command::Build {
-            target: building,
+            target: building_entity,
             // Kinda hacky? If we put `ActionState::OutOfRange` with an empty vec it
             // wouldn't get updated with the current `set_movement_paths` code.
             state: ActionState::InRange,
@@ -378,7 +411,7 @@ fn issue_command(
     player_side: &PlayerSide,
     world: &mut SubWorld,
 ) {
-    let position = ray_cast_location.0;
+    let position = ray_cast_location.pos;
 
     let entity_under_cursor = <(Entity, &Position, &Side, &Radius, Option<&Building>)>::query()
         .iter(world)
@@ -405,7 +438,7 @@ fn issue_command(
                 path: Vec::new(),
                 attack_move: true,
             }),
-            CommandMode::Construct(_) => None,
+            CommandMode::Construct { .. } => None,
             CommandMode::SetRecruitmentWaypoint => None,
         },
     };

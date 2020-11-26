@@ -24,20 +24,26 @@ pub fn render_building_plan(
     #[resource] cheese_coins: &CheeseCoins,
     #[resource] model_buffers: &mut ModelBuffers,
 ) {
-    if let CommandMode::Construct(building) = rts_controls.mode {
-        let colour = if building.stats().cost <= cheese_coins.0 {
-            Vec4::new(0.0, 1.0, 0.0, 0.25)
+    let allowed = Vec4::new(0.0, 1.0, 0.0, 0.25);
+    let not_allowed = Vec4::new(1.0, 0.25, 0.0, 1.0 / 2.5);
+    let cant_afford = Vec4::new(1.0, 0.0, 0.0, 1.0 / 3.0);
+
+    if let CommandMode::Construct { building } = rts_controls.mode {
+        let colour = if building.stats().cost > cheese_coins.0 {
+            cant_afford
+        } else if building == Building::Pump && ray_cast_location.snapped_to_guyser.is_none() {
+            not_allowed
         } else {
-            Vec4::new(1.0, 0.0, 0.0, 1.0 / 3.0)
+            allowed
         };
 
         model_buffers.building_plan.set(
             building,
             ModelInstance {
                 transform: Mat4::from_translation(Vec3::new(
-                    ray_cast_location.0.x,
+                    ray_cast_location.pos.x,
                     0.0,
-                    ray_cast_location.0.y,
+                    ray_cast_location.pos.y,
                 )),
                 flat_colour: colour,
             },
@@ -428,7 +434,7 @@ pub fn render_unit_under_cursor(
 }
 
 fn unit_under_cursor(ray_cast_location: &RayCastLocation, world: &SubWorld) -> Option<(Vec2, f32)> {
-    let position = ray_cast_location.0;
+    let position = ray_cast_location.pos;
 
     <(&Position, &Radius)>::query()
         .iter(world)

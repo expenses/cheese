@@ -1,4 +1,6 @@
-use super::{CheeseDropletPosition, CheeseDropletVelocity, CheeseGuyser, Position};
+use super::{
+    CheeseDropletPosition, CheeseDropletVelocity, CheeseGuyser, CheeseGuyserBuiltOn, Position,
+};
 use crate::renderer::{ModelBuffers, ModelInstance};
 use crate::resources::{DeltaTime, Gravity};
 use legion::{component, systems::CommandBuffer, Entity};
@@ -29,7 +31,7 @@ pub fn move_cheese_droplets(
 }
 
 #[legion::system(for_each)]
-#[filter(component::<CheeseGuyser>())]
+#[filter(component::<CheeseGuyser>() & !component::<CheeseGuyserBuiltOn>())]
 pub fn spawn_cheese_droplets(
     position: &Position,
     #[resource] rng: &mut rand::rngs::SmallRng,
