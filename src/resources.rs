@@ -2,6 +2,7 @@ use crate::ecs;
 use legion::Entity;
 use std::collections::BTreeMap;
 use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
+use winit::event::VirtualKeyCode;
 
 #[derive(Default)]
 pub struct CameraControls {
@@ -230,3 +231,12 @@ pub struct Gravity(pub f32);
 pub struct CheeseCoins(pub u32);
 #[derive(Default)]
 pub struct SelectedUnitsAbilities(pub BTreeMap<&'static ecs::Ability, Vec<Entity>>);
+
+pub struct Keypress {
+    pub code: Option<VirtualKeyCode>,
+    pub scancode: u32,
+    pub pressed: bool,
+}
+
+#[derive(Default)]
+pub struct Keypresses(pub Vec<Keypress>);

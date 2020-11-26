@@ -451,7 +451,8 @@ pub fn render_abilities(
     let gap = 10.0;
     let border = 2.0;
 
-    let offset = (selected_units_abilities.0.len() as f32 - 1.0) * ((ability_size + gap) * dpi / 2.0);
+    let offset =
+        (selected_units_abilities.0.len() as f32 - 1.0) * ((ability_size + gap) * dpi / 2.0);
 
     let position = |i| {
         Vec2::new(

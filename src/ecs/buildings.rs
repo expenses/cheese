@@ -77,11 +77,17 @@ pub fn progress_recruitment_queue(
     building_position: &Position,
     building: &Building,
     recruitment_queue: &mut RecruitmentQueue,
+    completeness: &BuildingCompleteness,
     side: &Side,
     #[resource] animations: &ModelAnimations,
     #[resource] delta_time: &DeltaTime,
     buffer: &mut CommandBuffer,
 ) {
+    // Todo: a `Complete` tag would be nice.
+    if completeness.0 != building.stats().max_health {
+        return;
+    }
+
     if let Some(unit) = recruitment_queue.queue.front().cloned() {
         let recruitment_time = unit.stats().recruitment_time;
         recruitment_queue.progress += delta_time.0;

@@ -31,9 +31,9 @@ use combat::{
 };
 use controls::{
     cast_ray_system, control_camera_system, handle_control_groups_system,
-    handle_drag_selection_system, handle_left_click_system, handle_right_click_system,
-    handle_stop_command_system, remove_dead_entities_from_control_groups_system,
-    update_selected_units_abilities_system,
+    handle_drag_selection_system, handle_keypresses_system, handle_left_click_system,
+    handle_right_click_system, handle_stop_command_system,
+    remove_dead_entities_from_control_groups_system, update_selected_units_abilities_system,
 };
 use debugging::{
     debug_select_box_system, debug_specific_path_system, render_building_grid_system,
@@ -78,6 +78,7 @@ pub fn cleanup_controls(
 
 pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
     builder
+        .add_system(handle_keypresses_system())
         .add_system(generate_cheese_coins_system())
         .add_system(progress_recruitment_queue_system())
         .add_system(reset_map_updated_system())

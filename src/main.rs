@@ -12,19 +12,16 @@ use crate::renderer::{
     RenderContext, ShadowPipeline, TextBuffer, TitlescreenBuffer, TorusBuffer, TorusPipeline,
 };
 use crate::resources::{
-    Camera, CameraControls, CheeseCoins, CommandMode, ControlGroups, CursorIcon, DebugControls,
-    DeltaTime, DpiScaling, Gravity, Mode, MouseState, PlayerSide, RayCastLocation, RtsControls,
-    ScreenDimensions, SelectedUnitsAbilities,
+    Camera, CameraControls, CheeseCoins, ControlGroups, CursorIcon, DebugControls, DeltaTime,
+    DpiScaling, Gravity, Keypress, Keypresses, Mode, MouseState, PlayerSide, RayCastLocation,
+    RtsControls, ScreenDimensions, SelectedUnitsAbilities,
 };
 use legion::*;
 use rand::{Rng, SeedableRng};
 use ultraviolet::Vec2;
 use winit::{
     dpi::PhysicalPosition,
-    event::{
-        ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, VirtualKeyCode,
-        WindowEvent,
-    },
+    event::{ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
 };
 
@@ -76,6 +73,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(Gravity(5.0));
     resources.insert(CheeseCoins(100_000));
     resources.insert(SelectedUnitsAbilities::default());
+    resources.insert(Keypresses::default());
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
@@ -165,33 +163,19 @@ async fn run() -> anyhow::Result<()> {
                     input:
                         KeyboardInput {
                             state,
-                            virtual_keycode,
+                            virtual_keycode: code,
                             scancode,
                             ..
                         },
                     ..
                 } => {
                     let pressed = *state == ElementState::Pressed;
-
-                    let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
-                    let mut rts_controls = resources.get_mut::<RtsControls>().unwrap();
-                    let mut debug_controls = resources.get_mut::<DebugControls>().unwrap();
-                    let selected_unit_abilities =
-                        resources.get::<SelectedUnitsAbilities>().unwrap();
-                    let mut cheese_coins = resources.get_mut::<CheeseCoins>().unwrap();
-
-                    handle_key(
-                        *virtual_keycode,
-                        *scancode,
+                    let mut keypresses = resources.get_mut::<Keypresses>().unwrap();
+                    keypresses.0.push(Keypress {
+                        code: *code,
+                        scancode: *scancode,
                         pressed,
-                        &mut camera_controls,
-                        &mut rts_controls,
-                        &mut debug_controls,
-                        control_flow,
-                        &selected_unit_abilities,
-                        &mut cheese_coins,
-                        &mut world,
-                    );
+                    });
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
                     let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
@@ -634,106 +618,4 @@ fn render_playing<'a>(
     // Render 2D items.
     lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
     //lines_pipeline.render_hud(&mut render_pass, &assets);
-}
-
-fn handle_key(
-    code: Option<VirtualKeyCode>,
-    scancode: u32,
-    pressed: bool,
-    camera_controls: &mut CameraControls,
-    rts_controls: &mut RtsControls,
-    debug_controls: &mut DebugControls,
-    control_flow: &mut ControlFlow,
-    selected_units_abilities: &SelectedUnitsAbilities,
-    cheese_coins: &mut CheeseCoins,
-    world: &mut World,
-) {
-    log::trace!("{:?} (scancode: {}) pressed: {}", code, scancode, pressed);
-
-    if let Some(code) = code {
-        if pressed {
-            for (ability, casters) in selected_units_abilities.0.iter() {
-                if code == ability.hotkey {
-                    match ability.ability_type {
-                        ecs::AbilityType::SetRecruitmentWaypoint => {
-                            rts_controls.mode = CommandMode::SetRecruitmentWaypoint;
-                        }
-                        ecs::AbilityType::Build(building) => {
-                            //if building.stats().cost <= cheese_coins.0 {
-                            rts_controls.mode = CommandMode::Construct(building);
-                            //} else {
-                            // Todo: play sound: meep merp (like from dota).
-                            //}
-                        }
-                        ecs::AbilityType::Recruit(unit) => {
-                            if unit.stats().cost <= cheese_coins.0 {
-                                cheese_coins.0 -= unit.stats().cost;
-
-                                let entity_with_shortest_recruitment_queue = casters
-                                    .iter()
-                                    .map(|caster| {
-                                        let queue_len = <&ecs::RecruitmentQueue>::query()
-                                            .get(world, *caster)
-                                            .unwrap()
-                                            .queue
-                                            .len();
-                                        (caster, queue_len)
-                                    })
-                                    .min_by_key(|(_, queue_len)| *queue_len)
-                                    .map(|(entity, _)| *entity)
-                                    .unwrap();
-
-                                <&mut ecs::RecruitmentQueue>::query()
-                                    .get_mut(world, entity_with_shortest_recruitment_queue)
-                                    .unwrap()
-                                    .queue
-                                    .push_back(unit);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        match code {
-            VirtualKeyCode::Up => camera_controls.up = pressed,
-            VirtualKeyCode::Down => camera_controls.down = pressed,
-            VirtualKeyCode::Left => camera_controls.left = pressed,
-            VirtualKeyCode::Right => camera_controls.right = pressed,
-            VirtualKeyCode::LShift => rts_controls.shift_held = pressed,
-            VirtualKeyCode::LControl => rts_controls.control_held = pressed,
-            VirtualKeyCode::S if pressed => rts_controls.stop_pressed = true,
-            VirtualKeyCode::A if pressed => rts_controls.mode = CommandMode::AttackMove,
-            VirtualKeyCode::T if pressed => debug_controls.set_pathfinding_start_pressed = true,
-            VirtualKeyCode::Escape if pressed => rts_controls.mode = CommandMode::Normal,
-
-            VirtualKeyCode::Key0 if pressed => rts_controls.control_group_key_pressed[0] = true,
-            VirtualKeyCode::Key1 if pressed => rts_controls.control_group_key_pressed[1] = true,
-            VirtualKeyCode::Key2 if pressed => rts_controls.control_group_key_pressed[2] = true,
-            VirtualKeyCode::Key3 if pressed => rts_controls.control_group_key_pressed[3] = true,
-            VirtualKeyCode::Key4 if pressed => rts_controls.control_group_key_pressed[4] = true,
-            VirtualKeyCode::Key5 if pressed => rts_controls.control_group_key_pressed[5] = true,
-            VirtualKeyCode::Key6 if pressed => rts_controls.control_group_key_pressed[6] = true,
-            VirtualKeyCode::Key7 if pressed => rts_controls.control_group_key_pressed[7] = true,
-            VirtualKeyCode::Key8 if pressed => rts_controls.control_group_key_pressed[8] = true,
-            VirtualKeyCode::Key9 if pressed => rts_controls.control_group_key_pressed[9] = true,
-
-            _ => {}
-        }
-    }
-
-    // Pressing shift + a number key doesn't output a virtualkeycode so we have to use scancodes instead.
-    match scancode {
-        11 if pressed => rts_controls.control_group_key_pressed[0] = true,
-        2 if pressed => rts_controls.control_group_key_pressed[1] = true,
-        3 if pressed => rts_controls.control_group_key_pressed[2] = true,
-        4 if pressed => rts_controls.control_group_key_pressed[3] = true,
-        5 if pressed => rts_controls.control_group_key_pressed[4] = true,
-        6 if pressed => rts_controls.control_group_key_pressed[5] = true,
-        7 if pressed => rts_controls.control_group_key_pressed[6] = true,
-        8 if pressed => rts_controls.control_group_key_pressed[7] = true,
-        9 if pressed => rts_controls.control_group_key_pressed[8] = true,
-        10 if pressed => rts_controls.control_group_key_pressed[9] = true,
-        _ => {}
-    }
 }

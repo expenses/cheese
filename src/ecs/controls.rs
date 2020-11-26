@@ -1,8 +1,117 @@
 use super::*;
 use crate::assets::ModelAnimations;
 use crate::resources::{
-    CheeseCoins, CommandMode, ControlGroups, RayCastLocation, SelectedUnitsAbilities,
+    CheeseCoins, CommandMode, ControlGroups, Keypress, Keypresses, RayCastLocation,
+    SelectedUnitsAbilities,
 };
+
+#[legion::system]
+#[write_component(RecruitmentQueue)]
+pub fn handle_keypresses(
+    #[resource] keypresses: &mut Keypresses,
+    #[resource] camera_controls: &mut CameraControls,
+    #[resource] rts_controls: &mut RtsControls,
+    #[resource] debug_controls: &mut DebugControls,
+    #[resource] cheese_coins: &mut CheeseCoins,
+    #[resource] selected_units_abilities: &SelectedUnitsAbilities,
+    world: &mut SubWorld,
+) {
+    for Keypress {
+        code,
+        scancode,
+        pressed,
+    } in keypresses.0.drain(..)
+    {
+        log::trace!("{:?} (scancode: {}) pressed: {}", code, scancode, pressed);
+
+        if let Some(code) = code {
+            if pressed {
+                for (ability, casters) in selected_units_abilities.0.iter() {
+                    if code == ability.hotkey {
+                        match ability.ability_type {
+                            AbilityType::SetRecruitmentWaypoint => {
+                                rts_controls.mode = CommandMode::SetRecruitmentWaypoint;
+                            }
+                            AbilityType::Build(building) => {
+                                //if building.stats().cost <= cheese_coins.0 {
+                                rts_controls.mode = CommandMode::Construct(building);
+                                //} else {
+                                // Todo: play sound: meep merp (like from dota).
+                                //}
+                            }
+                            AbilityType::Recruit(unit) => {
+                                if unit.stats().cost <= cheese_coins.0 {
+                                    cheese_coins.0 -= unit.stats().cost;
+
+                                    let entity_with_shortest_recruitment_queue = casters
+                                        .iter()
+                                        .map(|caster| {
+                                            let queue_len = <&RecruitmentQueue>::query()
+                                                .get(world, *caster)
+                                                .unwrap()
+                                                .queue
+                                                .len();
+                                            (caster, queue_len)
+                                        })
+                                        .min_by_key(|(_, queue_len)| *queue_len)
+                                        .map(|(entity, _)| *entity)
+                                        .unwrap();
+
+                                    <&mut RecruitmentQueue>::query()
+                                        .get_mut(world, entity_with_shortest_recruitment_queue)
+                                        .unwrap()
+                                        .queue
+                                        .push_back(unit);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            match code {
+                VirtualKeyCode::Up => camera_controls.up = pressed,
+                VirtualKeyCode::Down => camera_controls.down = pressed,
+                VirtualKeyCode::Left => camera_controls.left = pressed,
+                VirtualKeyCode::Right => camera_controls.right = pressed,
+                VirtualKeyCode::LShift => rts_controls.shift_held = pressed,
+                VirtualKeyCode::LControl => rts_controls.control_held = pressed,
+                VirtualKeyCode::S if pressed => rts_controls.stop_pressed = true,
+                VirtualKeyCode::A if pressed => rts_controls.mode = CommandMode::AttackMove,
+                VirtualKeyCode::T if pressed => debug_controls.set_pathfinding_start_pressed = true,
+                VirtualKeyCode::Escape if pressed => rts_controls.mode = CommandMode::Normal,
+
+                VirtualKeyCode::Key0 if pressed => rts_controls.control_group_key_pressed[0] = true,
+                VirtualKeyCode::Key1 if pressed => rts_controls.control_group_key_pressed[1] = true,
+                VirtualKeyCode::Key2 if pressed => rts_controls.control_group_key_pressed[2] = true,
+                VirtualKeyCode::Key3 if pressed => rts_controls.control_group_key_pressed[3] = true,
+                VirtualKeyCode::Key4 if pressed => rts_controls.control_group_key_pressed[4] = true,
+                VirtualKeyCode::Key5 if pressed => rts_controls.control_group_key_pressed[5] = true,
+                VirtualKeyCode::Key6 if pressed => rts_controls.control_group_key_pressed[6] = true,
+                VirtualKeyCode::Key7 if pressed => rts_controls.control_group_key_pressed[7] = true,
+                VirtualKeyCode::Key8 if pressed => rts_controls.control_group_key_pressed[8] = true,
+                VirtualKeyCode::Key9 if pressed => rts_controls.control_group_key_pressed[9] = true,
+
+                _ => {}
+            }
+        }
+
+        // Pressing shift + a number key doesn't output a virtualkeycode so we have to use scancodes instead.
+        match scancode {
+            11 if pressed => rts_controls.control_group_key_pressed[0] = true,
+            2 if pressed => rts_controls.control_group_key_pressed[1] = true,
+            3 if pressed => rts_controls.control_group_key_pressed[2] = true,
+            4 if pressed => rts_controls.control_group_key_pressed[3] = true,
+            5 if pressed => rts_controls.control_group_key_pressed[4] = true,
+            6 if pressed => rts_controls.control_group_key_pressed[5] = true,
+            7 if pressed => rts_controls.control_group_key_pressed[6] = true,
+            8 if pressed => rts_controls.control_group_key_pressed[7] = true,
+            9 if pressed => rts_controls.control_group_key_pressed[8] = true,
+            10 if pressed => rts_controls.control_group_key_pressed[9] = true,
+            _ => {}
+        }
+    }
+}
 
 #[legion::system]
 pub fn control_camera(
