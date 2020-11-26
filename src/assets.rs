@@ -18,6 +18,7 @@ pub struct Assets {
     pub pump_static_model: Model,
     pub wrench_model: AnimatedModel,
     pub blaster_model: AnimatedModel,
+    pub crevasse_model: Model,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
@@ -143,6 +144,11 @@ impl Assets {
             pump_static_model: Model::load_gltf(
                 include_bytes!("../models/pump.gltf"),
                 "Cheese static pump model",
+                device,
+            )?,
+            crevasse_model: Model::load_gltf(
+                include_bytes!("../models/crevasse.gltf"),
+                "Cheese crevasse model",
                 device,
             )?,
 
