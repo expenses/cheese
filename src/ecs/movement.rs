@@ -228,9 +228,10 @@ pub fn apply_steering(
     avoidance: &Avoidance,
     #[resource] map: &Map,
     command_buffer: &mut CommandBuffer,
+    #[resource] delta_time: &DeltaTime,
 ) {
-    // todo: delta time here
-    let new_position = position.0 + avoidance.0 * 0.1;
+    let avoidance_movement_per_second = 6.0;
+    let new_position = position.0 + avoidance.0 * avoidance_movement_per_second * delta_time.0;
 
     // We don't want units to get pushed inside of buildings!
     if map.impassable_between(position.0, new_position) {

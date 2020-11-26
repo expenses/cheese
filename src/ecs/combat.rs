@@ -96,9 +96,9 @@ pub fn handle_damaged(
     #[resource] map: &mut Map,
     world: &SubWorld,
 ) {
-    health.0 = health.0.saturating_sub(2);
+    health.0 = (health.0 - 2.0).max(0.0);
 
-    if health.0 == 0 {
+    if health.0 == 0.0 {
         buffer.remove(*entity);
 
         if let Some(map_handle) = map_handle {

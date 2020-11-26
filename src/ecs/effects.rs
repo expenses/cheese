@@ -1,5 +1,6 @@
 use super::{
-    CheeseDropletPosition, CheeseDropletVelocity, CheeseGuyser, CheeseGuyserBuiltOn, Position,
+    CheeseDropletPosition, CheeseDropletVelocity, CheeseGuyser, CheeseGuyserBuiltOn, Cooldown,
+    Position,
 };
 use crate::renderer::{ModelBuffers, ModelInstance};
 use crate::resources::{DeltaTime, Gravity};
@@ -36,7 +37,12 @@ pub fn spawn_cheese_droplets(
     position: &Position,
     #[resource] rng: &mut rand::rngs::SmallRng,
     buffer: &mut CommandBuffer,
+    cooldown: &mut Cooldown,
 ) {
+    if cooldown.0 != 0.0 {
+        return;
+    }
+
     for _ in 0..3 {
         let rotation = rng.gen_range(0.0, std::f32::consts::TAU);
         let velocity = Vec3::new(rotation.cos() * 0.75, 10.0, rotation.sin() * 0.75);
@@ -44,6 +50,7 @@ pub fn spawn_cheese_droplets(
             CheeseDropletPosition(Vec3::new(position.0.x, 0.0, position.0.y)),
             CheeseDropletVelocity(velocity),
         ));
+        cooldown.0 = 1.0 / 60.0;
     }
 }
 

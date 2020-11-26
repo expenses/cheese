@@ -118,6 +118,7 @@ fn spawn_pump_over_guyser(
         ecs::Position(position),
         ecs::CheeseGuyser,
         ecs::CheeseGuyserBuiltOn { pump: pump_entity },
+        ecs::Cooldown(0.0),
     ));
 }
 

@@ -17,9 +17,12 @@ pub fn build_buildings(
     entity: &Entity,
     command_queue: &mut CommandQueue,
     facing: &mut Facing,
+    #[resource] delta_time: &DeltaTime,
     world: &mut SubWorld,
 ) {
     let mut pop_front = false;
+    let health_increase_per_sec = 60.0;
+    let health_increase_this_tick = health_increase_per_sec * delta_time.0;
 
     let position = <&Position>::query()
         .get(world, *entity)
@@ -41,8 +44,8 @@ pub fn build_buildings(
         let vector = building_pos.0 - position;
         facing.0 = vector.y.atan2(vector.x);
 
-        health.0 = (health.0 + 1).min(max);
-        completeness.0 = (completeness.0 + 1).min(max);
+        health.0 = (health.0 + health_increase_this_tick).min(max);
+        completeness.0 = (completeness.0 + health_increase_this_tick).min(max);
 
         if health.0 == max {
             pop_front = true;
@@ -68,6 +71,7 @@ pub fn generate_cheese_coins(
         && completeness.0 == building.stats().max_health
         && side == &player_side.0
     {
+        // Reminder: no delta time stuff needed here because that's done in the cooldown code.
         cheese_coins.0 += 2;
         cooldown.0 = 0.5;
     }

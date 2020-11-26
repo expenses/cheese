@@ -121,8 +121,9 @@ pub fn control_camera(
     #[resource] camera_controls: &mut CameraControls,
     #[resource] mouse_state: &MouseState,
     #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] delta_time: &DeltaTime,
 ) {
-    let speed = 0.5;
+    let speed = 30.0 * delta_time.0;
 
     let edge_thickness = 50.0;
     let &ScreenDimensions {
@@ -152,6 +153,9 @@ pub fn control_camera(
     if camera_controls.down || mouse_y > screen_height - edge_thickness {
         camera.looking_at -= forwards;
     }
+
+    camera.looking_at.x = camera.looking_at.x.min(100.0).max(-100.0);
+    camera.looking_at.y = camera.looking_at.y.min(100.0).max(-100.0);
 
     camera.distance = (camera.distance - camera_controls.zoom_delta * 0.01)
         .max(5.0)

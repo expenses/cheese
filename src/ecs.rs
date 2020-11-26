@@ -2,7 +2,7 @@ use crate::assets::ModelAnimations;
 use crate::pathfinding::{Map, MapHandle};
 use crate::renderer::Button;
 use crate::resources::{
-    Camera, CameraControls, MouseState, PlayerSide, RtsControls, ScreenDimensions,
+    Camera, CameraControls, DeltaTime, MouseState, PlayerSide, RtsControls, ScreenDimensions,
 };
 use legion::systems::CommandBuffer;
 use legion::world::SubWorld;
@@ -63,10 +63,11 @@ pub fn cleanup_controls(
     #[resource] mouse_state: &mut MouseState,
     #[resource] rts_controls: &mut RtsControls,
     #[resource] debug_controls: &mut DebugControls,
+    #[resource] delta_time: &DeltaTime,
 ) {
     let position = mouse_state.position;
-    mouse_state.left_state.update(position);
-    mouse_state.right_state.update(position);
+    mouse_state.left_state.update(position, delta_time.0);
+    mouse_state.right_state.update(position, delta_time.0);
 
     rts_controls.stop_pressed = false;
 
@@ -309,8 +310,8 @@ impl ActionState {
 #[derive(Default)]
 pub struct CommandQueue(VecDeque<Command>);
 
-pub struct Health(pub u16);
-pub struct BuildingCompleteness(pub u16);
+pub struct Health(pub f32);
+pub struct BuildingCompleteness(pub f32);
 
 pub struct FiringRange(pub f32);
 pub struct MoveSpeed(pub f32);
@@ -342,7 +343,7 @@ pub enum Building {
 pub struct BuildingStats {
     pub radius: f32,
     pub dimensions: Vec2,
-    pub max_health: u16,
+    pub max_health: f32,
     pub cost: u32,
 }
 
@@ -352,13 +353,13 @@ impl Building {
             Self::Armoury => BuildingStats {
                 radius: 6.0,
                 dimensions: Vec2::new(6.0, 10.0),
-                max_health: 500,
+                max_health: 500.0,
                 cost: 200,
             },
             Self::Pump => BuildingStats {
                 radius: 3.0,
                 dimensions: Vec2::new(4.0, 4.0),
-                max_health: 200,
+                max_health: 200.0,
                 cost: 50,
             },
         }
@@ -395,8 +396,8 @@ impl Building {
             Radius(radius),
             Selectable,
             side,
-            Health(1),
-            BuildingCompleteness(1),
+            Health(1.0),
+            BuildingCompleteness(1.0),
         ))
     }
 
@@ -452,7 +453,7 @@ pub enum Unit {
 }
 
 pub struct UnitStats {
-    pub max_health: u16,
+    pub max_health: f32,
     pub move_speed: f32,
     pub radius: f32,
     pub firing_range: f32,
@@ -472,7 +473,7 @@ impl Unit {
     pub fn stats(self) -> UnitStats {
         match self {
             Self::MouseMarine => UnitStats {
-                max_health: 50,
+                max_health: 50.0,
                 firing_range: 10.0,
                 move_speed: 6.0,
                 radius: 1.0,
@@ -481,7 +482,7 @@ impl Unit {
                 recruitment_time: 10.0,
             },
             Self::Engineer => UnitStats {
-                max_health: 40,
+                max_health: 40.0,
                 firing_range: 1.0,
                 move_speed: 6.0,
                 radius: 1.0,
