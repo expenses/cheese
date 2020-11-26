@@ -3,11 +3,16 @@ use crate::ecs;
 use crate::pathfinding::Map;
 use legion::systems::CommandBuffer;
 use legion::*;
-use ultraviolet::Vec2;
 use rand::Rng;
+use ultraviolet::Vec2;
 
 // Squad of 10 marines vs 5.
-pub fn one(world: &mut World, animations: &ModelAnimations, map: &mut Map, rng: &mut rand::rngs::SmallRng) {
+pub fn one(
+    world: &mut World,
+    animations: &ModelAnimations,
+    map: &mut Map,
+    rng: &mut rand::rngs::SmallRng,
+) {
     world.clear();
 
     let mut command_buffer = legion::systems::CommandBuffer::new(&world);
@@ -32,49 +37,61 @@ pub fn one(world: &mut World, animations: &ModelAnimations, map: &mut Map, rng: 
 
     command_buffer.flush(world);
 
-    ecs::Building::Armoury.add_to_world_fully_built(
-        world,
-        Vec2::new(36.0, -10.0),
-        ecs::Side::Purple,
-        animations,
-        map,
-    ).unwrap();
+    ecs::Building::Armoury
+        .add_to_world_fully_built(
+            world,
+            Vec2::new(36.0, -10.0),
+            ecs::Side::Purple,
+            animations,
+            map,
+        )
+        .unwrap();
 
     spawn_pump_over_guyser(
         Vec2::new(46.0, -5.0),
         ecs::Side::Purple,
         world,
-        animations, map, rng
+        animations,
+        map,
+        rng,
     );
 
-    ecs::Building::Armoury.add_to_world_fully_built(
-        world,
-        Vec2::new(54.0, 2.0),
-        ecs::Side::Purple,
-        animations,
-        map,
-    ).unwrap();
+    ecs::Building::Armoury
+        .add_to_world_fully_built(
+            world,
+            Vec2::new(54.0, 2.0),
+            ecs::Side::Purple,
+            animations,
+            map,
+        )
+        .unwrap();
 
-    ecs::Building::Armoury.add_to_world_fully_built(
-        world,
-        Vec2::new(44.0, 16.0),
-        ecs::Side::Purple,
-        animations,
-        map,
-    ).unwrap();
+    ecs::Building::Armoury
+        .add_to_world_fully_built(
+            world,
+            Vec2::new(44.0, 16.0),
+            ecs::Side::Purple,
+            animations,
+            map,
+        )
+        .unwrap();
 
     spawn_pump_over_guyser(
         Vec2::new(54.0, 19.0),
         ecs::Side::Purple,
         world,
-        animations, map, rng,
+        animations,
+        map,
+        rng,
     );
 
     spawn_pump_over_guyser(
         Vec2::new(36.0, 22.0),
         ecs::Side::Purple,
         world,
-        animations, map, rng,
+        animations,
+        map,
+        rng,
     );
 }
 
@@ -86,23 +103,21 @@ fn spawn_pump_over_guyser(
     map: &mut Map,
     rng: &mut rand::rngs::SmallRng,
 ) {
-    let pump_entity = ecs::Building::Pump.add_to_world_fully_built(
-        world,
-        position,
-        side,
-        animations,
-        map,
-    ).unwrap();
+    let pump_entity = ecs::Building::Pump
+        .add_to_world_fully_built(world, position, side, animations, map)
+        .unwrap();
 
     let animation_offset = rng.gen_range(0.0, 1.0);
 
-    <&mut ecs::AnimationState>::query().get_mut(world, pump_entity)
-        .unwrap().time = animation_offset;
+    <&mut ecs::AnimationState>::query()
+        .get_mut(world, pump_entity)
+        .unwrap()
+        .time = animation_offset;
 
     world.push((
         ecs::Position(position),
         ecs::CheeseGuyser,
-        ecs::CheeseGuyserBuiltOn { pump: pump_entity }
+        ecs::CheeseGuyserBuiltOn { pump: pump_entity },
     ));
 }
 

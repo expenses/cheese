@@ -110,20 +110,27 @@ pub fn handle_damaged(
 
     // If the unit is idle and got attacked, go attack back!
     if let Some(commands) = commands {
-        let is_attaching_building = commands.0.front()
-            .map(|command| match command {
-                Command::Attack { target, explicit: false, .. } => {
-                    <&Building>::query().get(world, *target).is_ok()
-                },
-                _ => false,
-            }).unwrap_or(false);
-
-        if commands.0.is_empty() || is_attaching_building {
+        if commands.0.is_empty() || is_attacking_building(&commands, world) {
             commands.0.push_front(Command::new_attack(damaged.0, false));
         }
     }
 
     buffer.remove_component::<DamagedThisTick>(*entity);
+}
+
+fn is_attacking_building(commands: &CommandQueue, world: &SubWorld) -> bool {
+    commands
+        .0
+        .front()
+        .map(|command| match command {
+            Command::Attack {
+                target,
+                explicit: false,
+                ..
+            } => <&Building>::query().get(world, *target).is_ok(),
+            _ => false,
+        })
+        .unwrap_or(false)
 }
 
 #[legion::system(for_each)]
@@ -132,6 +139,7 @@ pub fn handle_damaged(
 #[read_component(Position)]
 #[read_component(Side)]
 #[read_component(FiringRange)]
+#[read_component(Building)]
 pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: &SubWorld) {
     let (position, side, firing_range) = <(&Position, &Side, &FiringRange)>::query()
         .get(world, *entity)
@@ -139,17 +147,34 @@ pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: 
 
     let agro_multiplier = 1.5;
 
+    // Todo: find a clean way to getting units to re-target when an enemy unit is in range and we're
+    // currently attacking a building.
     if matches!(commands.0.front(), None | Some(&Command::MoveTo { attack_move: true, .. })) {
-        let target = <(Entity, &Position, &Side)>::query()
+        let target = <(Entity, &Position, Option<&Building>, &Side)>::query()
             .iter(world)
             .filter(|(.., entity_side)| *entity_side != side)
-            .filter(|(_, entity_position, _)| {
+            .filter(|(_, entity_position, ..)| {
                 (position.0 - entity_position.0).mag_sq()
                     <= (firing_range.0 * agro_multiplier).powi(2)
             })
-            .min_by_key(|(_, entity_position, _)| {
+            .map(|(entity, entity_position, entity_building, _)| {
                 let distance_sq = (position.0 - entity_position.0).mag_sq();
-                ordered_float::OrderedFloat(distance_sq)
+                (
+                    entity,
+                    ordered_float::OrderedFloat(distance_sq),
+                    entity_building.is_some(),
+                )
+            })
+            .min_by(|&(_, a_pos, a_is_building), &(_, b_pos, b_is_building)| {
+                if a_is_building == b_is_building {
+                    a_pos.cmp(&b_pos)
+                // If only a is a building, then it a has less priority
+                } else if a_is_building {
+                    std::cmp::Ordering::Greater
+                // If only b is a building then it a has higher priority
+                } else {
+                    std::cmp::Ordering::Less
+                }
             })
             .map(|(entity, ..)| entity);
 
