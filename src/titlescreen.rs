@@ -10,6 +10,7 @@ use ultraviolet::{Mat4, Rotor3, Vec2, Vec3, Vec4};
 const TITLE_POSITION: Vec2 = Vec2::new(0.5, 1.0 / 6.0);
 const SKIRMISH_POSITION: Vec2 = Vec2::new(0.5, 3.0 / 4.0);
 const QUIT_POSITION: Vec2 = Vec2::new(0.5, 3.25 / 4.0);
+pub const MOON_POSITION: Vec3 = Vec3::new(0.0, 0.0, 5.0);
 
 pub fn titlescreen_schedule() -> Schedule {
     Schedule::builder()
@@ -31,19 +32,12 @@ fn update(
     #[resource] moon: &mut TitlescreenMoon,
     #[resource] delta_time: &DeltaTime,
     #[resource] titlescreen_buffer: &mut TitlescreenBuffer,
-    #[resource] camera: &mut Camera,
 ) {
-    let moon_position = Vec3::new(0.0, 0.0, 5.0);
-
     moon.rotation += 0.1 * delta_time.0;
     titlescreen_buffer.moon.write(ModelInstance {
-        transform: Mat4::from_translation(moon_position) * Mat4::from_rotation_y(moon.rotation),
+        transform: Mat4::from_translation(MOON_POSITION) * Mat4::from_rotation_y(moon.rotation),
         flat_colour: Vec4::one(),
     });
-    *camera = Camera {
-        position: Vec3::new(0.0, 0.0, 0.0),
-        looking_at: moon_position,
-    };
 }
 
 #[legion::system]

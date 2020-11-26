@@ -665,12 +665,13 @@ impl RenderContext {
         );
     }
 
+    pub fn update_view(&self, view: Mat4) {
+        self.queue
+            .write_buffer(&self.view_buffer, 0, bytemuck::bytes_of(&view));
+    }
+
     pub fn update_from_camera(&self, camera: &Camera) {
-        self.queue.write_buffer(
-            &self.view_buffer,
-            0,
-            bytemuck::bytes_of(&camera.to_matrix()),
-        );
+        self.update_view(camera.to_matrix());
 
         let screen_dimensions = self.screen_dimensions();
         let top_left = camera.cast_ray(Vec2::new(0.0, 0.0), &screen_dimensions);
@@ -680,13 +681,11 @@ impl RenderContext {
         );
         let bottom_right = camera.cast_ray(screen_dimensions.as_vec(), &screen_dimensions);
 
-        let look_at = Vec2::new(camera.looking_at.x, camera.looking_at.z);
-
         self.queue.write_buffer(
             &self.shadow_uniform_buffer,
             0,
             bytemuck::bytes_of(&ShadowUniforms::new(
-                look_at,
+                camera.looking_at,
                 top_left,
                 top_right,
                 bottom_right,

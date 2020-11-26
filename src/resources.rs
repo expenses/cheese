@@ -44,22 +44,36 @@ impl Default for CommandMode {
 }
 
 pub struct Camera {
-    pub position: Vec3,
-    pub looking_at: Vec3,
+    pub distance: f32,
+    pub looking_at: Vec2,
 }
 
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            position: Vec3::new(0.0, 20.0, 10.0),
-            looking_at: Vec3::new(0.0, 0.0, 0.0),
+            distance: Self::ANGLE.mag(),
+            looking_at: Vec2::new(0.0, 0.0),
         }
     }
 }
 
 impl Camera {
+    const ANGLE: Vec3 = Vec3::new(0.0, 20.0, 10.0);
+
+    fn looking_at_3(&self) -> Vec3 {
+        Vec3::new(self.looking_at.x, 0.0, self.looking_at.y)
+    }
+
+    fn position(&self) -> Vec3 {
+        self.looking_at_3() + Self::ANGLE.normalized() * self.distance
+    }
+
     pub fn to_matrix(&self) -> Mat4 {
-        Mat4::look_at(self.position, self.looking_at, Vec3::new(0.0, 1.0, 0.0))
+        Mat4::look_at(
+            self.position(),
+            self.looking_at_3(),
+            Vec3::new(0.0, 1.0, 0.0),
+        )
     }
 
     pub fn cast_ray(&self, mouse_position: Vec2, screen_dimensions: &ScreenDimensions) -> Vec2 {
@@ -74,8 +88,9 @@ impl Camera {
         let eye = Vec4::new(eye.x, eye.y, -1.0, 0.0);
         let direction = (self.to_matrix().inversed() * eye).truncated().normalized() * 1.0;
 
+        let position = self.position();
         let ray = ncollide3d::query::Ray::new(
-            ncollide3d::math::Point::new(self.position.x, self.position.y, self.position.z),
+            ncollide3d::math::Point::new(position.x, position.y, position.z),
             ncollide3d::math::Vector::new(direction.x, direction.y, direction.z),
         );
 
@@ -87,12 +102,12 @@ impl Camera {
 
         match toi {
             Some(toi) => {
-                let contact = self.position + direction * toi;
+                let contact = self.position() + direction * toi;
                 Vec2::new(contact.x, contact.z)
             }
             // The above ray cast can fail in odd cases such as where the window is minimized,
             // So let's just return the point the camera is centered on.
-            None => Vec2::new(self.looking_at.x, self.looking_at.z),
+            None => self.looking_at,
         }
     }
 }

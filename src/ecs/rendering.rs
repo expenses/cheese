@@ -253,7 +253,7 @@ pub fn render_recruitment_waypoints(
     let waypoint = recruitment_queue.waypoint;
 
     model_buffers.command_indicators.push(ModelInstance {
-        transform: Mat4::from_translation(Vec3::new(waypoint.x, 0.01, waypoint.y)),
+        transform: Mat4::from_translation(Vec3::new(waypoint.x, 0.02, waypoint.y)),
         flat_colour: colour,
     });
 
@@ -263,7 +263,7 @@ pub fn render_recruitment_waypoints(
     let scale = vector.mag();
 
     model_buffers.command_paths.push(ModelInstance {
-        transform: Mat4::from_translation(Vec3::new(center.x, 0.005, center.y))
+        transform: Mat4::from_translation(Vec3::new(center.x, 0.01, center.y))
             * Mat4::from_rotation_y(rotation)
             * Mat4::from_nonuniform_scale(Vec3::new(scale, 1.0, 1.0)),
         flat_colour: colour,
@@ -336,7 +336,7 @@ pub fn render_command_paths(
 
         if let Some(position) = position {
             model_buffers.command_indicators.push(ModelInstance {
-                transform: Mat4::from_translation(Vec3::new(position.x, 0.01, position.y)),
+                transform: Mat4::from_translation(Vec3::new(position.x, 0.02, position.y)),
                 flat_colour: colour,
             });
 
@@ -346,7 +346,7 @@ pub fn render_command_paths(
             let scale = vector.mag();
 
             model_buffers.command_paths.push(ModelInstance {
-                transform: Mat4::from_translation(Vec3::new(center.x, 0.005, center.y))
+                transform: Mat4::from_translation(Vec3::new(center.x, 0.01, center.y))
                     * Mat4::from_rotation_y(rotation)
                     * Mat4::from_nonuniform_scale(Vec3::new(scale, 1.0, 1.0)),
                 flat_colour: colour,

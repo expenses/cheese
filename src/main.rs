@@ -18,7 +18,7 @@ use crate::resources::{
 };
 use legion::*;
 use rand::{Rng, SeedableRng};
-use ultraviolet::Vec2;
+use ultraviolet::{Mat4, Vec2, Vec3};
 use winit::{
     dpi::PhysicalPosition,
     event::{ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, WindowEvent},
@@ -71,7 +71,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(Mode::Playing);
     resources.insert(DebugControls::default());
     resources.insert(Gravity(5.0));
-    resources.insert(CheeseCoins(100_000));
+    resources.insert(CheeseCoins(100));
     resources.insert(SelectedUnitsAbilities::default());
     resources.insert(Keypresses::default());
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
@@ -116,15 +116,7 @@ async fn run() -> anyhow::Result<()> {
 
     let mut map = pathfinding::Map::new();
 
-    ecs::Building::Armoury.add_to_world_fully_built(
-        &mut world,
-        Vec2::new(-50.0, 0.0),
-        ecs::Side::Green,
-        &animations,
-        &mut map,
-    );
-
-    for _ in 0..5 {
+    for _ in 0..10 {
         world.push((
             ecs::Position(Vec2::new(
                 rng.gen_range(-100.0, 100.0),
@@ -181,7 +173,7 @@ async fn run() -> anyhow::Result<()> {
                     let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
 
                     camera_controls.zoom_delta += match delta {
-                        MouseScrollDelta::LineDelta(_, y) => y * 100.0,
+                        MouseScrollDelta::LineDelta(_, y) => y * 200.0,
                         MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => *y as f32,
                     };
                 }
@@ -222,7 +214,6 @@ async fn run() -> anyhow::Result<()> {
                 render_context.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                let camera = resources.get::<Camera>().unwrap();
                 let mut model_buffers = resources.get_mut::<ModelBuffers>().unwrap();
                 let mut torus_buffer = resources.get_mut::<TorusBuffer>().unwrap();
                 let mut line_buffers = resources.get_mut::<LineBuffers>().unwrap();
@@ -232,7 +223,22 @@ async fn run() -> anyhow::Result<()> {
                 let mode = *resources.get::<Mode>().unwrap();
 
                 // Upload buffers to the gpu.
-                render_context.update_from_camera(&camera);
+
+                match mode {
+                    Mode::Playing => {
+                        let camera = resources.get::<Camera>().unwrap();
+                        render_context.update_from_camera(&camera);
+                    }
+                    Mode::Titlescreen => {
+                        render_context.update_view(Mat4::look_at(
+                            Vec3::zero(),
+                            titlescreen::MOON_POSITION,
+                            Vec3::new(0.0, 1.0, 0.0),
+                        ));
+                    }
+                    _ => {}
+                }
+
                 model_buffers.upload(&render_context, &assets);
                 torus_buffer.upload(&render_context);
                 line_buffers.upload(&render_context);
