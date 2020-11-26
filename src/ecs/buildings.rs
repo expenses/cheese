@@ -1,10 +1,11 @@
 use super::{
-    nearest_point_within_building, ActionState, Building, BuildingCompleteness, Command,
-    CommandQueue, Cooldown, Facing, Health, Position, RecruitmentQueue, Side,
+    nearest_point_within_building, ActionState, Building, BuildingCompleteness,
+    CheeseGuyserBuiltOn, Command, CommandQueue, Cooldown, Facing, Health, Position,
+    RecruitmentQueue, Side,
 };
 use crate::assets::ModelAnimations;
 use crate::resources::{CheeseCoins, DeltaTime, PlayerSide};
-use legion::{component, systems::CommandBuffer, world::SubWorld, Entity, IntoQuery};
+use legion::{component, systems::CommandBuffer, world::SubWorld, Entity, EntityStore, IntoQuery};
 
 #[legion::system(for_each)]
 #[filter(component::<Position>())]
@@ -77,11 +78,17 @@ pub fn progress_recruitment_queue(
     building_position: &Position,
     building: &Building,
     recruitment_queue: &mut RecruitmentQueue,
+    completeness: &BuildingCompleteness,
     side: &Side,
     #[resource] animations: &ModelAnimations,
     #[resource] delta_time: &DeltaTime,
     buffer: &mut CommandBuffer,
 ) {
+    // Todo: a `Complete` tag would be nice.
+    if completeness.0 != building.stats().max_health {
+        return;
+    }
+
     if let Some(unit) = recruitment_queue.queue.front().cloned() {
         let recruitment_time = unit.stats().recruitment_time;
         recruitment_queue.progress += delta_time.0;
@@ -114,5 +121,19 @@ pub fn progress_recruitment_queue(
         // If a unit just finished off the queue and there are no more units in the queue,
         // we don't want to keep the carry-over progress from the last unit around.
         recruitment_queue.progress = 0.0;
+    }
+}
+
+#[legion::system(for_each)]
+// I think we need this :^(
+#[read_component(Position)]
+pub fn free_up_cheese_guysers(
+    entity: &Entity,
+    built_on: &CheeseGuyserBuiltOn,
+    buffer: &mut CommandBuffer,
+    world: &SubWorld,
+) {
+    if world.entry_ref(built_on.pump).is_err() {
+        buffer.remove_component::<CheeseGuyserBuiltOn>(*entity);
     }
 }

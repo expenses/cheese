@@ -24,20 +24,26 @@ pub fn render_building_plan(
     #[resource] cheese_coins: &CheeseCoins,
     #[resource] model_buffers: &mut ModelBuffers,
 ) {
-    if let CommandMode::Construct(building) = rts_controls.mode {
-        let colour = if building.stats().cost <= cheese_coins.0 {
-            Vec4::new(0.0, 1.0, 0.0, 0.25)
+    let allowed = Vec4::new(0.0, 1.0, 0.0, 0.25);
+    let not_allowed = Vec4::new(1.0, 0.25, 0.0, 1.0 / 2.5);
+    let cant_afford = Vec4::new(1.0, 0.0, 0.0, 1.0 / 3.0);
+
+    if let CommandMode::Construct { building } = rts_controls.mode {
+        let colour = if building.stats().cost > cheese_coins.0 {
+            cant_afford
+        } else if building == Building::Pump && ray_cast_location.snapped_to_guyser.is_none() {
+            not_allowed
         } else {
-            Vec4::new(1.0, 0.0, 0.0, 1.0 / 3.0)
+            allowed
         };
 
         model_buffers.building_plan.set(
             building,
             ModelInstance {
                 transform: Mat4::from_translation(Vec3::new(
-                    ray_cast_location.0.x,
+                    ray_cast_location.pos.x,
                     0.0,
-                    ray_cast_location.0.y,
+                    ray_cast_location.pos.y,
                 )),
                 flat_colour: colour,
             },
@@ -247,7 +253,7 @@ pub fn render_recruitment_waypoints(
     let waypoint = recruitment_queue.waypoint;
 
     model_buffers.command_indicators.push(ModelInstance {
-        transform: Mat4::from_translation(Vec3::new(waypoint.x, 0.01, waypoint.y)),
+        transform: Mat4::from_translation(Vec3::new(waypoint.x, 0.02, waypoint.y)),
         flat_colour: colour,
     });
 
@@ -257,7 +263,7 @@ pub fn render_recruitment_waypoints(
     let scale = vector.mag();
 
     model_buffers.command_paths.push(ModelInstance {
-        transform: Mat4::from_translation(Vec3::new(center.x, 0.005, center.y))
+        transform: Mat4::from_translation(Vec3::new(center.x, 0.01, center.y))
             * Mat4::from_rotation_y(rotation)
             * Mat4::from_nonuniform_scale(Vec3::new(scale, 1.0, 1.0)),
         flat_colour: colour,
@@ -330,7 +336,7 @@ pub fn render_command_paths(
 
         if let Some(position) = position {
             model_buffers.command_indicators.push(ModelInstance {
-                transform: Mat4::from_translation(Vec3::new(position.x, 0.01, position.y)),
+                transform: Mat4::from_translation(Vec3::new(position.x, 0.02, position.y)),
                 flat_colour: colour,
             });
 
@@ -340,7 +346,7 @@ pub fn render_command_paths(
             let scale = vector.mag();
 
             model_buffers.command_paths.push(ModelInstance {
-                transform: Mat4::from_translation(Vec3::new(center.x, 0.005, center.y))
+                transform: Mat4::from_translation(Vec3::new(center.x, 0.01, center.y))
                     * Mat4::from_rotation_y(rotation)
                     * Mat4::from_nonuniform_scale(Vec3::new(scale, 1.0, 1.0)),
                 flat_colour: colour,
@@ -428,7 +434,7 @@ pub fn render_unit_under_cursor(
 }
 
 fn unit_under_cursor(ray_cast_location: &RayCastLocation, world: &SubWorld) -> Option<(Vec2, f32)> {
-    let position = ray_cast_location.0;
+    let position = ray_cast_location.pos;
 
     <(&Position, &Radius)>::query()
         .iter(world)
@@ -446,17 +452,18 @@ pub fn render_abilities(
     #[resource] selected_units_abilities: &SelectedUnitsAbilities,
 ) {
     let dims = screen_dimensions.as_vec();
+    let dpi = dpi_scaling.0;
     let ability_size = 64.0 * 1.5;
-
     let gap = 10.0;
     let border = 2.0;
 
-    let offset = selected_units_abilities.0.len() as f32 * ((ability_size + gap) / 2.0);
+    let offset =
+        (selected_units_abilities.0.len() as f32 - 1.0) * ((ability_size + gap) * dpi / 2.0);
 
     let position = |i| {
         Vec2::new(
-            (dims.x as f32 / 2.0) - offset + (i as f32 * (ability_size + gap)),
-            dims.y as f32 - ability_size / 2.0 - (gap - border),
+            (dims.x as f32 / 2.0) - offset + (i as f32 * (ability_size + gap) * dpi),
+            dims.y as f32 - (ability_size / 2.0 + gap - border) * dpi,
         )
     };
 
@@ -485,7 +492,7 @@ pub fn render_abilities(
         let nudge = Vec2::new(2.0, -2.0);
 
         text_buffer.render_text(
-            position(i) - Vec2::new(ability_size, ability_size) / 2.0 + nudge,
+            position(i) - (Vec2::new(ability_size, ability_size) / 2.0 - nudge) * dpi,
             &format!("{:?}", ability.hotkey),
             Font::Ui,
             1.0,
@@ -504,7 +511,7 @@ pub fn render_abilities(
             let nudge = Vec2::new(-2.0, -2.0);
 
             text_buffer.render_text(
-                position(i) - Vec2::new(-ability_size, ability_size) / 2.0 + nudge,
+                position(i) - (Vec2::new(-ability_size, ability_size) / 2.0 - nudge) * dpi,
                 &format!("{}", cost),
                 Font::Ui,
                 1.0,

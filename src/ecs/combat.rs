@@ -84,6 +84,7 @@ pub fn apply_bullets(
 }
 
 #[legion::system(for_each)]
+#[read_component(Building)]
 pub fn handle_damaged(
     entity: &Entity,
     damaged: &DamagedThisTick,
@@ -93,6 +94,7 @@ pub fn handle_damaged(
     map_handle: Option<&MapHandle>,
     buffer: &mut CommandBuffer,
     #[resource] map: &mut Map,
+    world: &SubWorld,
 ) {
     health.0 = health.0.saturating_sub(2);
 
@@ -108,7 +110,15 @@ pub fn handle_damaged(
 
     // If the unit is idle and got attacked, go attack back!
     if let Some(commands) = commands {
-        if commands.0.is_empty() {
+        let is_attaching_building = commands.0.front()
+            .map(|command| match command {
+                Command::Attack { target, explicit: false, .. } => {
+                    <&Building>::query().get(world, *target).is_ok()
+                },
+                _ => false,
+            }).unwrap_or(false);
+
+        if commands.0.is_empty() || is_attaching_building {
             commands.0.push_front(Command::new_attack(damaged.0, false));
         }
     }
