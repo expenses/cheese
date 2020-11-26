@@ -4,6 +4,7 @@ mod ecs;
 mod pathfinding;
 mod renderer;
 mod resources;
+mod scenarios;
 mod titlescreen;
 
 use crate::assets::Assets;
@@ -82,49 +83,9 @@ async fn run() -> anyhow::Result<()> {
         render_context.window.scale_factor().round() as f32
     ));
 
-    let mut command_buffer = legion::systems::CommandBuffer::new(&world);
-
-    ecs::Unit::Engineer.add_to_world(
-        &mut command_buffer,
-        Some(&animations),
-        Vec2::new(0.0, 0.0),
-        ecs::Facing(0.0),
-        ecs::Side::Green,
-        None,
-    );
-
-    ecs::Unit::Engineer.add_to_world(
-        &mut command_buffer,
-        Some(&animations),
-        Vec2::new(1.0, 1.0),
-        ecs::Facing(0.0),
-        ecs::Side::Green,
-        None,
-    );
-
-    ecs::Unit::MouseMarine.add_to_world(
-        &mut command_buffer,
-        Some(&animations),
-        Vec2::new(20.0, 0.0),
-        ecs::Facing(0.0),
-        ecs::Side::Purple,
-        None,
-    );
-
-    command_buffer.flush(&mut world);
-    drop(command_buffer);
-
     let mut map = pathfinding::Map::new();
 
-    for _ in 0..10 {
-        world.push((
-            ecs::Position(Vec2::new(
-                rng.gen_range(-100.0, 100.0),
-                rng.gen_range(-100.0, 100.0),
-            )),
-            ecs::CheeseGuyser,
-        ));
-    }
+    scenarios::one(&mut world, &animations, &mut map, &mut rng);
 
     resources.insert(animations);
     resources.insert(map);

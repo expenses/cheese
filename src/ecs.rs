@@ -201,7 +201,7 @@ pub struct Abilities(pub Vec<&'static Ability>);
 
 pub struct CheeseGuyser;
 pub struct CheeseGuyserBuiltOn {
-    pump: Entity,
+    pub pump: Entity,
 }
 
 #[derive(Debug)]
