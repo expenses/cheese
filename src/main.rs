@@ -14,8 +14,8 @@ use crate::renderer::{
 };
 use crate::resources::{
     Camera, CameraControls, CheeseCoins, ControlGroups, CursorIcon, DebugControls, DeltaTime,
-    DpiScaling, Gravity, Keypress, Keypresses, Mode, MouseState, PlayerSide, RayCastLocation,
-    RtsControls, ScreenDimensions, SelectedUnitsAbilities,
+    DpiScaling, Gravity, Keypress, Keypresses, Mode, MouseState, PlayerSide, PlayingState,
+    RayCastLocation, RtsControls, ScreenDimensions, SelectedUnitsAbilities,
 };
 use legion::*;
 use rand::SeedableRng;
@@ -53,6 +53,10 @@ async fn run() -> anyhow::Result<()> {
     let titlescreen_buffer = TitlescreenBuffer::new(render_context.device(), &mut rng);
 
     let mut world = World::default();
+    let mut map = pathfinding::Map::new();
+
+    let objectives = scenarios::one(&mut world, &animations, &mut map, &mut rng);
+
     let mut resources = Resources::default();
     resources.insert(model_buffers);
     resources.insert(torus_buffer);
@@ -82,14 +86,11 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(DpiScaling(
         render_context.window.scale_factor().round() as f32
     ));
-
-    let mut map = pathfinding::Map::new();
-
-    scenarios::one(&mut world, &animations, &mut map, &mut rng);
-
     resources.insert(animations);
     resources.insert(map);
     resources.insert(rng);
+    resources.insert(objectives);
+    resources.insert(PlayingState::InProgress);
 
     let mut titlescreen_schedule = titlescreen::titlescreen_schedule();
 

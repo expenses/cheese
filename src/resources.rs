@@ -255,3 +255,21 @@ pub struct Keypress {
 
 #[derive(Default)]
 pub struct Keypresses(pub Vec<Keypress>);
+
+#[derive(Debug)]
+pub enum Objective {
+    BuildN(u8, ecs::Building),
+    DestroyAll,
+    DontLetAllUnitsDie,
+    DontLetAllUnitsAndStructuresDie,
+}
+
+#[derive(Debug)]
+pub struct Objectives(pub Vec<Objective>);
+
+#[derive(Debug)]
+pub enum PlayingState {
+    Won,
+    Lost,
+    InProgress,
+}

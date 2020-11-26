@@ -5,7 +5,8 @@ use crate::renderer::{
     TorusInstance,
 };
 use crate::resources::{
-    CheeseCoins, CommandMode, CursorIcon, DpiScaling, RayCastLocation, SelectedUnitsAbilities,
+    CheeseCoins, CommandMode, CursorIcon, DpiScaling, Objectives, PlayingState, RayCastLocation,
+    SelectedUnitsAbilities,
 };
 use ultraviolet::Vec4;
 
@@ -211,10 +212,14 @@ pub fn render_ui(
     #[resource] cheese_coins: &CheeseCoins,
     #[resource] text_buffer: &mut TextBuffer,
     #[resource] player_side: &PlayerSide,
+    #[resource] objectives: &Objectives,
+    #[resource] playing_state: &PlayingState,
     world: &SubWorld,
 ) {
     let coins = std::iter::once(format!("Cheese coins: {}\n", cheese_coins.0));
     let mode = std::iter::once(format!("Mode: {:?}\n", rts_controls.mode));
+    let objectives = std::iter::once(format!("Objectives: {:?}\n", objectives));
+    let playing_state = std::iter::once(format!("State: {:?}\n", playing_state));
 
     let mut query = <(&RecruitmentQueue, &Side)>::query();
     let queue_infos = query
@@ -222,7 +227,12 @@ pub fn render_ui(
         .filter(|(_, side)| **side == player_side.0)
         .map(|(queue, _)| format!("Queue progress: {}\n", queue.progress));
 
-    let text: String = coins.chain(mode).chain(queue_infos).collect();
+    let text: String = playing_state
+        .chain(objectives)
+        .chain(coins)
+        .chain(mode)
+        .chain(queue_infos)
+        .collect();
 
     text_buffer.render_text(
         Vec2::new(10.0, 10.0),

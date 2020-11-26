@@ -34,7 +34,8 @@ use controls::{
     cast_ray_system, control_camera_system, handle_control_groups_system,
     handle_drag_selection_system, handle_keypresses_system, handle_left_click_system,
     handle_right_click_system, handle_stop_command_system,
-    remove_dead_entities_from_control_groups_system, update_selected_units_abilities_system,
+    remove_dead_entities_from_control_groups_system, update_playing_state_system,
+    update_selected_units_abilities_system,
 };
 use debugging::{
     debug_select_box_system, debug_specific_path_system, render_building_grid_system,
@@ -114,7 +115,8 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(firing_system())
         .add_system(apply_bullets_system())
         .flush()
-        .add_system(handle_damaged_system());
+        .add_system(handle_damaged_system())
+        .add_system(update_playing_state_system());
 }
 
 pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {

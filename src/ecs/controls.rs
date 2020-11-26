@@ -1,8 +1,8 @@
 use super::*;
 use crate::assets::ModelAnimations;
 use crate::resources::{
-    CheeseCoins, CommandMode, ControlGroups, Keypress, Keypresses, RayCastLocation,
-    SelectedUnitsAbilities,
+    CheeseCoins, CommandMode, ControlGroups, Keypress, Keypresses, Objective, Objectives,
+    PlayingState, RayCastLocation, SelectedUnitsAbilities,
 };
 
 #[legion::system]
@@ -611,6 +611,64 @@ fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {
         .for_each(world, |entity| {
             commands.remove_component::<Selected>(*entity)
         });
+}
+
+#[legion::system]
+#[read_component(Side)]
+#[read_component(Building)]
+#[read_component(BuildingCompleteness)]
+pub fn update_playing_state(
+    #[resource] objectives: &Objectives,
+    #[resource] player_side: &PlayerSide,
+    #[resource] playing_state: &mut PlayingState,
+    world: &SubWorld,
+) {
+    for objective in objectives.0.iter() {
+        match objective {
+            Objective::DestroyAll => {
+                let all_destroyed = <&Side>::query()
+                    .iter(world)
+                    .all(|side| *side == player_side.0);
+                if all_destroyed {
+                    *playing_state = PlayingState::Won;
+                    return;
+                }
+            }
+            Objective::BuildN(num, building) => {
+                let num_buildings = <(&Side, &Building, &BuildingCompleteness)>::query()
+                    .iter(world)
+                    .filter(|(side, building_type, completeness)| {
+                        **side == player_side.0
+                            && building == *building_type
+                            && completeness.0 == building.stats().max_health
+                    })
+                    .count();
+                if num_buildings as u8 >= *num {
+                    *playing_state = PlayingState::Won;
+                    return;
+                }
+            }
+            Objective::DontLetAllUnitsDie => {
+                let all_units_dead = <&Side>::query()
+                    .filter(component::<Unit>())
+                    .iter(world)
+                    .all(|side| *side != player_side.0);
+
+                if all_units_dead {
+                    *playing_state = PlayingState::Lost;
+                }
+            }
+            Objective::DontLetAllUnitsAndStructuresDie => {
+                let all_dead = <&Side>::query()
+                    .iter(world)
+                    .all(|side| *side != player_side.0);
+
+                if all_dead {
+                    *playing_state = PlayingState::Lost;
+                }
+            }
+        }
+    }
 }
 
 #[test]

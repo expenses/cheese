@@ -1,6 +1,7 @@
 use crate::assets::ModelAnimations;
 use crate::ecs;
 use crate::pathfinding::Map;
+use crate::resources::{Objective, Objectives};
 use legion::systems::CommandBuffer;
 use legion::*;
 use rand::Rng;
@@ -12,7 +13,7 @@ pub fn one(
     animations: &ModelAnimations,
     map: &mut Map,
     rng: &mut rand::rngs::SmallRng,
-) {
+) -> Objectives {
     world.clear();
 
     let mut command_buffer = legion::systems::CommandBuffer::new(&world);
@@ -93,6 +94,8 @@ pub fn one(
         map,
         rng,
     );
+
+    Objectives(vec![Objective::DontLetAllUnitsDie, Objective::DestroyAll])
 }
 
 fn spawn_pump_over_guyser(
@@ -149,5 +152,10 @@ fn two(
     animations: &ModelAnimations,
     map: &mut Map,
     rng: &mut rand::rngs::SmallRng,
-) {
+) -> Objectives {
+    Objectives(vec![
+        Objective::BuildN(2, ecs::Building::Pump),
+        Objective::BuildN(1, ecs::Building::Armoury),
+        Objective::DestroyAll,
+    ])
 }
