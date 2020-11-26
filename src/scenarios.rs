@@ -144,4 +144,10 @@ fn spawn_units_in_circle(
 }
 
 // Single engineer has to build a base.
-fn two(world: &mut World) {}
+fn two(
+    world: &mut World,
+    animations: &ModelAnimations,
+    map: &mut Map,
+    rng: &mut rand::rngs::SmallRng,
+) {
+}

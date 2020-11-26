@@ -30,12 +30,6 @@ impl Map {
         };
 
         this.insert(Vec2::new(0.0, 0.0), Vec2::new(200.0, 200.0));
-        /*let a = this.dlt.insert(Point2::new(-25.0, 50.0));
-        let b = this.dlt.insert(Point2::new(-25.0, 100.0));
-        let c = this.dlt.insert(Point2::new(-22.5, 100.0));
-        this.dlt.add_constraint(a, b);
-        this.dlt.add_constraint(a, c);*/
-
         this
     }
 

@@ -65,9 +65,8 @@ pub fn cleanup_controls(
     #[resource] debug_controls: &mut DebugControls,
     #[resource] delta_time: &DeltaTime,
 ) {
-    let position = mouse_state.position;
-    mouse_state.left_state.update(position, delta_time.0);
-    mouse_state.right_state.update(position, delta_time.0);
+    mouse_state.left_state.update(delta_time.0);
+    mouse_state.right_state.update(delta_time.0);
 
     rts_controls.stop_pressed = false;
 

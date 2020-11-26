@@ -18,7 +18,7 @@ use crate::resources::{
     RtsControls, ScreenDimensions, SelectedUnitsAbilities,
 };
 use legion::*;
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use ultraviolet::{Mat4, Vec2, Vec3};
 use winit::{
     dpi::PhysicalPosition,
@@ -106,7 +106,6 @@ async fn run() -> anyhow::Result<()> {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::Resized(size) => {
                     render_context.resize(size.width as u32, size.height as u32);
-                    lines_pipeline.resize(&render_context, size.width as u32, size.height as u32);
                     resources.insert(ScreenDimensions {
                         width: size.width as u32,
                         height: size.height as u32,
@@ -584,5 +583,4 @@ fn render_playing<'a>(
 
     // Render 2D items.
     lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
-    //lines_pipeline.render_hud(&mut render_pass, &assets);
 }

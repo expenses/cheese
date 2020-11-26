@@ -1,21 +1,14 @@
 use super::{colour_state_descriptor, DynamicBuffer, RenderContext, DEPTH_FORMAT, INDEX_FORMAT};
 use crate::assets::Assets;
 use ultraviolet::{Vec2, Vec3};
-use wgpu::util::DeviceExt;
 
 pub struct LinesPipeline {
     bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
-    hud_buffer: wgpu::Buffer,
 }
 
 impl LinesPipeline {
     pub fn new(context: &RenderContext, assets: &Assets) -> Self {
-        let dimensions = context.window.inner_size();
-        let width = dimensions.width;
-        let height = dimensions.height;
-        let sampler = &context.sampler;
-
         let bind_group_layout =
             context
                 .device
@@ -54,7 +47,7 @@ impl LinesPipeline {
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
-                        resource: wgpu::BindingResource::Sampler(sampler),
+                        resource: wgpu::BindingResource::Sampler(&context.sampler),
                     },
                 ],
             });
@@ -107,36 +100,11 @@ impl LinesPipeline {
             alpha_to_coverage_enabled: false,
         });
 
-        let hud_buffer = context
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Cheese line hud buffer"),
-                contents: bytemuck::cast_slice(&generate_hud_vertices(width, height)),
-                usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
-            });
-
         Self {
             bind_group,
             pipeline,
-            hud_buffer,
         }
     }
-
-    pub fn resize(&self, context: &RenderContext, width: u32, height: u32) {
-        context.queue.write_buffer(
-            &self.hud_buffer,
-            0,
-            bytemuck::cast_slice(&generate_hud_vertices(width, height)),
-        );
-    }
-
-    /*pub fn render_hud<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, assets: &'a Assets) {
-        render_pass.set_pipeline(&self.pipeline);
-        render_pass.set_bind_group(0, &self.bind_group, &[]);
-        render_pass.set_bind_group(1, &assets.misc_texture, &[]);
-        render_pass.set_vertex_buffer(0, self.hud_buffer.slice(..));
-        render_pass.draw(0..6, 0..1);
-    }*/
 
     pub fn render<'a>(
         &'a self,
@@ -374,34 +342,4 @@ impl Vertex {
             } as i32,
         }
     }
-}
-
-fn generate_hud_vertices(screen_width: u32, screen_height: u32) -> [Vertex; 6] {
-    let vertex = |x, y, u, v| Vertex {
-        position: Vec2::new(x as f32, y as f32),
-        uv: Vec2::new(u as f32, v),
-        colour: Vec3::new(0.0, 0.0, 0.0),
-        mode: Mode::Textured as i32,
-    };
-
-    let screen_height = screen_height as f32;
-    // The hud is a 64px x 8px image
-    let hud_height = screen_width as f32 / 8.0;
-    let hud_top = screen_height - hud_height;
-
-    let offset = (64.0 - 8.0) / 64.0;
-
-    let top_left = vertex(0, hud_top, 0, offset);
-    let top_right = vertex(screen_width, hud_top, 1, offset);
-    let bottom_left = vertex(0, screen_height, 0, 1.0);
-    let bottom_right = vertex(screen_width, screen_height, 1, 1.0);
-
-    [
-        top_left,
-        top_right,
-        bottom_left,
-        top_right,
-        bottom_left,
-        bottom_right,
-    ]
 }

@@ -164,7 +164,7 @@ impl Default for MouseButtonState {
 }
 
 impl MouseButtonState {
-    pub fn update(&mut self, mouse: Vec2, delta_time: f32) {
+    pub fn update(&mut self, delta_time: f32) {
         match *self {
             Self::Clicked => *self = Self::Up,
             Self::Down(ref mut time_down, start) => {
