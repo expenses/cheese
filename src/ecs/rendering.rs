@@ -446,17 +446,17 @@ pub fn render_abilities(
     #[resource] selected_units_abilities: &SelectedUnitsAbilities,
 ) {
     let dims = screen_dimensions.as_vec();
+    let dpi = dpi_scaling.0;
     let ability_size = 64.0 * 1.5;
-
     let gap = 10.0;
     let border = 2.0;
 
-    let offset = selected_units_abilities.0.len() as f32 * ((ability_size + gap) / 2.0);
+    let offset = (selected_units_abilities.0.len() as f32 - 1.0) * ((ability_size + gap) * dpi / 2.0);
 
     let position = |i| {
         Vec2::new(
-            (dims.x as f32 / 2.0) - offset + (i as f32 * (ability_size + gap)),
-            dims.y as f32 - ability_size / 2.0 - (gap - border),
+            (dims.x as f32 / 2.0) - offset + (i as f32 * (ability_size + gap) * dpi),
+            dims.y as f32 - (ability_size / 2.0 + gap - border) * dpi,
         )
     };
 
@@ -485,7 +485,7 @@ pub fn render_abilities(
         let nudge = Vec2::new(2.0, -2.0);
 
         text_buffer.render_text(
-            position(i) - Vec2::new(ability_size, ability_size) / 2.0 + nudge,
+            position(i) - (Vec2::new(ability_size, ability_size) / 2.0 - nudge) * dpi,
             &format!("{:?}", ability.hotkey),
             Font::Ui,
             1.0,
@@ -504,7 +504,7 @@ pub fn render_abilities(
             let nudge = Vec2::new(-2.0, -2.0);
 
             text_buffer.render_text(
-                position(i) - Vec2::new(-ability_size, ability_size) / 2.0 + nudge,
+                position(i) - (Vec2::new(-ability_size, ability_size) / 2.0 - nudge) * dpi,
                 &format!("{}", cost),
                 Font::Ui,
                 1.0,
