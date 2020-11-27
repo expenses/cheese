@@ -37,7 +37,7 @@ float shadow_calculation() {
     float bias = max(max_bias * (1.0 - dot(normalize(normal), normalize(sun_direction))), min_bias);
 
     float shadow = 0.0;
-    float texel_size = 1.0 / 1024.0;
+    float texel_size = 1.0 / textureSize(sampler2D(shadow_map, u_depth_sampler), 0);
     for (int x =  -1; x <= 1; x++) {
         for (int y = -1; y <= 1; y++) {
             float depth = texture(sampler2D(shadow_map, u_depth_sampler), uv + vec2(x, y) * texel_size).r;

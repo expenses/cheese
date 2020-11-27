@@ -279,3 +279,17 @@ pub enum PlayingState {
     Lost,
     InProgress,
 }
+
+pub struct Settings {
+    pub bloom: bool,
+    pub shadow_resolution: u32,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            bloom: true,
+            shadow_resolution: 1024,
+        }
+    }
+}

@@ -1,4 +1,4 @@
-use crate::resources::{Camera, ScreenDimensions};
+use crate::resources::{Camera, ScreenDimensions, Settings};
 use std::sync::Arc;
 use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
@@ -76,7 +76,7 @@ pub struct RenderContext {
 }
 
 impl RenderContext {
-    pub async fn new(event_loop: &EventLoop<()>) -> anyhow::Result<Self> {
+    pub async fn new(event_loop: &EventLoop<()>, settings: &Settings) -> anyhow::Result<Self> {
         let window = WindowBuilder::new()
             .with_title("Cheese (working title)")
             .build(event_loop)?;
@@ -224,8 +224,8 @@ impl RenderContext {
         let shadow_texture = create_texture(
             &device,
             "Cheese shadow texture",
-            1024,
-            1024,
+            settings.shadow_resolution,
+            settings.shadow_resolution,
             DEPTH_FORMAT,
             wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );

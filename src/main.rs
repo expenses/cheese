@@ -17,7 +17,7 @@ use crate::renderer::{
 use crate::resources::{
     Camera, CameraControls, CheeseCoins, ControlGroups, CursorIcon, DebugControls, DeltaTime,
     DpiScaling, Gravity, Keypress, Keypresses, Mode, MouseState, PlayerSide, PlayingState,
-    RayCastLocation, RtsControls, ScreenDimensions, SelectedUnitsAbilities,
+    RayCastLocation, RtsControls, ScreenDimensions, SelectedUnitsAbilities, Settings,
 };
 use legion::*;
 use rand::SeedableRng;
@@ -38,8 +38,9 @@ async fn run() -> anyhow::Result<()> {
     let event_loop = EventLoop::new();
 
     let mut rng = rand::rngs::SmallRng::from_entropy();
+    let mut settings = Settings::default();
 
-    let mut render_context = RenderContext::new(&event_loop).await?;
+    let mut render_context = RenderContext::new(&event_loop, &settings).await?;
     let (assets, animations, command_buffer) = Assets::new(&render_context.device())?;
     render_context.submit(command_buffer);
     let model_pipelines = ModelPipelines::new(&render_context, &assets);
@@ -315,55 +316,57 @@ async fn run() -> anyhow::Result<()> {
 
                     drop(render_pass);
 
-                    // First bloom pass
-                    // todo: setting to disable bloom
+                    if settings.bloom {
+                        // First bloom pass
+                        // todo: setting to disable bloom
 
-                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: &render_context.bloombuffer_after_vertical,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color {
-                                    r: 0.0,
-                                    g: 0.0,
-                                    b: 0.0,
-                                    a: 1.0,
-                                }),
-                                store: true,
-                            },
-                        }],
-                        depth_stencil_attachment: None,
-                    });
+                        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                                attachment: &render_context.bloombuffer_after_vertical,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                                        r: 0.0,
+                                        g: 0.0,
+                                        b: 0.0,
+                                        a: 1.0,
+                                    }),
+                                    store: true,
+                                },
+                            }],
+                            depth_stencil_attachment: None,
+                        });
 
-                    render_pass.set_pipeline(&render_context.bloom_blur_pipeline);
-                    render_pass.set_bind_group(0, &render_context.bloom_first_pass_bind_group, &[]);
-                    render_pass.draw(0..3, 0..1);
+                        render_pass.set_pipeline(&render_context.bloom_blur_pipeline);
+                        render_pass.set_bind_group(0, &render_context.bloom_first_pass_bind_group, &[]);
+                        render_pass.draw(0..3, 0..1);
 
-                    drop(render_pass);
+                        drop(render_pass);
 
-                    // Second bloom pass and composit onto framebuffer
+                        // Second bloom pass and composit onto framebuffer
 
-                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: &render_context.framebuffer,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: true,
-                            },
-                        }],
-                        depth_stencil_attachment: None,
-                    });
+                        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                                attachment: &render_context.framebuffer,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Load,
+                                    store: true,
+                                },
+                            }],
+                            depth_stencil_attachment: None,
+                        });
 
-                    render_pass.set_pipeline(&render_context.bloom_blur_pipeline);
-                    render_pass.set_bind_group(
-                        0,
-                        &render_context.bloom_second_pass_bind_group,
-                        &[],
-                    );
-                    render_pass.draw(0..3, 0..1);
+                        render_pass.set_pipeline(&render_context.bloom_blur_pipeline);
+                        render_pass.set_bind_group(
+                            0,
+                            &render_context.bloom_second_pass_bind_group,
+                            &[],
+                        );
+                        render_pass.draw(0..3, 0..1);
 
-                    drop(render_pass);
+                        drop(render_pass);
+                    }
 
                     // Post-processing pass
 

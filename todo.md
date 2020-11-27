@@ -4,4 +4,3 @@
 - Pyschic units
 - Helmets should increase opacity when in combat
 - Map crevasses
-- Don't tie things to framerate!
