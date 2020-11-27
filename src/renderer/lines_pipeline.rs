@@ -1,8 +1,8 @@
 use super::{colour_state_descriptor, DynamicBuffer, RenderContext, DEPTH_FORMAT, INDEX_FORMAT};
 use crate::assets::Assets;
-use ultraviolet::{Vec2, Vec3};
+use ultraviolet::{Vec2, Vec4};
 
-const WHITE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
+const WHITE: Vec4 = Vec4::new(1.0, 1.0, 1.0, 1.0);
 
 pub struct LinesPipeline {
     bind_group: wgpu::BindGroup,
@@ -94,7 +94,7 @@ impl LinesPipeline {
                 vertex_buffers: &[wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<Vertex>() as u64,
                     step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float2, 1 => Float2, 2 => Float3, 3 => Int],
+                    attributes: &wgpu::vertex_attr_array![0 => Float2, 1 => Float2, 2 => Float4, 3 => Int],
                 }],
             },
             sample_count: 1,
@@ -133,7 +133,7 @@ use lyon_tessellation::{
 };
 
 struct Constructor {
-    colour: Vec3,
+    colour: Vec4,
 }
 
 impl StrokeVertexConstructor<Vertex> for Constructor {
@@ -207,7 +207,7 @@ impl LineBuffers {
         &mut self,
         center: Vec2,
         mut dimensions: Vec2,
-        colour: Vec3,
+        colour: Vec4,
         dpi_scaling: f32,
     ) {
         dimensions *= dpi_scaling;
@@ -322,7 +322,7 @@ enum Mode {
 struct Vertex {
     position: Vec2,
     uv: Vec2,
-    colour: Vec3,
+    colour: Vec4,
     mode: i32,
 }
 
@@ -331,7 +331,7 @@ impl Vertex {
         Self {
             position,
             uv,
-            colour: Vec3::one(),
+            colour: Vec4::one(),
             mode: if greyscale {
                 Mode::Greyscale
             } else {

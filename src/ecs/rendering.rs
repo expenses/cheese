@@ -13,7 +13,7 @@ use ultraviolet::Vec4;
 const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
 const GREEN: Vec3 = Vec3::new(43.0, 140.0, 0.0);
 const PURPLE: Vec3 = Vec3::new(196.0, 0.0, 109.0);
-const BLACK: Vec3 = Vec3::new(0.0, 0.0, 0.0);
+const BLACK: Vec4 = Vec4::new(0.0, 0.0, 0.0, 1.0);
 const WHITE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 
 fn mix(colour_a: Vec3, colour_b: Vec3, factor: f32) -> Vec3 {
@@ -185,7 +185,7 @@ pub fn render_health_bars(
             line_buffers.draw_filled_rect(
                 location,
                 Vec2::new(length, 10.0),
-                Vec3::new(1.0 - health_percentage, health_percentage, 0.0),
+                Vec4::new(1.0 - health_percentage, health_percentage, 0.0, 1.0),
                 dpi_scaling.0,
             );
         }
@@ -218,10 +218,13 @@ pub fn render_ui(
     #[resource] playing_state: &PlayingState,
     world: &SubWorld,
 ) {
+    if *playing_state != PlayingState::InProgress {
+        return;
+    }
+
     let coins = std::iter::once(format!("Cheese coins: {}\n", cheese_coins.0));
     let mode = std::iter::once(format!("Mode: {:?}\n", rts_controls.mode));
     let objectives = std::iter::once(format!("Objectives: {:?}\n", objectives));
-    let playing_state = std::iter::once(format!("State: {:?}\n", playing_state));
 
     let mut query = <(&RecruitmentQueue, &Side)>::query();
     let queue_infos = query
@@ -229,8 +232,7 @@ pub fn render_ui(
         .filter(|(_, side)| **side == player_side.0)
         .map(|(queue, _)| format!("Queue progress: {}\n", queue.progress));
 
-    let text: String = playing_state
-        .chain(objectives)
+    let text: String = objectives
         .chain(coins)
         .chain(mode)
         .chain(queue_infos)
@@ -533,4 +535,37 @@ pub fn render_abilities(
             );
         }
     }
+}
+
+#[legion::system]
+pub fn render_win_lose(
+    #[resource] playing_state: &PlayingState,
+    #[resource] line_buffers: &mut LineBuffers,
+    #[resource] text_buffer: &mut TextBuffer,
+    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] dpi_scaling: &DpiScaling,
+) {
+    if *playing_state == PlayingState::InProgress {
+        return;
+    }
+
+    let screen_dims = screen_dimensions.as_vec();
+
+    line_buffers.draw_filled_rect(
+        screen_dims / 2.0,
+        screen_dims,
+        Vec4::new(0.0, 0.0, 0.0, 0.925),
+        // Don't need DPI if we're just rendering a fullscreen quad.
+        1.0,
+    );
+
+    text_buffer.render_text(
+        Vec2::new(0.5, 0.4) * screen_dims,
+        &format!("Scenario {:?}", playing_state),
+        Font::Title,
+        1.5,
+        dpi_scaling.0,
+        TextAlignment::Center,
+        Vec4::one(),
+    );
 }

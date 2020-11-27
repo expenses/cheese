@@ -270,7 +270,7 @@ pub struct Objectives {
     pub lose_conditions: Vec<LoseCondition>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum PlayingState {
     Won,
     Lost,

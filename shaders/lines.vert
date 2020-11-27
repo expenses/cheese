@@ -2,11 +2,11 @@
 
 layout(location = 0) in vec2 position;
 layout(location = 1) in vec2 uv;
-layout(location = 2) in vec3 colour;
+layout(location = 2) in vec4 colour;
 layout(location = 3) in int mode;
 
 layout(location = 0) out vec2 out_uv;
-layout(location = 1) out vec3 out_colour;
+layout(location = 1) out vec4 out_colour;
 layout(location = 2) out int out_mode;
 
 layout(set = 0, binding = 0) uniform Uniforms {

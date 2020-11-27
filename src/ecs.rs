@@ -56,7 +56,7 @@ use rendering::{
     render_bullets_system, render_command_paths_system, render_drag_box_system,
     render_health_bars_system, render_recruitment_waypoints_system, render_selections_system,
     render_ui_system, render_under_select_box_system, render_unit_under_cursor_system,
-    render_units_system,
+    render_units_system, render_win_lose_system,
 };
 
 #[legion::system]
@@ -142,6 +142,7 @@ pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
         .add_system(render_cheese_droplets_system())
         .add_system(render_abilities_system())
         .add_system(render_recruitment_waypoints_system())
+        .add_system(render_win_lose_system())
         //.add_system(debug_select_box_system())
         //.add_system(debug_specific_path_system())
         // Cleanup
