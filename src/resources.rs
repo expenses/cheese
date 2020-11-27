@@ -265,9 +265,11 @@ pub struct Keypress {
 #[derive(Default)]
 pub struct Keypresses(pub Vec<Keypress>);
 
-#[derive(Debug)]
+#[derive(Debug, derive_more::Display)]
 pub enum WinCondition {
+    #[display(fmt = "Build {} {}", _0, "_1.maybe_plural(*_0)")]
     BuildN(u8, ecs::Building),
+    #[display(fmt = "Destroy all enemies")]
     DestroyAll,
 }
 

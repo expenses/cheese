@@ -76,7 +76,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(Mode::Titlescreen);
     resources.insert(DebugControls::default());
     resources.insert(Gravity(5.0));
-    resources.insert(CheeseCoins(100));
+    resources.insert(CheeseCoins(0));
     resources.insert(SelectedUnitsAbilities::default());
     resources.insert(Keypresses::default());
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
@@ -180,14 +180,32 @@ async fn run() -> anyhow::Result<()> {
                     let mut rng = resources.get_mut::<SmallRng>().unwrap();
                     let mut objectives = resources.get_mut::<Objectives>().unwrap();
                     let mut camera = resources.get_mut::<Camera>().unwrap();
-                    scenarios::one(
-                        &mut world,
-                        &animations,
-                        &mut map,
-                        &mut rng,
-                        &mut objectives,
-                        &mut camera,
-                    );
+                    let mut cheese_coins = resources.get_mut::<CheeseCoins>().unwrap();
+                    match scenario {
+                        1 => {
+                            scenarios::one(
+                                &mut world,
+                                &animations,
+                                &mut map,
+                                &mut rng,
+                                &mut objectives,
+                                &mut camera,
+                                &mut cheese_coins,
+                            );
+                        }
+                        2 => {
+                            scenarios::two(
+                                &mut world,
+                                &animations,
+                                &mut map,
+                                &mut rng,
+                                &mut objectives,
+                                &mut camera,
+                                &mut cheese_coins,
+                            );
+                        }
+                        _ => {}
+                    }
                     // Gotta change both the Mode in resources and the local copy.
                     *resources.get_mut::<Mode>().unwrap() = Mode::Playing;
                     mode = Mode::Playing;

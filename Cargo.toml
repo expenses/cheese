@@ -29,6 +29,7 @@ wgpu = "0.6.0"
 wgpu_glyph = "0.10.0"
 winit = "0.23.0"
 ncollide2d = "0.26.1"
+derive_more = "0.99.11"
 
 [features]
 default = ["multithreading"]

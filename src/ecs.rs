@@ -171,7 +171,7 @@ pub struct Ability {
 impl Ability {
     const BUILD_PUMP: Self = Self {
         ability_type: AbilityType::Build(Building::Pump),
-        hotkey: VirtualKeyCode::P,
+        hotkey: VirtualKeyCode::Q,
     };
 
     const BUILD_ARMOURY: Self = Self {
@@ -362,6 +362,17 @@ pub struct BuildingStats {
 }
 
 impl Building {
+    pub fn maybe_plural(self, number: u8) -> &'static str {
+        let plural = number != 1;
+
+        match self {
+            Self::Pump if plural => "Pumps",
+            Self::Pump => "Pump",
+            Self::Armoury if plural => "Armouries",
+            Self::Armoury => "Armoury",
+        }
+    }
+
     pub fn stats(self) -> BuildingStats {
         match self {
             Self::Armoury => BuildingStats {
