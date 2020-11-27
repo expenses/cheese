@@ -25,7 +25,7 @@ pathfinding = "2.0.4"
 spade = "1.8.2"
 rand = { version = "0.7.3", default-features = false, features = ["small_rng"] }
 ultraviolet = { version = "0.7.5", features = ["bytemuck"] }
-wgpu = "0.6.0"
+wgpu = "0.6.2"
 wgpu_glyph = "0.10.0"
 winit = "0.23.0"
 ncollide2d = "0.26.1"
