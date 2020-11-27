@@ -130,7 +130,7 @@ async fn run() -> anyhow::Result<()> {
                     let pressed = *state == ElementState::Pressed;
                     let mode = resources.get::<Mode>().unwrap();
                     let mut keypresses = resources.get_mut::<Keypresses>().unwrap();
-                    // We only push keypresses in modes that handle them. This is a bit messy.
+                    // We only push keypresses in modes that consume them. This is a bit messy.
                     if matches!(*mode, Mode::Playing | Mode::PlayingMenu) {
                         keypresses.0.push(Keypress {
                             code: *code,
