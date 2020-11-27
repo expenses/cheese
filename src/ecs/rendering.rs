@@ -229,14 +229,19 @@ pub fn render_ui(
 
     let coins = std::iter::once(format!("Cheese coins: {}\n", cheese_coins.0));
     let mode = std::iter::once(format!("Mode: {:?}\n", rts_controls.mode));
-    let objectives = std::iter::once(format!("Objectives:\n")).chain(
-        objectives
-            .win_conditions
-            .iter()
-            .map(|cond| format!("{}\n", cond)),
-    ).chain(
-        objectives.lose_conditions.iter().map(|cond| format!("{}\n", cond))
-    );
+    let objectives = std::iter::once(format!("Objectives:\n"))
+        .chain(
+            objectives
+                .win_conditions
+                .iter()
+                .map(|cond| format!("{}\n", cond)),
+        )
+        .chain(
+            objectives
+                .lose_conditions
+                .iter()
+                .map(|cond| format!("{}\n", cond)),
+        );
 
     let mut query = <(&RecruitmentQueue, &Side)>::query();
     let queue_infos = query
