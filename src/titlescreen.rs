@@ -46,13 +46,16 @@ impl Menu {
 }
 
 pub fn titlescreen_schedule() -> Schedule {
-    Schedule::builder()
+    let mut builder = Schedule::builder();
+
+    builder
         .add_system(update_system())
         .add_system(handle_clicks_system())
-        .add_system(render_text_system())
-        .add_system(render_click_regions_system())
-        .add_system(crate::ecs::cleanup_controls_system())
-        .build()
+        .add_system(render_text_system());
+    //.(render_click_regions_system())
+
+    crate::ecs::add_cleanup_systems(&mut builder);
+    builder.build()
 }
 
 #[derive(Default)]

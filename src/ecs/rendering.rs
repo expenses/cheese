@@ -124,8 +124,13 @@ pub fn render_under_select_box(
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] player_side: &PlayerSide,
     #[resource] torus_buffer: &mut TorusBuffer,
+    #[resource] mode: &Mode,
     world: &SubWorld,
 ) {
+    if *mode != Mode::Playing {
+        return;
+    }
+
     if let Some(start) = mouse_state.left_state.is_being_dragged() {
         let select_box = SelectBox::new(camera, screen_dimensions, start, mouse_state.position);
 
@@ -403,8 +408,13 @@ pub fn render_buildings(
 pub fn render_drag_box(
     #[resource] mouse_state: &MouseState,
     #[resource] dpi_scaling: &DpiScaling,
+    #[resource] mode: &Mode,
     #[resource] line_buffers: &mut LineBuffers,
 ) {
+    if *mode != Mode::Playing {
+        return;
+    }
+
     if let Some(start) = mouse_state.left_state.is_being_dragged() {
         let (top_left, bottom_right) = sort_points(start, mouse_state.position);
         line_buffers.draw_rect(top_left, bottom_right, dpi_scaling.0);

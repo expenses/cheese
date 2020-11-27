@@ -65,7 +65,7 @@ use rendering::{
 };
 
 #[legion::system]
-pub fn cleanup_controls(
+fn cleanup_controls(
     #[resource] mouse_state: &mut MouseState,
     #[resource] rts_controls: &mut RtsControls,
     #[resource] debug_controls: &mut DebugControls,
@@ -158,8 +158,8 @@ pub fn add_cleanup_systems(builder: &mut legion::systems::Builder) {
 pub fn add_playing_menu_systems(builder: &mut legion::systems::Builder) {
     builder
         .add_system(handle_playing_menu_controls_system())
-        .add_system(render_playing_menu_system())
-        .add_system(render_playing_menu_click_regions_system());
+        .add_system(render_playing_menu_system());
+    //.add_system(render_playing_menu_click_regions_system());
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]

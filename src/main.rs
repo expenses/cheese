@@ -102,6 +102,7 @@ async fn run() -> anyhow::Result<()> {
     let mut playing_menu_system = Schedule::builder();
     ecs::add_rendering_systems(&mut playing_menu_system);
     ecs::add_playing_menu_systems(&mut playing_menu_system);
+    ecs::add_cleanup_systems(&mut playing_menu_system);
     let mut playing_menu_system = playing_menu_system.build();
 
     let mut time = std::time::Instant::now();
