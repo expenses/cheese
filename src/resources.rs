@@ -257,15 +257,21 @@ pub struct Keypress {
 pub struct Keypresses(pub Vec<Keypress>);
 
 #[derive(Debug)]
-pub enum Objective {
+pub enum WinCondition {
     BuildN(u8, ecs::Building),
     DestroyAll,
-    DontLetAllUnitsDie,
-    DontLetAllUnitsAndStructuresDie,
 }
 
 #[derive(Debug)]
-pub struct Objectives(pub Vec<Objective>);
+pub enum LoseCondition {
+    LetAllUnitsDie,
+}
+
+#[derive(Debug)]
+pub struct Objectives {
+    pub win_conditions: Vec<WinCondition>,
+    pub lose_conditions: Vec<LoseCondition>,
+}
 
 #[derive(Debug)]
 pub enum PlayingState {

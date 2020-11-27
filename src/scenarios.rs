@@ -1,7 +1,7 @@
 use crate::assets::ModelAnimations;
 use crate::ecs;
 use crate::pathfinding::Map;
-use crate::resources::{Objective, Objectives};
+use crate::resources::{WinCondition, LoseCondition, Objectives};
 use legion::systems::CommandBuffer;
 use legion::*;
 use rand::Rng;
@@ -95,7 +95,10 @@ pub fn one(
         rng,
     );
 
-    Objectives(vec![Objective::DontLetAllUnitsDie, Objective::DestroyAll])
+    Objectives {
+        win_conditions: vec![WinCondition::DestroyAll],
+        lose_conditions: vec![LoseCondition::LetAllUnitsDie],
+    }
 }
 
 fn spawn_pump_over_guyser(
@@ -153,9 +156,12 @@ fn two(
     map: &mut Map,
     rng: &mut rand::rngs::SmallRng,
 ) -> Objectives {
-    Objectives(vec![
-        Objective::BuildN(2, ecs::Building::Pump),
-        Objective::BuildN(1, ecs::Building::Armoury),
-        Objective::DestroyAll,
-    ])
+    Objectives {
+        win_conditions: vec![
+            WinCondition::DestroyAll,
+            WinCondition::BuildN(2, ecs::Building::Pump),
+            WinCondition::BuildN(1, ecs::Building::Armoury)
+        ],
+        lose_conditions: vec![LoseCondition::LetAllUnitsDie],
+    }
 }
