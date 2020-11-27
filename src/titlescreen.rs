@@ -17,6 +17,8 @@ const MOON_POSITION: Vec3 = Vec3::new(-1.5, 0.0, 3.0);
 
 const MAIN_MENU: &'static [(&'static str, Vec2)] = &[
     ("Scenarios", Vec2::new(0.3, 3.5 / 6.0)),
+    // No quitting for you!
+    #[cfg(not(feature = "wasm"))]
     ("Quit", Vec2::new(0.3, 4.0 / 6.0)),
 ];
 

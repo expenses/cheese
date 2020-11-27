@@ -398,6 +398,25 @@ async fn run() -> anyhow::Result<()> {
                         drop(render_pass);
                     }
 
+                    // Text rendering pass
+
+                    let size = render_context.window.inner_size();
+                    let mut staging_belt = wgpu::util::StagingBelt::new(10);
+
+                    text_buffer
+                        .glyph_brush
+                        .draw_queued(
+                            &render_context.device,
+                            &mut staging_belt,
+                            &mut encoder,
+                            &render_context.framebuffer,
+                            size.width,
+                            size.height,
+                        )
+                        .unwrap();
+
+                    // Post-processing pass
+
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                             attachment: &frame.output.view,
@@ -424,23 +443,6 @@ async fn run() -> anyhow::Result<()> {
                     render_pass.draw(0..3, 0..1);
 
                     drop(render_pass);
-
-                    // Text rendering pass
-
-                    let size = render_context.window.inner_size();
-                    let mut staging_belt = wgpu::util::StagingBelt::new(10);
-
-                    text_buffer
-                        .glyph_brush
-                        .draw_queued(
-                            &render_context.device,
-                            &mut staging_belt,
-                            &mut encoder,
-                            &frame.output.view,
-                            size.width,
-                            size.height,
-                        )
-                        .unwrap();
 
                     staging_belt.finish();
 
