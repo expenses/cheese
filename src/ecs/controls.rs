@@ -1,8 +1,8 @@
 use super::*;
 use crate::assets::ModelAnimations;
 use crate::resources::{
-    CheeseCoins, CommandMode, ControlGroups, Keypress, Keypresses, RayCastLocation,
-    SelectedUnitsAbilities,
+    CheeseCoins, CommandMode, ControlGroups, Keypress, Keypresses, LoseCondition, Objectives,
+    PlayingState, RayCastLocation, SelectedUnitsAbilities, WinCondition,
 };
 
 #[legion::system]
@@ -121,8 +121,9 @@ pub fn control_camera(
     #[resource] camera_controls: &mut CameraControls,
     #[resource] mouse_state: &MouseState,
     #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] delta_time: &DeltaTime,
 ) {
-    let speed = 0.5;
+    let speed = 30.0 * delta_time.0;
 
     let edge_thickness = 50.0;
     let &ScreenDimensions {
@@ -152,6 +153,9 @@ pub fn control_camera(
     if camera_controls.down || mouse_y > screen_height - edge_thickness {
         camera.looking_at -= forwards;
     }
+
+    camera.looking_at.x = camera.looking_at.x.min(100.0).max(-100.0);
+    camera.looking_at.y = camera.looking_at.y.min(100.0).max(-100.0);
 
     camera.distance = (camera.distance - camera_controls.zoom_delta * 0.01)
         .max(5.0)
@@ -607,6 +611,63 @@ fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {
         .for_each(world, |entity| {
             commands.remove_component::<Selected>(*entity)
         });
+}
+
+#[legion::system]
+#[read_component(Side)]
+#[read_component(Building)]
+#[read_component(BuildingCompleteness)]
+pub fn update_playing_state(
+    #[resource] objectives: &Objectives,
+    #[resource] player_side: &PlayerSide,
+    #[resource] playing_state: &mut PlayingState,
+    world: &SubWorld,
+) {
+    let won = objectives
+        .win_conditions
+        .iter()
+        .all(|condition| match condition {
+            WinCondition::DestroyAll => {
+                let all_destroyed = <&Side>::query()
+                    .iter(world)
+                    .all(|side| *side == player_side.0);
+                all_destroyed
+            }
+            WinCondition::BuildN(num, building) => {
+                let num_buildings = <(&Side, &Building, &BuildingCompleteness)>::query()
+                    .iter(world)
+                    .filter(|(side, building_type, completeness)| {
+                        **side == player_side.0
+                            && building == *building_type
+                            && completeness.0 == building.stats().max_health
+                    })
+                    .count();
+                num_buildings as u8 >= *num
+            }
+        });
+
+    if won {
+        *playing_state = PlayingState::Won;
+        return;
+    }
+
+    let lost = objectives
+        .lose_conditions
+        .iter()
+        .any(|condition| match condition {
+            LoseCondition::LetAllUnitsDie => {
+                let all_units_dead = <&Side>::query()
+                    .filter(component::<Unit>())
+                    .iter(world)
+                    .all(|side| *side != player_side.0);
+
+                all_units_dead
+            }
+        });
+
+    if lost {
+        *playing_state = PlayingState::Lost;
+    }
 }
 
 #[test]

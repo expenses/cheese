@@ -1,3 +1,5 @@
+#![allow(clippy::float_cmp)]
+
 mod animation;
 mod assets;
 mod ecs;
@@ -14,13 +16,13 @@ use crate::renderer::{
 };
 use crate::resources::{
     Camera, CameraControls, CheeseCoins, ControlGroups, CursorIcon, DebugControls, DeltaTime,
-    DpiScaling, Gravity, Keypress, Keypresses, Mode, MouseState, PlayerSide, RayCastLocation,
-    RtsControls, ScreenDimensions, SelectedUnitsAbilities,
+    DpiScaling, Gravity, Keypress, Keypresses, Mode, MouseState, Objectives, PlayerSide,
+    PlayingState, RayCastLocation, RtsControls, ScreenDimensions, SelectedUnitsAbilities, Settings,
 };
 use futures::FutureExt;
 use legion::*;
-use rand::{Rng, SeedableRng};
-use ultraviolet::{Mat4, Vec2, Vec3};
+use rand::{rngs::SmallRng, SeedableRng};
+use ultraviolet::Vec2;
 use winit::{
     dpi::PhysicalPosition,
     event::{ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, WindowEvent},
@@ -46,9 +48,10 @@ fn main() -> anyhow::Result<()> {
 async fn run() -> anyhow::Result<()> {
     let event_loop = EventLoop::new();
 
-    let mut rng = rand::rngs::SmallRng::from_entropy();
+    let mut rng = SmallRng::from_entropy();
+    let settings = Settings::default();
 
-    let mut render_context = RenderContext::new(&event_loop).await?;
+    let mut render_context = RenderContext::new(&event_loop, &settings).await?;
     let (assets, animations, command_buffer) = Assets::new(&render_context.device())?;
     render_context.submit(command_buffer);
     let model_pipelines = ModelPipelines::new(&render_context, &assets);
@@ -80,7 +83,8 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(PlayerSide(ecs::Side::Green));
     resources.insert(ControlGroups::default());
     resources.insert(titlescreen::TitlescreenMoon::default());
-    resources.insert(Mode::Playing);
+    resources.insert(titlescreen::Menu::Main);
+    resources.insert(Mode::Titlescreen);
     resources.insert(DebugControls::default());
     resources.insert(Gravity(5.0));
     resources.insert(CheeseCoins(100));
@@ -93,14 +97,11 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(DpiScaling(
         render_context.window.scale_factor().round() as f32
     ));
-
-    let mut map = pathfinding::Map::new();
-
-    scenarios::one(&mut world, &animations, &mut map, &mut rng);
-
     resources.insert(animations);
-    resources.insert(map);
+    resources.insert(pathfinding::Map::new());
     resources.insert(rng);
+    resources.insert(PlayingState::InProgress);
+    resources.insert(Objectives::default());
 
     let mut titlescreen_schedule = titlescreen::titlescreen_schedule();
 
@@ -117,7 +118,6 @@ async fn run() -> anyhow::Result<()> {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::Resized(size) => {
                     render_context.resize(size.width as u32, size.height as u32);
-                    lines_pipeline.resize(&render_context, size.width as u32, size.height as u32);
                     resources.insert(ScreenDimensions {
                         width: size.width as u32,
                         height: size.height as u32,
@@ -173,12 +173,32 @@ async fn run() -> anyhow::Result<()> {
                 resources.insert(DeltaTime(1.0 / 60.0));
                 resources.insert(CursorIcon(winit::window::CursorIcon::default()));
 
-                let mode = *resources.get::<Mode>().unwrap();
+                let mut mode: Mode = *resources.get_mut::<Mode>().unwrap();
+
+                if let Mode::StartScenario(scenario) = mode {
+                    let animations = resources.get::<assets::ModelAnimations>().unwrap();
+                    let mut map = resources.get_mut::<pathfinding::Map>().unwrap();
+                    let mut rng = resources.get_mut::<SmallRng>().unwrap();
+                    let mut objectives = resources.get_mut::<Objectives>().unwrap();
+                    let mut camera = resources.get_mut::<Camera>().unwrap();
+                    scenarios::one(
+                        &mut world,
+                        &animations,
+                        &mut map,
+                        &mut rng,
+                        &mut objectives,
+                        &mut camera,
+                    );
+                    // Gotta change both the Mode in resources and the local copy.
+                    *resources.get_mut::<Mode>().unwrap() = Mode::Playing;
+                    mode = Mode::Playing;
+                }
 
                 match mode {
                     Mode::Playing => schedule.execute(&mut world, &mut resources),
                     Mode::Titlescreen => titlescreen_schedule.execute(&mut world, &mut resources),
                     Mode::Quit => *control_flow = ControlFlow::Exit,
+                    Mode::StartScenario(_) => unreachable!(),
                 }
 
                 let cursor_icon = resources.get::<CursorIcon>().unwrap();
@@ -202,11 +222,7 @@ async fn run() -> anyhow::Result<()> {
                         render_context.update_from_camera(&camera);
                     }
                     Mode::Titlescreen => {
-                        render_context.update_view(Mat4::look_at(
-                            Vec3::zero(),
-                            titlescreen::MOON_POSITION,
-                            Vec3::new(0.0, 1.0, 0.0),
-                        ));
+                        render_context.update_view(titlescreen::camera_view());
                     }
                     _ => {}
                 }
@@ -319,60 +335,68 @@ async fn run() -> anyhow::Result<()> {
                             );
                             lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
                         }
-                        Mode::Quit => {}
+                        _ => {}
                     }
 
                     drop(render_pass);
 
-                    // First bloom pass
-                    // todo: setting to disable bloom
+                    if settings.bloom {
+                        // First bloom pass
+                        // todo: setting to disable bloom
 
-                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: &render_context.bloombuffer_after_vertical,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color {
-                                    r: 0.0,
-                                    g: 0.0,
-                                    b: 0.0,
-                                    a: 1.0,
-                                }),
-                                store: true,
-                            },
-                        }],
-                        depth_stencil_attachment: None,
-                    });
+                        let mut render_pass =
+                            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                                    attachment: &render_context.bloombuffer_after_vertical,
+                                    resolve_target: None,
+                                    ops: wgpu::Operations {
+                                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                                            r: 0.0,
+                                            g: 0.0,
+                                            b: 0.0,
+                                            a: 1.0,
+                                        }),
+                                        store: true,
+                                    },
+                                }],
+                                depth_stencil_attachment: None,
+                            });
 
-                    render_pass.set_pipeline(&render_context.bloom_blur_pipeline);
-                    render_pass.set_bind_group(0, &render_context.bloom_first_pass_bind_group, &[]);
-                    render_pass.draw(0..3, 0..1);
+                        render_pass.set_pipeline(&render_context.bloom_blur_pipeline);
+                        render_pass.set_bind_group(
+                            0,
+                            &render_context.bloom_first_pass_bind_group,
+                            &[],
+                        );
+                        render_pass.draw(0..3, 0..1);
 
-                    drop(render_pass);
+                        drop(render_pass);
 
-                    // Second bloom pass and composit onto framebuffer
+                        // Second bloom pass and composit onto framebuffer
 
-                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: &render_context.framebuffer,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: true,
-                            },
-                        }],
-                        depth_stencil_attachment: None,
-                    });
+                        let mut render_pass =
+                            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                                    attachment: &render_context.framebuffer,
+                                    resolve_target: None,
+                                    ops: wgpu::Operations {
+                                        load: wgpu::LoadOp::Load,
+                                        store: true,
+                                    },
+                                }],
+                                depth_stencil_attachment: None,
+                            });
 
-                    render_pass.set_pipeline(&render_context.bloom_blur_pipeline);
-                    render_pass.set_bind_group(
-                        0,
-                        &render_context.bloom_second_pass_bind_group,
-                        &[],
-                    );
-                    render_pass.draw(0..3, 0..1);
+                        render_pass.set_pipeline(&render_context.bloom_blur_pipeline);
+                        render_pass.set_bind_group(
+                            0,
+                            &render_context.bloom_second_pass_bind_group,
+                            &[],
+                        );
+                        render_pass.draw(0..3, 0..1);
 
-                    drop(render_pass);
+                        drop(render_pass);
+                    }
 
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -596,5 +620,4 @@ fn render_playing<'a>(
 
     // Render 2D items.
     lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
-    //lines_pipeline.render_hud(&mut render_pass, &assets);
 }

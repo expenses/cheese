@@ -1,4 +1,4 @@
-use crate::resources::{Camera, ScreenDimensions};
+use crate::resources::{Camera, ScreenDimensions, Settings};
 use std::sync::Arc;
 use ultraviolet::{Mat4, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
@@ -84,7 +84,7 @@ pub struct RenderContext {
 }
 
 impl RenderContext {
-    pub async fn new(event_loop: &EventLoop<()>) -> anyhow::Result<Self> {
+    pub async fn new(event_loop: &EventLoop<()>, settings: &Settings) -> anyhow::Result<Self> {
         let window = WindowBuilder::new()
             .with_title("Cheese (working title)")
             .build(event_loop)?;
@@ -219,11 +219,7 @@ impl RenderContext {
             usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         });
 
-        let view = Mat4::look_at(
-            Vec3::new(1.0, 1.0, 1.0),
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-        );
+        let view = Mat4::look_at(Vec3::one(), Vec3::zero(), Vec3::unit_y());
 
         let view_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Cheese view buffer"),
@@ -250,8 +246,8 @@ impl RenderContext {
         let shadow_texture = create_texture(
             &device,
             "Cheese shadow texture",
-            1024,
-            1024,
+            settings.shadow_resolution,
+            settings.shadow_resolution,
             DEPTH_FORMAT,
             wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
@@ -1067,7 +1063,7 @@ impl Font {
     pub fn scale(&self) -> f32 {
         match self {
             Self::Ui => 24.0,
-            Self::Title => 48.0,
+            Self::Title => 64.0,
         }
     }
 }
@@ -1198,11 +1194,7 @@ impl ShadowUniforms {
 
         let look_at = Vec3::new(look_at.x, 0.0, look_at.y);
 
-        let view = Mat4::look_at(
-            sun_direction_multiplied + look_at,
-            look_at,
-            Vec3::new(0.0, 1.0, 0.0),
-        );
+        let view = Mat4::look_at(sun_direction_multiplied + look_at, look_at, Vec3::unit_y());
 
         Self {
             light_projection_view: projection * view,

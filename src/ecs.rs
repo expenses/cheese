@@ -2,7 +2,7 @@ use crate::assets::ModelAnimations;
 use crate::pathfinding::{Map, MapHandle};
 use crate::renderer::Button;
 use crate::resources::{
-    Camera, CameraControls, MouseState, PlayerSide, RtsControls, ScreenDimensions,
+    Camera, CameraControls, DeltaTime, MouseState, PlayerSide, RtsControls, ScreenDimensions,
 };
 use legion::systems::CommandBuffer;
 use legion::world::SubWorld;
@@ -34,7 +34,8 @@ use controls::{
     cast_ray_system, control_camera_system, handle_control_groups_system,
     handle_drag_selection_system, handle_keypresses_system, handle_left_click_system,
     handle_right_click_system, handle_stop_command_system,
-    remove_dead_entities_from_control_groups_system, update_selected_units_abilities_system,
+    remove_dead_entities_from_control_groups_system, update_playing_state_system,
+    update_selected_units_abilities_system,
 };
 use debugging::{
     debug_select_box_system, debug_specific_path_system, render_building_grid_system,
@@ -55,7 +56,7 @@ use rendering::{
     render_bullets_system, render_command_paths_system, render_drag_box_system,
     render_health_bars_system, render_recruitment_waypoints_system, render_selections_system,
     render_ui_system, render_under_select_box_system, render_unit_under_cursor_system,
-    render_units_system,
+    render_units_system, render_win_lose_system,
 };
 
 #[legion::system]
@@ -63,10 +64,10 @@ pub fn cleanup_controls(
     #[resource] mouse_state: &mut MouseState,
     #[resource] rts_controls: &mut RtsControls,
     #[resource] debug_controls: &mut DebugControls,
+    #[resource] delta_time: &DeltaTime,
 ) {
-    let position = mouse_state.position;
-    mouse_state.left_state.update(position);
-    mouse_state.right_state.update(position);
+    mouse_state.left_state.update(delta_time.0);
+    mouse_state.right_state.update(delta_time.0);
 
     rts_controls.stop_pressed = false;
 
@@ -114,7 +115,8 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(firing_system())
         .add_system(apply_bullets_system())
         .flush()
-        .add_system(handle_damaged_system());
+        .add_system(handle_damaged_system())
+        .add_system(update_playing_state_system());
 }
 
 pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
@@ -132,7 +134,7 @@ pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
         .add_system(render_ui_system())
         .add_system(render_health_bars_system())
         .add_system(render_unit_under_cursor_system())
-        .add_system(render_pathfinding_map_system())
+        //.add_system(render_pathfinding_map_system())
         //.add_system(render_unit_paths_system())
         .add_system(render_debug_unit_pathfinding_system())
         .add_system(render_buildings_system())
@@ -140,6 +142,7 @@ pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
         .add_system(render_cheese_droplets_system())
         .add_system(render_abilities_system())
         .add_system(render_recruitment_waypoints_system())
+        .add_system(render_win_lose_system())
         //.add_system(debug_select_box_system())
         //.add_system(debug_specific_path_system())
         // Cleanup
@@ -309,8 +312,8 @@ impl ActionState {
 #[derive(Default)]
 pub struct CommandQueue(VecDeque<Command>);
 
-pub struct Health(pub u16);
-pub struct BuildingCompleteness(pub u16);
+pub struct Health(pub f32);
+pub struct BuildingCompleteness(pub f32);
 
 pub struct FiringRange(pub f32);
 pub struct MoveSpeed(pub f32);
@@ -342,7 +345,7 @@ pub enum Building {
 pub struct BuildingStats {
     pub radius: f32,
     pub dimensions: Vec2,
-    pub max_health: u16,
+    pub max_health: f32,
     pub cost: u32,
 }
 
@@ -352,13 +355,13 @@ impl Building {
             Self::Armoury => BuildingStats {
                 radius: 6.0,
                 dimensions: Vec2::new(6.0, 10.0),
-                max_health: 500,
+                max_health: 500.0,
                 cost: 200,
             },
             Self::Pump => BuildingStats {
                 radius: 3.0,
                 dimensions: Vec2::new(4.0, 4.0),
-                max_health: 200,
+                max_health: 200.0,
                 cost: 50,
             },
         }
@@ -395,8 +398,8 @@ impl Building {
             Radius(radius),
             Selectable,
             side,
-            Health(1),
-            BuildingCompleteness(1),
+            Health(1.0),
+            BuildingCompleteness(1.0),
         ))
     }
 
@@ -452,7 +455,7 @@ pub enum Unit {
 }
 
 pub struct UnitStats {
-    pub max_health: u16,
+    pub max_health: f32,
     pub move_speed: f32,
     pub radius: f32,
     pub firing_range: f32,
@@ -472,7 +475,7 @@ impl Unit {
     pub fn stats(self) -> UnitStats {
         match self {
             Self::MouseMarine => UnitStats {
-                max_health: 50,
+                max_health: 50.0,
                 firing_range: 10.0,
                 move_speed: 6.0,
                 radius: 1.0,
@@ -481,7 +484,7 @@ impl Unit {
                 recruitment_time: 10.0,
             },
             Self::Engineer => UnitStats {
-                max_health: 40,
+                max_health: 40.0,
                 firing_range: 1.0,
                 move_speed: 6.0,
                 radius: 1.0,

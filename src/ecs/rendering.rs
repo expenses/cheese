@@ -5,13 +5,16 @@ use crate::renderer::{
     TorusInstance,
 };
 use crate::resources::{
-    CheeseCoins, CommandMode, CursorIcon, DpiScaling, RayCastLocation, SelectedUnitsAbilities,
+    CheeseCoins, CommandMode, CursorIcon, DpiScaling, Objectives, PlayingState, RayCastLocation,
+    SelectedUnitsAbilities,
 };
 use ultraviolet::Vec4;
 
 const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
 const GREEN: Vec3 = Vec3::new(43.0, 140.0, 0.0);
 const PURPLE: Vec3 = Vec3::new(196.0, 0.0, 109.0);
+const BLACK: Vec4 = Vec4::new(0.0, 0.0, 0.0, 1.0);
+const WHITE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 
 fn mix(colour_a: Vec3, colour_b: Vec3, factor: f32) -> Vec3 {
     colour_a * (1.0 - factor) + colour_b * factor
@@ -83,7 +86,7 @@ pub fn render_units(
                 Side::Green => GREEN,
                 Side::Purple => PURPLE,
             } / COLOUR_MAX;
-            let colour = mix(colour, Vec3::new(1.0, 1.0, 1.0), 0.25);
+            let colour = mix(colour, WHITE, 0.25);
 
             Vec4::new(colour.x, colour.y, colour.z, 0.2)
         },
@@ -134,7 +137,7 @@ pub fn render_under_select_box(
             .for_each(|(position, radius, _)| {
                 torus_buffer.toruses.push(TorusInstance {
                     center: Vec3::new(position.0.x, 0.0, position.0.y),
-                    colour: Vec3::new(1.0, 1.0, 1.0),
+                    colour: WHITE,
                     radius: radius.0,
                 });
             });
@@ -175,14 +178,14 @@ pub fn render_health_bars(
             line_buffers.draw_filled_rect(
                 location,
                 Vec2::new(length + 2.0, 12.0),
-                Vec3::new(0.0, 0.0, 0.0),
+                BLACK,
                 dpi_scaling.0,
             );
 
             line_buffers.draw_filled_rect(
                 location,
                 Vec2::new(length, 10.0),
-                Vec3::new(1.0 - health_percentage, health_percentage, 0.0),
+                Vec4::new(1.0 - health_percentage, health_percentage, 0.0, 1.0),
                 dpi_scaling.0,
             );
         }
@@ -211,10 +214,17 @@ pub fn render_ui(
     #[resource] cheese_coins: &CheeseCoins,
     #[resource] text_buffer: &mut TextBuffer,
     #[resource] player_side: &PlayerSide,
+    #[resource] objectives: &Objectives,
+    #[resource] playing_state: &PlayingState,
     world: &SubWorld,
 ) {
+    if *playing_state != PlayingState::InProgress {
+        return;
+    }
+
     let coins = std::iter::once(format!("Cheese coins: {}\n", cheese_coins.0));
     let mode = std::iter::once(format!("Mode: {:?}\n", rts_controls.mode));
+    let objectives = std::iter::once(format!("Objectives: {:?}\n", objectives));
 
     let mut query = <(&RecruitmentQueue, &Side)>::query();
     let queue_infos = query
@@ -222,7 +232,11 @@ pub fn render_ui(
         .filter(|(_, side)| **side == player_side.0)
         .map(|(queue, _)| format!("Queue progress: {}\n", queue.progress));
 
-    let text: String = coins.chain(mode).chain(queue_infos).collect();
+    let text: String = objectives
+        .chain(coins)
+        .chain(mode)
+        .chain(queue_infos)
+        .collect();
 
     text_buffer.render_text(
         Vec2::new(10.0, 10.0),
@@ -427,7 +441,7 @@ pub fn render_unit_under_cursor(
         cursor_icon.0 = winit::window::CursorIcon::Hand;
         torus_buffer.toruses.push(TorusInstance {
             center: Vec3::new(pos.x, 0.0, pos.y),
-            colour: Vec3::new(1.0, 1.0, 1.0),
+            colour: WHITE,
             radius,
         });
     }
@@ -471,7 +485,7 @@ pub fn render_abilities(
         line_buffers.draw_filled_rect(
             position(i),
             Vec2::new(ability_size + border * 2.0, ability_size + border * 2.0),
-            Vec3::zero(),
+            BLACK,
             dpi_scaling.0,
         );
 
@@ -521,4 +535,37 @@ pub fn render_abilities(
             );
         }
     }
+}
+
+#[legion::system]
+pub fn render_win_lose(
+    #[resource] playing_state: &PlayingState,
+    #[resource] line_buffers: &mut LineBuffers,
+    #[resource] text_buffer: &mut TextBuffer,
+    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] dpi_scaling: &DpiScaling,
+) {
+    if *playing_state == PlayingState::InProgress {
+        return;
+    }
+
+    let screen_dims = screen_dimensions.as_vec();
+
+    line_buffers.draw_filled_rect(
+        screen_dims / 2.0,
+        screen_dims,
+        Vec4::new(0.0, 0.0, 0.0, 0.925),
+        // Don't need DPI if we're just rendering a fullscreen quad.
+        1.0,
+    );
+
+    text_buffer.render_text(
+        Vec2::new(0.5, 0.4) * screen_dims,
+        &format!("Scenario {:?}", playing_state),
+        Font::Title,
+        1.5,
+        dpi_scaling.0,
+        TextAlignment::Center,
+        Vec4::one(),
+    );
 }
