@@ -7,17 +7,46 @@ use crate::resources::{
 use legion::*;
 use ultraviolet::{Mat4, Rotor3, Vec2, Vec3, Vec4};
 
-const TITLE_POSITION: Vec2 = Vec2::new(0.5, 1.0 / 6.0);
-const SKIRMISH_POSITION: Vec2 = Vec2::new(0.5, 3.0 / 4.0);
-const QUIT_POSITION: Vec2 = Vec2::new(0.5, 3.25 / 4.0);
-pub const MOON_POSITION: Vec3 = Vec3::new(0.0, 0.0, 5.0);
+pub fn camera_view() -> Mat4 {
+    // The camera is at zero and looks towards the z axis.
+    Mat4::look_at(Vec3::zero(), Vec3::unit_z(), Vec3::unit_y())
+}
+
+const TITLE_POSITION: Vec2 = Vec2::new(0.3, 1.0 / 6.0);
+const MOON_POSITION: Vec3 = Vec3::new(-1.5, 0.0, 3.0);
+
+const MAIN_MENU: &'static [(&'static str, Vec2)] = &[
+    ("Scenarios", Vec2::new(0.3, 3.5 / 6.0)),
+    ("Quit", Vec2::new(0.3, 4.0 / 6.0)),
+];
+
+const SCENARIOS_MENU: &'static [(&'static str, Vec2)] = &[
+    ("Training 1: Attacking", Vec2::new(0.3, 3.5 / 6.0)),
+    ("Training 2: Base Building", Vec2::new(0.3, 4.0 / 6.0)),
+    ("Skirmish", Vec2::new(0.3, 4.5 / 6.0)),
+    ("Back", Vec2::new(0.3, 5.0 / 6.0)),
+];
+
+pub enum Menu {
+    Main,
+    Scenarios,
+}
+
+impl Menu {
+    fn list(&self) -> &'static [(&'static str, Vec2)] {
+        match self {
+            Self::Main => MAIN_MENU,
+            Self::Scenarios => SCENARIOS_MENU,
+        }
+    }
+}
 
 pub fn titlescreen_schedule() -> Schedule {
     Schedule::builder()
         .add_system(update_system())
         .add_system(handle_clicks_system())
         .add_system(render_text_system())
-        //.add_system(render_click_regions_system())
+        .add_system(render_click_regions_system())
         .add_system(crate::ecs::cleanup_controls_system())
         .build()
 }
@@ -47,6 +76,7 @@ fn render_text(
     #[resource] dpi_scaling: &DpiScaling,
     #[resource] mouse_state: &MouseState,
     #[resource] cursor_icon: &mut CursorIcon,
+    #[resource] menu: &Menu,
 ) {
     let screen_dimensions = screen_dimensions.as_vec();
 
@@ -63,7 +93,7 @@ fn render_text(
         colour,
     );
 
-    for (text, position) in [("Skirmish", SKIRMISH_POSITION), ("Quit", QUIT_POSITION)].iter() {
+    for (text, position) in menu.list().iter() {
         let center = *position * screen_dimensions;
 
         let (top_left, bottom_right) = text_selection_area(center, text, dpi_scaling.0);
@@ -90,10 +120,11 @@ fn render_click_regions(
     #[resource] line_buffers: &mut LineBuffers,
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] dpi_scaling: &DpiScaling,
+    #[resource] menu: &Menu,
 ) {
     let screen_dimensions = screen_dimensions.as_vec();
 
-    for (text, position) in [("Skirmish", SKIRMISH_POSITION), ("Quit", QUIT_POSITION)].iter() {
+    for (text, position) in menu.list().iter() {
         let center = *position * screen_dimensions;
 
         let (top_left, bottom_right) = text_selection_area(center, text, dpi_scaling.0);
@@ -108,6 +139,7 @@ fn handle_clicks(
     #[resource] mouse_state: &MouseState,
     #[resource] mode: &mut Mode,
     #[resource] camera: &mut Camera,
+    #[resource] menu: &mut Menu,
 ) {
     if !mouse_state.left_state.was_clicked() {
         return;
@@ -115,18 +147,33 @@ fn handle_clicks(
 
     let screen_dimensions = screen_dimensions.as_vec();
 
-    let center = SKIRMISH_POSITION * screen_dimensions;
-    let (top_left, bottom_right) = text_selection_area(center, "Skirmish", dpi_scaling.0);
-    if point_in_area(mouse_state.position, top_left, bottom_right) {
-        *mode = Mode::Playing;
-        *camera = Camera::default();
-        return;
-    }
-
-    let center = QUIT_POSITION * screen_dimensions;
-    let (top_left, bottom_right) = text_selection_area(center, "Quit", dpi_scaling.0);
-    if point_in_area(mouse_state.position, top_left, bottom_right) {
-        *mode = Mode::Quit;
+    for &(text, position) in menu.list().iter() {
+        let center = position * screen_dimensions;
+        let (top_left, bottom_right) = text_selection_area(center, text, dpi_scaling.0);
+        if point_in_area(mouse_state.position, top_left, bottom_right) {
+            match text {
+                "Scenarios" => {
+                    *menu = Menu::Scenarios;
+                }
+                "Training 1: Attacking" => {
+                    *mode = Mode::StartScenario(1);
+                }
+                "Training 2: Base Building" => {
+                    *mode = Mode::StartScenario(2);
+                }
+                "Skirmish" => {
+                    *mode = Mode::StartScenario(3);
+                }
+                "Back" => {
+                    *menu = Menu::Main;
+                }
+                "Quit" => {
+                    *mode = Mode::Quit;
+                }
+                _ => {}
+            }
+            return;
+        }
     }
 }
 
@@ -158,7 +205,7 @@ pub fn create_stars<R: rand::Rng>(rng: &mut R) -> Vec<ModelInstance> {
 
             ModelInstance {
                 transform: Mat4::from_translation(pos)
-                    * Rotor3::from_rotation_between(Vec3::new(0.0, 1.0, 0.0), pos)
+                    * Rotor3::from_rotation_between(Vec3::unit_y(), pos)
                         .into_matrix()
                         .into_homogeneous()
                     * Mat4::from_scale(rng.gen_range(0.01, 0.05)),

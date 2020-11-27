@@ -193,11 +193,7 @@ impl RenderContext {
             usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         });
 
-        let view = Mat4::look_at(
-            Vec3::new(1.0, 1.0, 1.0),
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-        );
+        let view = Mat4::look_at(Vec3::one(), Vec3::zero(), Vec3::unit_y());
 
         let view_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Cheese view buffer"),
@@ -992,7 +988,7 @@ impl Font {
     pub fn scale(&self) -> f32 {
         match self {
             Self::Ui => 24.0,
-            Self::Title => 48.0,
+            Self::Title => 64.0,
         }
     }
 }
@@ -1123,11 +1119,7 @@ impl ShadowUniforms {
 
         let look_at = Vec3::new(look_at.x, 0.0, look_at.y);
 
-        let view = Mat4::look_at(
-            sun_direction_multiplied + look_at,
-            look_at,
-            Vec3::new(0.0, 1.0, 0.0),
-        );
+        let view = Mat4::look_at(sun_direction_multiplied + look_at, look_at, Vec3::unit_y());
 
         Self {
             light_projection_view: projection * view,

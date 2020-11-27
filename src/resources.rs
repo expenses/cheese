@@ -69,11 +69,7 @@ impl Camera {
     }
 
     pub fn to_matrix(&self) -> Mat4 {
-        Mat4::look_at(
-            self.position(),
-            self.looking_at_3(),
-            Vec3::new(0.0, 1.0, 0.0),
-        )
+        Mat4::look_at(self.position(), self.looking_at_3(), Vec3::unit_y())
     }
 
     pub fn cast_ray(&self, mouse_position: Vec2, screen_dimensions: &ScreenDimensions) -> Vec2 {
@@ -235,11 +231,12 @@ pub struct DpiScaling(pub f32);
 #[derive(Default)]
 pub struct ControlGroups(pub [Vec<legion::Entity>; 10]);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Mode {
     Titlescreen,
     Playing,
     Quit,
+    StartScenario(u8),
 }
 
 pub struct Gravity(pub f32);
@@ -267,7 +264,7 @@ pub enum LoseCondition {
     LetAllUnitsDie,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Objectives {
     pub win_conditions: Vec<WinCondition>,
     pub lose_conditions: Vec<LoseCondition>,

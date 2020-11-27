@@ -1,7 +1,7 @@
 use crate::assets::ModelAnimations;
 use crate::ecs;
 use crate::pathfinding::Map;
-use crate::resources::{WinCondition, LoseCondition, Objectives};
+use crate::resources::{Camera, LoseCondition, Objectives, WinCondition};
 use legion::systems::CommandBuffer;
 use legion::*;
 use rand::Rng;
@@ -13,16 +13,20 @@ pub fn one(
     animations: &ModelAnimations,
     map: &mut Map,
     rng: &mut rand::rngs::SmallRng,
-) -> Objectives {
+    objectives: &mut Objectives,
+    camera: &mut Camera,
+) {
     world.clear();
 
     let mut command_buffer = legion::systems::CommandBuffer::new(&world);
+
+    let unit_spawn_point = Vec2::new(-36.0, 0.0);
 
     spawn_units_in_circle(
         &mut command_buffer,
         animations,
         10,
-        Vec2::new(-36.0, 0.0),
+        unit_spawn_point,
         0.0,
         ecs::Side::Green,
     );
@@ -95,10 +99,15 @@ pub fn one(
         rng,
     );
 
-    Objectives {
+    *objectives = Objectives {
         win_conditions: vec![WinCondition::DestroyAll],
         lose_conditions: vec![LoseCondition::LetAllUnitsDie],
-    }
+    };
+
+    *camera = Camera {
+        looking_at: unit_spawn_point,
+        distance: 15.0,
+    };
 }
 
 fn spawn_pump_over_guyser(
@@ -160,7 +169,7 @@ fn two(
         win_conditions: vec![
             WinCondition::DestroyAll,
             WinCondition::BuildN(2, ecs::Building::Pump),
-            WinCondition::BuildN(1, ecs::Building::Armoury)
+            WinCondition::BuildN(1, ecs::Building::Armoury),
         ],
         lose_conditions: vec![LoseCondition::LetAllUnitsDie],
     }

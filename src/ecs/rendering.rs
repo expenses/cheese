@@ -13,6 +13,8 @@ use ultraviolet::Vec4;
 const COLOUR_MAX: Vec3 = Vec3::new(255.0, 255.0, 255.0);
 const GREEN: Vec3 = Vec3::new(43.0, 140.0, 0.0);
 const PURPLE: Vec3 = Vec3::new(196.0, 0.0, 109.0);
+const BLACK: Vec3 = Vec3::new(0.0, 0.0, 0.0);
+const WHITE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 
 fn mix(colour_a: Vec3, colour_b: Vec3, factor: f32) -> Vec3 {
     colour_a * (1.0 - factor) + colour_b * factor
@@ -84,7 +86,7 @@ pub fn render_units(
                 Side::Green => GREEN,
                 Side::Purple => PURPLE,
             } / COLOUR_MAX;
-            let colour = mix(colour, Vec3::new(1.0, 1.0, 1.0), 0.25);
+            let colour = mix(colour, WHITE, 0.25);
 
             Vec4::new(colour.x, colour.y, colour.z, 0.2)
         },
@@ -135,7 +137,7 @@ pub fn render_under_select_box(
             .for_each(|(position, radius, _)| {
                 torus_buffer.toruses.push(TorusInstance {
                     center: Vec3::new(position.0.x, 0.0, position.0.y),
-                    colour: Vec3::new(1.0, 1.0, 1.0),
+                    colour: WHITE,
                     radius: radius.0,
                 });
             });
@@ -176,7 +178,7 @@ pub fn render_health_bars(
             line_buffers.draw_filled_rect(
                 location,
                 Vec2::new(length + 2.0, 12.0),
-                Vec3::new(0.0, 0.0, 0.0),
+                BLACK,
                 dpi_scaling.0,
             );
 
@@ -437,7 +439,7 @@ pub fn render_unit_under_cursor(
         cursor_icon.0 = winit::window::CursorIcon::Hand;
         torus_buffer.toruses.push(TorusInstance {
             center: Vec3::new(pos.x, 0.0, pos.y),
-            colour: Vec3::new(1.0, 1.0, 1.0),
+            colour: WHITE,
             radius,
         });
     }
@@ -481,7 +483,7 @@ pub fn render_abilities(
         line_buffers.draw_filled_rect(
             position(i),
             Vec2::new(ability_size + border * 2.0, ability_size + border * 2.0),
-            Vec3::zero(),
+            BLACK,
             dpi_scaling.0,
         );
 

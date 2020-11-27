@@ -2,6 +2,8 @@ use super::{colour_state_descriptor, DynamicBuffer, RenderContext, DEPTH_FORMAT,
 use crate::assets::Assets;
 use ultraviolet::{Vec2, Vec3};
 
+const WHITE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
+
 pub struct LinesPipeline {
     bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
@@ -275,12 +277,7 @@ impl LineBuffers {
         stroke_rectangle(
             &rect(top_left.x, top_left.y, dimensions.x, dimensions.y),
             &options,
-            &mut BuffersBuilder::new(
-                &mut self.lyon_buffers,
-                Constructor {
-                    colour: Vec3::new(1.0, 1.0, 1.0),
-                },
-            ),
+            &mut BuffersBuilder::new(&mut self.lyon_buffers, Constructor { colour: WHITE }),
         )
         .unwrap();
 

@@ -1,8 +1,8 @@
 use super::*;
 use crate::assets::ModelAnimations;
 use crate::resources::{
-    CheeseCoins, CommandMode, ControlGroups, Keypress, Keypresses, WinCondition, LoseCondition, Objectives,
-    PlayingState, RayCastLocation, SelectedUnitsAbilities,
+    CheeseCoins, CommandMode, ControlGroups, Keypress, Keypresses, LoseCondition, Objectives,
+    PlayingState, RayCastLocation, SelectedUnitsAbilities, WinCondition,
 };
 
 #[legion::system]
@@ -623,7 +623,9 @@ pub fn update_playing_state(
     #[resource] playing_state: &mut PlayingState,
     world: &SubWorld,
 ) {
-    let won = objectives.win_conditions.iter()
+    let won = objectives
+        .win_conditions
+        .iter()
         .all(|condition| match condition {
             WinCondition::DestroyAll => {
                 let all_destroyed = <&Side>::query()
@@ -649,7 +651,9 @@ pub fn update_playing_state(
         return;
     }
 
-    let lost = objectives.lose_conditions.iter()
+    let lost = objectives
+        .lose_conditions
+        .iter()
         .any(|condition| match condition {
             LoseCondition::LetAllUnitsDie => {
                 let all_units_dead = <&Side>::query()
@@ -660,7 +664,7 @@ pub fn update_playing_state(
                 all_units_dead
             }
         });
-    
+
     if lost {
         *playing_state = PlayingState::Lost;
     }
