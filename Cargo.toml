@@ -15,7 +15,7 @@ cgmath = "0.17.0"
 env_logger = "0.8.1"
 futures = "0.3.7"
 gltf = { version = "0.15.2", default-features = false, features = ["utils", "names"] }
-image = { version = "0.23.11", default-features = false, features = ["png"] }
+image = { version = "0.23.12", default-features = false, features = ["png"] }
 legion = { version = "0.3.1", default-features = false, features = ["codegen", "extended-tuple-impls"] }
 log = "0.4.11"
 lyon_tessellation = "0.16.2"
