@@ -4,3 +4,4 @@
 - Pyschic units
 - Helmets should increase opacity when in combat
 - Map crevasses
+- Stats on win/loss

@@ -18,6 +18,7 @@ mod controls;
 mod debugging;
 mod effects;
 mod movement;
+mod playing_menu;
 mod rendering;
 
 use crate::resources::DebugControls;
@@ -51,12 +52,16 @@ use movement::{
     apply_steering_system, avoidance_system, move_bullets_system, move_units_system,
     reset_map_updated_system, set_movement_paths_system, Avoidable, Avoids,
 };
+use playing_menu::{
+    handle_playing_menu_controls_system, render_playing_menu_click_regions_system,
+    render_playing_menu_system,
+};
 use rendering::{
     render_abilities_system, render_building_plan_system, render_buildings_system,
     render_bullets_system, render_command_paths_system, render_drag_box_system,
     render_health_bars_system, render_recruitment_waypoints_system, render_selections_system,
     render_ui_system, render_under_select_box_system, render_unit_under_cursor_system,
-    render_units_system, render_win_lose_system,
+    render_units_system,
 };
 
 #[legion::system]
@@ -116,14 +121,14 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(apply_bullets_system())
         .flush()
         .add_system(handle_damaged_system())
-        .add_system(update_playing_state_system());
+        .add_system(update_playing_state_system())
+        // Animations.
+        .add_system(progress_animations_system())
+        .add_system(progress_building_animations_system());
 }
 
 pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
     builder
-        .add_system(progress_animations_system())
-        .add_system(progress_building_animations_system())
-        // Rendering
         .add_system(render_bullets_system())
         .add_system(render_units_system())
         .add_system(render_selections_system())
@@ -141,13 +146,20 @@ pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
         .add_system(render_building_plan_system())
         .add_system(render_cheese_droplets_system())
         .add_system(render_abilities_system())
-        .add_system(render_recruitment_waypoints_system())
-        .add_system(render_win_lose_system())
-        //.add_system(debug_select_box_system())
-        //.add_system(debug_specific_path_system())
-        // Cleanup
-        .flush()
-        .add_system(cleanup_controls_system());
+        .add_system(render_recruitment_waypoints_system());
+    //.add_system(debug_select_box_system())
+    //.add_system(debug_specific_path_system())
+}
+
+pub fn add_cleanup_systems(builder: &mut legion::systems::Builder) {
+    builder.flush().add_system(cleanup_controls_system());
+}
+
+pub fn add_playing_menu_systems(builder: &mut legion::systems::Builder) {
+    builder
+        .add_system(handle_playing_menu_controls_system())
+        .add_system(render_playing_menu_system())
+        .add_system(render_playing_menu_click_regions_system());
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]

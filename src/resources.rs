@@ -231,12 +231,24 @@ pub struct DpiScaling(pub f32);
 #[derive(Default)]
 pub struct ControlGroups(pub [Vec<legion::Entity>; 10]);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Mode {
     Titlescreen,
     Playing,
+    PlayingMenu,
     Quit,
     StartScenario(u8),
+    ScenarioWon,
+    ScenarioLost,
+}
+
+impl Mode {
+    pub fn should_render(&self) -> bool {
+        matches!(
+            self,
+            Self::Playing | Self::PlayingMenu | Self::ScenarioWon | Self::ScenarioLost
+        )
+    }
 }
 
 pub struct Gravity(pub f32);
@@ -268,13 +280,6 @@ pub enum LoseCondition {
 pub struct Objectives {
     pub win_conditions: Vec<WinCondition>,
     pub lose_conditions: Vec<LoseCondition>,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum PlayingState {
-    Won,
-    Lost,
-    InProgress,
 }
 
 pub struct Settings {

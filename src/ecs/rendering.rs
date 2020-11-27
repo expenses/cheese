@@ -5,7 +5,7 @@ use crate::renderer::{
     TorusInstance,
 };
 use crate::resources::{
-    CheeseCoins, CommandMode, CursorIcon, DpiScaling, Objectives, PlayingState, RayCastLocation,
+    CheeseCoins, CommandMode, CursorIcon, DpiScaling, Mode, Objectives, RayCastLocation,
     SelectedUnitsAbilities,
 };
 use ultraviolet::Vec4;
@@ -215,10 +215,10 @@ pub fn render_ui(
     #[resource] text_buffer: &mut TextBuffer,
     #[resource] player_side: &PlayerSide,
     #[resource] objectives: &Objectives,
-    #[resource] playing_state: &PlayingState,
+    #[resource] mode: &Mode,
     world: &SubWorld,
 ) {
-    if *playing_state != PlayingState::InProgress {
+    if *mode != Mode::Playing {
         return;
     }
 
@@ -535,37 +535,4 @@ pub fn render_abilities(
             );
         }
     }
-}
-
-#[legion::system]
-pub fn render_win_lose(
-    #[resource] playing_state: &PlayingState,
-    #[resource] line_buffers: &mut LineBuffers,
-    #[resource] text_buffer: &mut TextBuffer,
-    #[resource] screen_dimensions: &ScreenDimensions,
-    #[resource] dpi_scaling: &DpiScaling,
-) {
-    if *playing_state == PlayingState::InProgress {
-        return;
-    }
-
-    let screen_dims = screen_dimensions.as_vec();
-
-    line_buffers.draw_filled_rect(
-        screen_dims / 2.0,
-        screen_dims,
-        Vec4::new(0.0, 0.0, 0.0, 0.925),
-        // Don't need DPI if we're just rendering a fullscreen quad.
-        1.0,
-    );
-
-    text_buffer.render_text(
-        Vec2::new(0.5, 0.4) * screen_dims,
-        &format!("Scenario {:?}", playing_state),
-        Font::Title,
-        1.5,
-        dpi_scaling.0,
-        TextAlignment::Center,
-        Vec4::one(),
-    );
 }

@@ -17,7 +17,7 @@ use crate::renderer::{
 use crate::resources::{
     Camera, CameraControls, CheeseCoins, ControlGroups, CursorIcon, DebugControls, DeltaTime,
     DpiScaling, Gravity, Keypress, Keypresses, Mode, MouseState, Objectives, PlayerSide,
-    PlayingState, RayCastLocation, RtsControls, ScreenDimensions, SelectedUnitsAbilities, Settings,
+    RayCastLocation, RtsControls, ScreenDimensions, SelectedUnitsAbilities, Settings,
 };
 use legion::*;
 use rand::{rngs::SmallRng, SeedableRng};
@@ -89,7 +89,6 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(animations);
     resources.insert(pathfinding::Map::new());
     resources.insert(rng);
-    resources.insert(PlayingState::InProgress);
     resources.insert(Objectives::default());
 
     let mut titlescreen_schedule = titlescreen::titlescreen_schedule();
@@ -97,7 +96,13 @@ async fn run() -> anyhow::Result<()> {
     let mut builder = Schedule::builder();
     ecs::add_gameplay_systems(&mut builder);
     ecs::add_rendering_systems(&mut builder);
+    ecs::add_cleanup_systems(&mut builder);
     let mut schedule = builder.build();
+
+    let mut playing_menu_system = Schedule::builder();
+    ecs::add_rendering_systems(&mut playing_menu_system);
+    ecs::add_playing_menu_systems(&mut playing_menu_system);
+    let mut playing_menu_system = playing_menu_system.build();
 
     let mut time = std::time::Instant::now();
 
@@ -123,12 +128,16 @@ async fn run() -> anyhow::Result<()> {
                     ..
                 } => {
                     let pressed = *state == ElementState::Pressed;
+                    let mode = resources.get::<Mode>().unwrap();
                     let mut keypresses = resources.get_mut::<Keypresses>().unwrap();
-                    keypresses.0.push(Keypress {
-                        code: *code,
-                        scancode: *scancode,
-                        pressed,
-                    });
+                    // We only push keypresses in modes that handle them. This is a bit messy.
+                    if matches!(*mode, Mode::Playing | Mode::PlayingMenu) {
+                        keypresses.0.push(Keypress {
+                            code: *code,
+                            scancode: *scancode,
+                            pressed,
+                        });
+                    }
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
                     let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
@@ -187,6 +196,9 @@ async fn run() -> anyhow::Result<()> {
                     Mode::Playing => schedule.execute(&mut world, &mut resources),
                     Mode::Titlescreen => titlescreen_schedule.execute(&mut world, &mut resources),
                     Mode::Quit => *control_flow = ControlFlow::Exit,
+                    Mode::ScenarioWon | Mode::ScenarioLost | Mode::PlayingMenu => {
+                        playing_menu_system.execute(&mut world, &mut resources)
+                    }
                     Mode::StartScenario(_) => unreachable!(),
                 }
 
@@ -206,7 +218,7 @@ async fn run() -> anyhow::Result<()> {
                 // Upload buffers to the gpu.
 
                 match mode {
-                    Mode::Playing => {
+                    Mode::Playing | Mode::ScenarioWon | Mode::ScenarioLost => {
                         let camera = resources.get::<Camera>().unwrap();
                         render_context.update_from_camera(&camera);
                     }
@@ -245,7 +257,7 @@ async fn run() -> anyhow::Result<()> {
                         ),
                     });
 
-                    if let Mode::Playing = mode {
+                    if mode.should_render() {
                         render_shadows(&mut shadow_pass, &shadow_pipeline, &model_buffers, &assets);
                     }
 
@@ -294,37 +306,33 @@ async fn run() -> anyhow::Result<()> {
                         ),
                     });
 
-                    match mode {
-                        Mode::Playing => {
-                            render_playing(
-                                &mut render_pass,
-                                &model_pipelines,
-                                &model_buffers,
-                                &torus_pipeline,
-                                &torus_buffer,
-                                &lines_pipeline,
-                                &line_buffers,
-                                &lines_3d_pipeline,
-                                &lines_3d_buffer,
-                                &assets,
-                            );
-                        }
-                        Mode::Titlescreen => {
-                            model_pipelines.render_single_with_transform(
-                                &mut render_pass,
-                                &assets.cheese_moon_model,
-                                &assets.surface_texture,
-                                &titlescreen_buffer.moon,
-                            );
-                            model_pipelines.render_transparent_buffer(
-                                &mut render_pass,
-                                &assets.billboard_model,
-                                &titlescreen_buffer.stars,
-                                titlescreen_buffer.num_stars,
-                            );
-                            lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
-                        }
-                        _ => {}
+                    if mode.should_render() {
+                        render_playing(
+                            &mut render_pass,
+                            &model_pipelines,
+                            &model_buffers,
+                            &torus_pipeline,
+                            &torus_buffer,
+                            &lines_pipeline,
+                            &line_buffers,
+                            &lines_3d_pipeline,
+                            &lines_3d_buffer,
+                            &assets,
+                        );
+                    } else if let Mode::Titlescreen = mode {
+                        model_pipelines.render_single_with_transform(
+                            &mut render_pass,
+                            &assets.cheese_moon_model,
+                            &assets.surface_texture,
+                            &titlescreen_buffer.moon,
+                        );
+                        model_pipelines.render_transparent_buffer(
+                            &mut render_pass,
+                            &assets.billboard_model,
+                            &titlescreen_buffer.stars,
+                            titlescreen_buffer.num_stars,
+                        );
+                        lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
                     }
 
                     drop(render_pass);
