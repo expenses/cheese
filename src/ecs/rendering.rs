@@ -234,6 +234,8 @@ pub fn render_ui(
             .win_conditions
             .iter()
             .map(|cond| format!("{}\n", cond)),
+    ).chain(
+        objectives.lose_conditions.iter().map(|cond| format!("{}\n", cond))
     );
 
     let mut query = <(&RecruitmentQueue, &Side)>::query();

@@ -265,7 +265,7 @@ pub struct Keypress {
 #[derive(Default)]
 pub struct Keypresses(pub Vec<Keypress>);
 
-#[derive(Debug, derive_more::Display)]
+#[derive(derive_more::Display)]
 pub enum WinCondition {
     #[display(fmt = "Build {} {}", _0, "_1.maybe_plural(*_0)")]
     BuildN(u8, ecs::Building),
@@ -273,12 +273,13 @@ pub enum WinCondition {
     DestroyAll,
 }
 
-#[derive(Debug)]
+#[derive(derive_more::Display)]
 pub enum LoseCondition {
+    #[display(fmt = "Keep at least one unit alive")]
     LetAllUnitsDie,
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Objectives {
     pub win_conditions: Vec<WinCondition>,
     pub lose_conditions: Vec<LoseCondition>,
