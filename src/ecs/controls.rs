@@ -130,7 +130,7 @@ pub fn control_camera(
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] delta_time: &DeltaTime,
 ) {
-    let speed = 30.0 * delta_time.0;
+    let speed = 45.0 * delta_time.0;
 
     let edge_thickness = 50.0;
     let &ScreenDimensions {

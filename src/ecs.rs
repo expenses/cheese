@@ -190,7 +190,7 @@ impl Ability {
 
     const RECRUIT_MOUSE_MARINE: Self = Self {
         ability_type: AbilityType::Recruit(Unit::MouseMarine),
-        hotkey: VirtualKeyCode::M,
+        hotkey: VirtualKeyCode::F,
     };
 
     const SET_RECRUITMENT_WAYPOINT: Self = Self {
@@ -681,7 +681,7 @@ fn nearest_point_within_building(
 
 pub struct Explosion {
     translation_rotation: Mat4,
-    size: f32,
+    progress: f32,
     max_size: f32,
 }
 
@@ -700,8 +700,28 @@ impl Explosion {
 
         Self {
             translation_rotation: translation * rotation,
-            size: max_size / 4.0,
+            progress: 0.0,
             max_size,
         }
     }
+
+    fn duration(&self) -> f32 {
+        let min_size = self.max_size / 4.0;
+        self.max_size - min_size
+    }
+
+    fn size(&self) -> f32 {
+        let min_size = self.max_size / 4.0;
+        let easing = mix(self.progress, ease_out_quad(self.progress), 0.8);
+
+        min_size + easing * self.duration()
+    }
+}
+
+fn mix(a: f32, b: f32, factor: f32) -> f32 {
+    a * (1.0 - factor) + b * factor
+}
+
+fn ease_out_quad(x: f32) -> f32 {
+    1.0 - (1.0 - x) * (1.0 - x)
 }
