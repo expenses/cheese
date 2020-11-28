@@ -1,6 +1,6 @@
 use crate::assets::ModelAnimations;
 use crate::pathfinding::{Map, MapHandle};
-use crate::renderer::Button;
+use crate::renderer::Image;
 use crate::resources::{
     Camera, CameraControls, DeltaTime, MouseState, PlayerSide, RtsControls, ScreenDimensions,
 };
@@ -198,13 +198,13 @@ impl Ability {
         hotkey: VirtualKeyCode::W,
     };
 
-    fn button(&self) -> Button {
+    fn image(&self) -> Image {
         match self.ability_type {
-            AbilityType::Build(Building::Armoury) => Button::BuildArmoury,
-            AbilityType::Build(Building::Pump) => Button::BuildPump,
-            AbilityType::Recruit(Unit::Engineer) => Button::RecruitEngineer,
-            AbilityType::Recruit(Unit::MouseMarine) => Button::RecruitMouseMarine,
-            AbilityType::SetRecruitmentWaypoint => Button::SetRecruitmentWaypoint,
+            AbilityType::Build(Building::Armoury) => Image::BuildArmoury,
+            AbilityType::Build(Building::Pump) => Image::BuildPump,
+            AbilityType::Recruit(Unit::Engineer) => Image::RecruitEngineer,
+            AbilityType::Recruit(Unit::MouseMarine) => Image::RecruitMouseMarine,
+            AbilityType::SetRecruitmentWaypoint => Image::SetRecruitmentWaypoint,
         }
     }
 }
