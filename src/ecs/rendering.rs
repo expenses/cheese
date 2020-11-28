@@ -231,7 +231,6 @@ pub fn render_ui(
         return;
     }
 
-    let mode = std::iter::once(format!("Mode: {:?}\n", rts_controls.mode));
     let objectives = std::iter::once(format!("Objectives:\n"))
         .chain(
             objectives
@@ -252,7 +251,7 @@ pub fn render_ui(
         .filter(|(_, side)| **side == player_side.0)
         .map(|(queue, _)| format!("Queue progress: {}\n", queue.progress));
 
-    let text: String = objectives.chain(mode).chain(queue_infos).collect();
+    let text: String = objectives.chain(queue_infos).collect();
 
     let y_offset = 4.0;
 
