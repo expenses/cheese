@@ -249,6 +249,13 @@ impl Mode {
             Self::Playing | Self::PlayingMenu | Self::ScenarioWon | Self::ScenarioLost
         )
     }
+
+    pub fn is_playing_menu(&self) -> bool {
+        matches!(
+            self,
+            Self::PlayingMenu | Self::ScenarioWon | Self::ScenarioLost
+        )
+    }
 }
 
 pub struct Gravity(pub f32);

@@ -414,6 +414,25 @@ async fn run() -> anyhow::Result<()> {
                         drop(render_pass);
                     }
 
+                    // Darken the screen if we're in a menu.
+                    if mode.is_playing_menu() {
+                        let mut render_pass =
+                            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                                    attachment: &render_context.framebuffer,
+                                    resolve_target: None,
+                                    ops: wgpu::Operations {
+                                        load: wgpu::LoadOp::Load,
+                                        store: true,
+                                    },
+                                }],
+                                depth_stencil_attachment: None,
+                            });
+
+                        render_pass.set_pipeline(&render_context.darken_pipeline);
+                        render_pass.draw(0..3, 0..1);
+                        drop(render_pass);
+                    }
                     // Post-processing pass
 
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

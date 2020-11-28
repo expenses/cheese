@@ -3,7 +3,7 @@ use crate::resources::{
     CursorIcon, DpiScaling, Keypress, Keypresses, Mode, MouseState, ScreenDimensions,
 };
 use crate::titlescreen::{point_in_area, selected_colour, text_selection_area, TEXT_COLOUR};
-use ultraviolet::{Vec2, Vec4};
+use ultraviolet::Vec2;
 use winit::event::VirtualKeyCode;
 
 const WIN_LOSE_MENU: &'static [(&'static str, Vec2)] =
@@ -65,29 +65,20 @@ pub fn handle_playing_menu_controls(
 #[legion::system]
 pub fn render_playing_menu(
     #[resource] mode: &Mode,
-    #[resource] line_buffers: &mut LineBuffers,
     #[resource] text_buffer: &mut TextBuffer,
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] dpi_scaling: &DpiScaling,
     #[resource] mouse_state: &MouseState,
     #[resource] cursor_icon: &mut CursorIcon,
 ) {
-    let screen_dims = screen_dimensions.as_vec();
-
-    line_buffers.draw_filled_rect(
-        screen_dims / 2.0,
-        screen_dims,
-        Vec4::new(0.0, 0.0, 0.0, 0.925),
-        // Don't need DPI if we're just rendering a fullscreen quad.
-        1.0,
-    );
-
     let text = match mode {
         Mode::ScenarioWon => "Scenario Won",
         Mode::ScenarioLost => "Scenario Lost",
         Mode::PlayingMenu => "Playing Menu",
         _ => return,
     };
+
+    let screen_dims = screen_dimensions.as_vec();
 
     text_buffer.render_text(
         Vec2::new(0.5, 0.4) * screen_dims,

@@ -45,6 +45,8 @@ pub fn one(
 
     command_buffer.flush(world);
 
+    world.push((ecs::Explosion::new(Vec2::zero(), rng),));
+
     ecs::Building::Armoury
         .add_to_world_fully_built(
             world,

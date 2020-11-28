@@ -73,6 +73,8 @@ pub struct RenderContext {
     pub shadow_uniform_bind_group: Arc<wgpu::BindGroup>,
     pub shadow_uniform_bind_group_layout: wgpu::BindGroupLayout,
     shadow_uniform_buffer: wgpu::Buffer,
+
+    pub darken_pipeline: wgpu::RenderPipeline,
 }
 
 impl RenderContext {
@@ -533,6 +535,42 @@ impl RenderContext {
             alpha_to_coverage_enabled: false,
         });
 
+        // Darkening pipeline for menus on top of the game.
+
+        let fs_darken = wgpu::include_spirv!("../shaders/compiled/darken.frag.spv");
+        let fs_darken_module = device.create_shader_module(fs_darken);
+
+        let darken_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Cheese darken pipeline layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+
+        let darken_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Cheese darken pipeline"),
+            layout: Some(&darken_pipeline_layout),
+            vertex_stage: wgpu::ProgrammableStageDescriptor {
+                module: &vs_full_screen_quad_module,
+                entry_point: "main",
+            },
+            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+                module: &fs_darken_module,
+                entry_point: "main",
+            }),
+            rasterization_state: Some(wgpu::RasterizationStateDescriptor::default()),
+            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
+            color_states: &[colour_state_descriptor(true)],
+            depth_stencil_state: None,
+            vertex_state: wgpu::VertexStateDescriptor {
+                index_format: INDEX_FORMAT,
+                vertex_buffers: &[],
+            },
+            sample_count: 1,
+            sample_mask: !0,
+            alpha_to_coverage_enabled: false,
+        });
+
         // Create the swap chain
 
         let swap_chain_desc = wgpu::SwapChainDescriptor {
@@ -591,6 +629,7 @@ impl RenderContext {
             bloom_second_pass_bind_group,
             bloom_bind_group_layout,
             bloom_blur_pipeline,
+            darken_pipeline,
         })
     }
 
