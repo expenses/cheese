@@ -18,6 +18,7 @@ pub struct Assets {
     pub pump_static_model: Model,
     pub wrench_model: AnimatedModel,
     pub blaster_model: AnimatedModel,
+    pub explosion_model: Model,
 
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
 
@@ -28,6 +29,7 @@ pub struct Assets {
     pub pump_texture: wgpu::BindGroup,
     pub blaster_texture: wgpu::BindGroup,
     pub buttons_texture: wgpu::BindGroup,
+    pub explosion_texture: wgpu::BindGroup,
 }
 
 #[derive(Default)]
@@ -145,6 +147,11 @@ impl Assets {
                 "Cheese static pump model",
                 device,
             )?,
+            explosion_model: Model::load_gltf(
+                include_bytes!("../models/explosion.gltf"),
+                "Cheese explosion model",
+                device,
+            )?,
 
             surface_texture: load_texture(
                 include_bytes!("../textures/surface.png"),
@@ -191,6 +198,13 @@ impl Assets {
             buttons_texture: load_texture(
                 include_bytes!("../textures/buttons.png"),
                 "Cheese buttons texture",
+                &texture_bind_group_layout,
+                device,
+                &mut init_encoder,
+            )?,
+            explosion_texture: load_texture(
+                include_bytes!("../textures/explosion.png"),
+                "Cheese explosion texture",
                 &texture_bind_group_layout,
                 device,
                 &mut init_encoder,

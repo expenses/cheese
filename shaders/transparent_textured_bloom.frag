@@ -10,6 +10,7 @@ layout(set = 0, binding = 3) uniform sampler u_sampler;
 layout(set = 1, binding = 0) uniform texture2D u_texture;
 
 void main() {
-    colour = texture(sampler2D(u_texture, u_sampler), uv) * flat_colour;
-    bloom_colour = colour;
+    colour = texture(sampler2D(u_texture, u_sampler), uv);
+    float intensity = flat_colour.a;
+    bloom_colour = vec4(colour.rgb * intensity, 1.0);
 }

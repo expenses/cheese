@@ -593,6 +593,15 @@ fn render_playing<'a>(
         &assets.surface_texture,
         &assets.surface_model,
     );
+    // Explosions
+    // Needs to go after the ground because otherwise underground bloom fragments will be written to
+    // And not overwritten.
+    model_pipelines.render_transparent_textured_with_bloom(
+        &mut render_pass,
+        &model_buffers.explosions,
+        &assets.explosion_texture,
+        &assets.explosion_model,
+    );
     model_pipelines.render_transparent_textured_without_depth(
         &mut render_pass,
         &model_buffers.command_paths,

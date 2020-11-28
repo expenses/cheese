@@ -7,6 +7,8 @@ use crate::resources::{
 use legion::systems::CommandBuffer;
 use legion::world::SubWorld;
 use legion::*;
+use rand::rngs::SmallRng;
+use rand::Rng;
 use std::collections::VecDeque;
 use ultraviolet::{Mat4, Vec2, Vec3};
 use winit::event::VirtualKeyCode;
@@ -45,8 +47,8 @@ use debugging::{
     spawn_debug_building_system,
 };
 use effects::{
-    apply_gravity_system, move_cheese_droplets_system, render_cheese_droplets_system,
-    spawn_cheese_droplets_system,
+    apply_gravity_system, expand_explosions_system, move_cheese_droplets_system,
+    render_cheese_droplets_system, render_explosions_system, spawn_cheese_droplets_system,
 };
 use movement::{
     apply_steering_system, avoidance_system, move_bullets_system, move_units_system,
@@ -111,6 +113,7 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         // Cheese droplets.
         .add_system(spawn_cheese_droplets_system())
         .flush()
+        .add_system(expand_explosions_system())
         .add_system(apply_gravity_system())
         .add_system(move_cheese_droplets_system())
         .add_system(move_units_system())
@@ -145,6 +148,7 @@ pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
         .add_system(render_buildings_system())
         .add_system(render_building_plan_system())
         .add_system(render_cheese_droplets_system())
+        .add_system(render_explosions_system())
         .add_system(render_abilities_system())
         .add_system(render_recruitment_waypoints_system());
     //.add_system(debug_select_box_system())
@@ -673,4 +677,31 @@ fn nearest_point_within_building(
     };
 
     building_pos + Vec2::new(x, y)
+}
+
+pub struct Explosion {
+    translation_rotation: Mat4,
+    size: f32,
+    max_size: f32,
+}
+
+impl Explosion {
+    pub fn new(position: Vec2, rng: &mut SmallRng) -> Self {
+        let facing = crate::titlescreen::uniform_sphere_distribution_from_coords(
+            rng.gen_range(0.0, 1.0),
+            rng.gen_range(0.0, 1.0),
+        );
+
+        let translation = Mat4::from_translation(Vec3::new(position.x, 1.0, position.y));
+
+        let rotation = ultraviolet::Rotor3::from_rotation_between(Vec3::unit_x(), facing)
+            .into_matrix()
+            .into_homogeneous();
+
+        Self {
+            translation_rotation: translation * rotation,
+            size: 0.0,
+            max_size: 10.0,
+        }
+    }
 }

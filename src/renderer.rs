@@ -486,7 +486,7 @@ impl RenderContext {
             &device,
             "Cheese bloom first pass bind group",
             &bloom_bind_group_layout,
-            &sampler,
+            &framebuffer_sampler,
             &bloombuffer,
             &bloom_blur_vert_buffer,
         );
@@ -494,7 +494,7 @@ impl RenderContext {
             &device,
             "Cheese bloom second pass bind group",
             &bloom_bind_group_layout,
-            &sampler,
+            &framebuffer_sampler,
             &bloombuffer_after_vertical,
             &bloom_blur_hori_buffer,
         );
@@ -646,7 +646,7 @@ impl RenderContext {
             &self.device,
             "Cheese bloom first pass bind group",
             &self.bloom_bind_group_layout,
-            &self.sampler,
+            &self.framebuffer_sampler,
             &self.bloombuffer,
             &self.bloom_blur_vert_buffer,
         );
@@ -654,7 +654,7 @@ impl RenderContext {
             &self.device,
             "Cheese bloom second pass bind group",
             &self.bloom_bind_group_layout,
-            &self.sampler,
+            &self.framebuffer_sampler,
             &self.bloombuffer_after_vertical,
             &self.bloom_blur_hori_buffer,
         );
