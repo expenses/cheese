@@ -27,6 +27,7 @@ wgpu = "=0.6.0"
 wgpu_glyph = "0.10.0"
 winit = "0.23.0"
 ncollide2d = "0.26.1"
+derive_more = "0.99.11"
 web-sys = { version = "0.3.45", optional = true }
 wasm-bindgen-futures = { version = "0.4.18", optional = true }
 console_log = "0.2.0"

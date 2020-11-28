@@ -7,6 +7,8 @@ use crate::resources::{
 use legion::systems::CommandBuffer;
 use legion::world::SubWorld;
 use legion::*;
+use rand::rngs::SmallRng;
+use rand::Rng;
 use std::collections::VecDeque;
 use ultraviolet::{Mat4, Vec2, Vec3};
 use winit::event::VirtualKeyCode;
@@ -18,6 +20,7 @@ mod controls;
 mod debugging;
 mod effects;
 mod movement;
+mod playing_menu;
 mod rendering;
 
 use crate::resources::DebugControls;
@@ -44,23 +47,27 @@ use debugging::{
     spawn_debug_building_system,
 };
 use effects::{
-    apply_gravity_system, move_cheese_droplets_system, render_cheese_droplets_system,
-    spawn_cheese_droplets_system,
+    apply_gravity_system, expand_explosions_system, move_cheese_droplets_system,
+    render_cheese_droplets_system, render_explosions_system, spawn_cheese_droplets_system,
 };
 use movement::{
     apply_steering_system, avoidance_system, move_bullets_system, move_units_system,
     reset_map_updated_system, set_movement_paths_system, Avoidable, Avoids,
+};
+use playing_menu::{
+    handle_playing_menu_controls_system, render_playing_menu_click_regions_system,
+    render_playing_menu_system,
 };
 use rendering::{
     render_abilities_system, render_building_plan_system, render_buildings_system,
     render_bullets_system, render_command_paths_system, render_drag_box_system,
     render_health_bars_system, render_recruitment_waypoints_system, render_selections_system,
     render_ui_system, render_under_select_box_system, render_unit_under_cursor_system,
-    render_units_system, render_win_lose_system,
+    render_units_system,
 };
 
 #[legion::system]
-pub fn cleanup_controls(
+fn cleanup_controls(
     #[resource] mouse_state: &mut MouseState,
     #[resource] rts_controls: &mut RtsControls,
     #[resource] debug_controls: &mut DebugControls,
@@ -106,6 +113,7 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         // Cheese droplets.
         .add_system(spawn_cheese_droplets_system())
         .flush()
+        .add_system(expand_explosions_system())
         .add_system(apply_gravity_system())
         .add_system(move_cheese_droplets_system())
         .add_system(move_units_system())
@@ -116,14 +124,14 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(apply_bullets_system())
         .flush()
         .add_system(handle_damaged_system())
-        .add_system(update_playing_state_system());
+        .add_system(update_playing_state_system())
+        // Animations.
+        .add_system(progress_animations_system())
+        .add_system(progress_building_animations_system());
 }
 
 pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
     builder
-        .add_system(progress_animations_system())
-        .add_system(progress_building_animations_system())
-        // Rendering
         .add_system(render_bullets_system())
         .add_system(render_units_system())
         .add_system(render_selections_system())
@@ -140,14 +148,22 @@ pub fn add_rendering_systems(builder: &mut legion::systems::Builder) {
         .add_system(render_buildings_system())
         .add_system(render_building_plan_system())
         .add_system(render_cheese_droplets_system())
+        .add_system(render_explosions_system())
         .add_system(render_abilities_system())
-        .add_system(render_recruitment_waypoints_system())
-        .add_system(render_win_lose_system())
-        //.add_system(debug_select_box_system())
-        //.add_system(debug_specific_path_system())
-        // Cleanup
-        .flush()
-        .add_system(cleanup_controls_system());
+        .add_system(render_recruitment_waypoints_system());
+    //.add_system(debug_select_box_system())
+    //.add_system(debug_specific_path_system())
+}
+
+pub fn add_cleanup_systems(builder: &mut legion::systems::Builder) {
+    builder.flush().add_system(cleanup_controls_system());
+}
+
+pub fn add_playing_menu_systems(builder: &mut legion::systems::Builder) {
+    builder
+        .add_system(handle_playing_menu_controls_system())
+        .add_system(render_playing_menu_system());
+    //.add_system(render_playing_menu_click_regions_system());
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -159,7 +175,7 @@ pub struct Ability {
 impl Ability {
     const BUILD_PUMP: Self = Self {
         ability_type: AbilityType::Build(Building::Pump),
-        hotkey: VirtualKeyCode::P,
+        hotkey: VirtualKeyCode::Q,
     };
 
     const BUILD_ARMOURY: Self = Self {
@@ -350,6 +366,17 @@ pub struct BuildingStats {
 }
 
 impl Building {
+    pub fn maybe_plural(self, number: u8) -> &'static str {
+        let plural = number != 1;
+
+        match self {
+            Self::Pump if plural => "Pumps",
+            Self::Pump => "Pump",
+            Self::Armoury if plural => "Armouries",
+            Self::Armoury => "Armoury",
+        }
+    }
+
     pub fn stats(self) -> BuildingStats {
         match self {
             Self::Armoury => BuildingStats {
@@ -650,4 +677,31 @@ fn nearest_point_within_building(
     };
 
     building_pos + Vec2::new(x, y)
+}
+
+pub struct Explosion {
+    translation_rotation: Mat4,
+    size: f32,
+    max_size: f32,
+}
+
+impl Explosion {
+    pub fn new(position: Vec2, rng: &mut SmallRng) -> Self {
+        let facing = crate::titlescreen::uniform_sphere_distribution_from_coords(
+            rng.gen_range(0.0, 1.0),
+            rng.gen_range(0.0, 1.0),
+        );
+
+        let translation = Mat4::from_translation(Vec3::new(position.x, 1.0, position.y));
+
+        let rotation = ultraviolet::Rotor3::from_rotation_between(Vec3::unit_x(), facing)
+            .into_matrix()
+            .into_homogeneous();
+
+        Self {
+            translation_rotation: translation * rotation,
+            size: 0.0,
+            max_size: 10.0,
+        }
+    }
 }

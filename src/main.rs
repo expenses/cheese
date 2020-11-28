@@ -17,7 +17,7 @@ use crate::renderer::{
 use crate::resources::{
     Camera, CameraControls, CheeseCoins, ControlGroups, CursorIcon, DebugControls, DeltaTime,
     DpiScaling, Gravity, Keypress, Keypresses, Mode, MouseState, Objectives, PlayerSide,
-    PlayingState, RayCastLocation, RtsControls, ScreenDimensions, SelectedUnitsAbilities, Settings,
+    RayCastLocation, RtsControls, ScreenDimensions, SelectedUnitsAbilities, Settings,
 };
 use futures::FutureExt;
 use legion::*;
@@ -87,7 +87,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(Mode::Titlescreen);
     resources.insert(DebugControls::default());
     resources.insert(Gravity(5.0));
-    resources.insert(CheeseCoins(100));
+    resources.insert(CheeseCoins(0));
     resources.insert(SelectedUnitsAbilities::default());
     resources.insert(Keypresses::default());
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
@@ -100,7 +100,6 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(animations);
     resources.insert(pathfinding::Map::new());
     resources.insert(rng);
-    resources.insert(PlayingState::InProgress);
     resources.insert(Objectives::default());
 
     let mut titlescreen_schedule = titlescreen::titlescreen_schedule();
@@ -108,7 +107,14 @@ async fn run() -> anyhow::Result<()> {
     let mut builder = Schedule::builder();
     ecs::add_gameplay_systems(&mut builder);
     ecs::add_rendering_systems(&mut builder);
+    ecs::add_cleanup_systems(&mut builder);
     let mut schedule = builder.build();
+
+    let mut playing_menu_system = Schedule::builder();
+    ecs::add_rendering_systems(&mut playing_menu_system);
+    ecs::add_playing_menu_systems(&mut playing_menu_system);
+    ecs::add_cleanup_systems(&mut playing_menu_system);
+    let mut playing_menu_system = playing_menu_system.build();
 
     //let mut time = std::time::Instant::now();
 
@@ -134,12 +140,16 @@ async fn run() -> anyhow::Result<()> {
                     ..
                 } => {
                     let pressed = *state == ElementState::Pressed;
+                    let mode = resources.get::<Mode>().unwrap();
                     let mut keypresses = resources.get_mut::<Keypresses>().unwrap();
-                    keypresses.0.push(Keypress {
-                        code: *code,
-                        scancode: *scancode,
-                        pressed,
-                    });
+                    // We only push keypresses in modes that consume them. This is a bit messy.
+                    if matches!(*mode, Mode::Playing | Mode::PlayingMenu) {
+                        keypresses.0.push(Keypress {
+                            code: *code,
+                            scancode: *scancode,
+                            pressed,
+                        });
+                    }
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
                     let mut camera_controls = resources.get_mut::<CameraControls>().unwrap();
@@ -181,14 +191,32 @@ async fn run() -> anyhow::Result<()> {
                     let mut rng = resources.get_mut::<SmallRng>().unwrap();
                     let mut objectives = resources.get_mut::<Objectives>().unwrap();
                     let mut camera = resources.get_mut::<Camera>().unwrap();
-                    scenarios::one(
-                        &mut world,
-                        &animations,
-                        &mut map,
-                        &mut rng,
-                        &mut objectives,
-                        &mut camera,
-                    );
+                    let mut cheese_coins = resources.get_mut::<CheeseCoins>().unwrap();
+                    match scenario {
+                        1 => {
+                            scenarios::one(
+                                &mut world,
+                                &animations,
+                                &mut map,
+                                &mut rng,
+                                &mut objectives,
+                                &mut camera,
+                                &mut cheese_coins,
+                            );
+                        }
+                        2 => {
+                            scenarios::two(
+                                &mut world,
+                                &animations,
+                                &mut map,
+                                &mut rng,
+                                &mut objectives,
+                                &mut camera,
+                                &mut cheese_coins,
+                            );
+                        }
+                        _ => {}
+                    }
                     // Gotta change both the Mode in resources and the local copy.
                     *resources.get_mut::<Mode>().unwrap() = Mode::Playing;
                     mode = Mode::Playing;
@@ -198,6 +226,9 @@ async fn run() -> anyhow::Result<()> {
                     Mode::Playing => schedule.execute(&mut world, &mut resources),
                     Mode::Titlescreen => titlescreen_schedule.execute(&mut world, &mut resources),
                     Mode::Quit => *control_flow = ControlFlow::Exit,
+                    Mode::ScenarioWon | Mode::ScenarioLost | Mode::PlayingMenu => {
+                        playing_menu_system.execute(&mut world, &mut resources)
+                    }
                     Mode::StartScenario(_) => unreachable!(),
                 }
 
@@ -217,7 +248,7 @@ async fn run() -> anyhow::Result<()> {
                 // Upload buffers to the gpu.
 
                 match mode {
-                    Mode::Playing => {
+                    Mode::Playing | Mode::ScenarioWon | Mode::ScenarioLost => {
                         let camera = resources.get::<Camera>().unwrap();
                         render_context.update_from_camera(&camera);
                     }
@@ -256,7 +287,7 @@ async fn run() -> anyhow::Result<()> {
                         ),
                     });
 
-                    if let Mode::Playing = mode {
+                    if mode.should_render() {
                         render_shadows(&mut shadow_pass, &shadow_pipeline, &model_buffers, &assets);
                     }
 
@@ -305,37 +336,33 @@ async fn run() -> anyhow::Result<()> {
                         ),
                     });
 
-                    match mode {
-                        Mode::Playing => {
-                            render_playing(
-                                &mut render_pass,
-                                &model_pipelines,
-                                &model_buffers,
-                                &torus_pipeline,
-                                &torus_buffer,
-                                &lines_pipeline,
-                                &line_buffers,
-                                &lines_3d_pipeline,
-                                &lines_3d_buffer,
-                                &assets,
-                            );
-                        }
-                        Mode::Titlescreen => {
-                            model_pipelines.render_single_with_transform(
-                                &mut render_pass,
-                                &assets.cheese_moon_model,
-                                &assets.surface_texture,
-                                &titlescreen_buffer.moon,
-                            );
-                            model_pipelines.render_transparent_buffer(
-                                &mut render_pass,
-                                &assets.billboard_model,
-                                &titlescreen_buffer.stars,
-                                titlescreen_buffer.num_stars,
-                            );
-                            lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
-                        }
-                        _ => {}
+                    if mode.should_render() {
+                        render_playing(
+                            &mut render_pass,
+                            &model_pipelines,
+                            &model_buffers,
+                            &torus_pipeline,
+                            &torus_buffer,
+                            &lines_pipeline,
+                            &line_buffers,
+                            &lines_3d_pipeline,
+                            &lines_3d_buffer,
+                            &assets,
+                        );
+                    } else if let Mode::Titlescreen = mode {
+                        model_pipelines.render_single_with_transform(
+                            &mut render_pass,
+                            &assets.cheese_moon_model,
+                            &assets.surface_texture,
+                            &titlescreen_buffer.moon,
+                        );
+                        model_pipelines.render_transparent_buffer(
+                            &mut render_pass,
+                            &assets.billboard_model,
+                            &titlescreen_buffer.stars,
+                            titlescreen_buffer.num_stars,
+                        );
+                        lines_pipeline.render(&mut render_pass, &line_buffers, &assets);
                     }
 
                     drop(render_pass);
@@ -395,6 +422,26 @@ async fn run() -> anyhow::Result<()> {
                         );
                         render_pass.draw(0..3, 0..1);
 
+                        drop(render_pass);
+                    }
+
+                    // Darken the screen if we're in a menu.
+                    if mode.is_playing_menu() {
+                        let mut render_pass =
+                            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                                    attachment: &render_context.framebuffer,
+                                    resolve_target: None,
+                                    ops: wgpu::Operations {
+                                        load: wgpu::LoadOp::Load,
+                                        store: true,
+                                    },
+                                }],
+                                depth_stencil_attachment: None,
+                            });
+
+                        render_pass.set_pipeline(&render_context.darken_pipeline);
+                        render_pass.draw(0..3, 0..1);
                         drop(render_pass);
                     }
 
@@ -579,6 +626,15 @@ fn render_playing<'a>(
         &mut render_pass,
         &assets.surface_texture,
         &assets.surface_model,
+    );
+    // Explosions
+    // Needs to go after the ground because otherwise underground bloom fragments will be written to
+    // And not overwritten.
+    model_pipelines.render_transparent_textured_with_bloom(
+        &mut render_pass,
+        &model_buffers.explosions,
+        &assets.explosion_texture,
+        &assets.explosion_model,
     );
     model_pipelines.render_transparent_textured_without_depth(
         &mut render_pass,

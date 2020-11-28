@@ -1,9 +1,7 @@
 use crate::renderer::{
     Font, LineBuffers, ModelInstance, TextAlignment, TextBuffer, TitlescreenBuffer,
 };
-use crate::resources::{
-    Camera, CursorIcon, DeltaTime, DpiScaling, Mode, MouseState, ScreenDimensions,
-};
+use crate::resources::{CursorIcon, DeltaTime, DpiScaling, Mode, MouseState, ScreenDimensions};
 use legion::*;
 use ultraviolet::{Mat4, Rotor3, Vec2, Vec3, Vec4};
 
@@ -29,6 +27,12 @@ const SCENARIOS_MENU: &'static [(&'static str, Vec2)] = &[
     ("Back", Vec2::new(0.3, 5.0 / 6.0)),
 ];
 
+pub const TEXT_COLOUR: Vec4 = Vec4::new(0.867, 0.675, 0.086, 1.0);
+
+pub fn selected_colour() -> Vec4 {
+    TEXT_COLOUR * 0.5 + Vec4::one() * 0.5
+}
+
 pub enum Menu {
     Main,
     Scenarios,
@@ -44,13 +48,16 @@ impl Menu {
 }
 
 pub fn titlescreen_schedule() -> Schedule {
-    Schedule::builder()
+    let mut builder = Schedule::builder();
+
+    builder
         .add_system(update_system())
         .add_system(handle_clicks_system())
-        .add_system(render_text_system())
-        //.add_system(render_click_regions_system())
-        .add_system(crate::ecs::cleanup_controls_system())
-        .build()
+        .add_system(render_text_system());
+    //.(render_click_regions_system())
+
+    crate::ecs::add_cleanup_systems(&mut builder);
+    builder.build()
 }
 
 #[derive(Default)]
@@ -82,9 +89,6 @@ fn render_text(
 ) {
     let screen_dimensions = screen_dimensions.as_vec();
 
-    let colour = Vec4::new(0.867, 0.675, 0.086, 1.0);
-    let selected_colour = colour * 0.5 + Vec4::one() * 0.5;
-
     text_buffer.render_text(
         TITLE_POSITION * screen_dimensions,
         "Cheese (working title :^))",
@@ -92,7 +96,7 @@ fn render_text(
         1.5,
         dpi_scaling.0,
         TextAlignment::Center,
-        colour,
+        TEXT_COLOUR,
     );
 
     for (text, position) in menu.list().iter() {
@@ -112,7 +116,11 @@ fn render_text(
             1.0,
             dpi_scaling.0,
             TextAlignment::Center,
-            if selected { selected_colour } else { colour },
+            if selected {
+                selected_colour()
+            } else {
+                TEXT_COLOUR
+            },
         );
     }
 }
@@ -140,7 +148,6 @@ fn handle_clicks(
     #[resource] dpi_scaling: &DpiScaling,
     #[resource] mouse_state: &MouseState,
     #[resource] mode: &mut Mode,
-    #[resource] camera: &mut Camera,
     #[resource] menu: &mut Menu,
 ) {
     if !mouse_state.left_state.was_clicked() {
@@ -180,7 +187,7 @@ fn handle_clicks(
 }
 
 // Kinda hacky code to get a selection box around some text. Works well enough though.
-fn text_selection_area(center: Vec2, text: &str, dpi_scaling: f32) -> (Vec2, Vec2) {
+pub fn text_selection_area(center: Vec2, text: &str, dpi_scaling: f32) -> (Vec2, Vec2) {
     let dimensions = Vec2::new(
         text.len() as f32 / 2.0 * Font::Title.scale() * dpi_scaling,
         Font::Title.scale() * dpi_scaling,
@@ -189,7 +196,7 @@ fn text_selection_area(center: Vec2, text: &str, dpi_scaling: f32) -> (Vec2, Vec
     (center - dimensions / 2.0, center + dimensions / 2.0)
 }
 
-fn point_in_area(point: Vec2, top_left: Vec2, bottom_right: Vec2) -> bool {
+pub fn point_in_area(point: Vec2, top_left: Vec2, bottom_right: Vec2) -> bool {
     point.x >= top_left.x
         && point.y >= top_left.y
         && point.x <= bottom_right.x

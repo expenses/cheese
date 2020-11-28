@@ -1,8 +1,8 @@
 use super::*;
 use crate::assets::ModelAnimations;
 use crate::resources::{
-    CheeseCoins, CommandMode, ControlGroups, Keypress, Keypresses, LoseCondition, Objectives,
-    PlayingState, RayCastLocation, SelectedUnitsAbilities, WinCondition,
+    CheeseCoins, CommandMode, ControlGroups, Keypress, Keypresses, LoseCondition, Mode, Objectives,
+    RayCastLocation, SelectedUnitsAbilities, WinCondition,
 };
 
 #[legion::system]
@@ -15,6 +15,7 @@ pub fn handle_keypresses(
     #[resource] cheese_coins: &mut CheeseCoins,
     #[resource] player_side: &mut PlayerSide,
     #[resource] selected_units_abilities: &SelectedUnitsAbilities,
+    #[resource] mode: &mut Mode,
     world: &mut SubWorld,
 ) {
     for Keypress {
@@ -81,7 +82,13 @@ pub fn handle_keypresses(
                 VirtualKeyCode::S if pressed => rts_controls.stop_pressed = true,
                 VirtualKeyCode::A if pressed => rts_controls.mode = CommandMode::AttackMove,
                 VirtualKeyCode::T if pressed => debug_controls.set_pathfinding_start_pressed = true,
-                VirtualKeyCode::Escape if pressed => rts_controls.mode = CommandMode::Normal,
+                VirtualKeyCode::Escape if pressed => {
+                    if rts_controls.mode != CommandMode::Normal {
+                        rts_controls.mode = CommandMode::Normal;
+                    } else {
+                        *mode = Mode::PlayingMenu;
+                    }
+                }
 
                 VirtualKeyCode::Key0 if pressed => rts_controls.control_group_key_pressed[0] = true,
                 VirtualKeyCode::Key1 if pressed => rts_controls.control_group_key_pressed[1] = true,
@@ -620,7 +627,7 @@ fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {
 pub fn update_playing_state(
     #[resource] objectives: &Objectives,
     #[resource] player_side: &PlayerSide,
-    #[resource] playing_state: &mut PlayingState,
+    #[resource] mode: &mut Mode,
     world: &SubWorld,
 ) {
     let won = objectives
@@ -647,7 +654,7 @@ pub fn update_playing_state(
         });
 
     if won {
-        *playing_state = PlayingState::Won;
+        *mode = Mode::ScenarioWon;
         return;
     }
 
@@ -666,7 +673,7 @@ pub fn update_playing_state(
         });
 
     if lost {
-        *playing_state = PlayingState::Lost;
+        *mode = Mode::ScenarioLost;
     }
 }
 

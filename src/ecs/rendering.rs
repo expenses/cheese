@@ -5,7 +5,7 @@ use crate::renderer::{
     TorusInstance,
 };
 use crate::resources::{
-    CheeseCoins, CommandMode, CursorIcon, DpiScaling, Objectives, PlayingState, RayCastLocation,
+    CheeseCoins, CommandMode, CursorIcon, DpiScaling, Mode, Objectives, RayCastLocation,
     SelectedUnitsAbilities,
 };
 use ultraviolet::Vec4;
@@ -124,8 +124,13 @@ pub fn render_under_select_box(
     #[resource] screen_dimensions: &ScreenDimensions,
     #[resource] player_side: &PlayerSide,
     #[resource] torus_buffer: &mut TorusBuffer,
+    #[resource] mode: &Mode,
     world: &SubWorld,
 ) {
+    if *mode != Mode::Playing {
+        return;
+    }
+
     if let Some(start) = mouse_state.left_state.is_being_dragged() {
         let select_box = SelectBox::new(camera, screen_dimensions, start, mouse_state.position);
 
@@ -215,16 +220,28 @@ pub fn render_ui(
     #[resource] text_buffer: &mut TextBuffer,
     #[resource] player_side: &PlayerSide,
     #[resource] objectives: &Objectives,
-    #[resource] playing_state: &PlayingState,
+    #[resource] mode: &Mode,
     world: &SubWorld,
 ) {
-    if *playing_state != PlayingState::InProgress {
+    if *mode != Mode::Playing {
         return;
     }
 
     let coins = std::iter::once(format!("Cheese coins: {}\n", cheese_coins.0));
     let mode = std::iter::once(format!("Mode: {:?}\n", rts_controls.mode));
-    let objectives = std::iter::once(format!("Objectives: {:?}\n", objectives));
+    let objectives = std::iter::once(format!("Objectives:\n"))
+        .chain(
+            objectives
+                .win_conditions
+                .iter()
+                .map(|cond| format!("{}\n", cond)),
+        )
+        .chain(
+            objectives
+                .lose_conditions
+                .iter()
+                .map(|cond| format!("{}\n", cond)),
+        );
 
     let mut query = <(&RecruitmentQueue, &Side)>::query();
     let queue_infos = query
@@ -403,8 +420,13 @@ pub fn render_buildings(
 pub fn render_drag_box(
     #[resource] mouse_state: &MouseState,
     #[resource] dpi_scaling: &DpiScaling,
+    #[resource] mode: &Mode,
     #[resource] line_buffers: &mut LineBuffers,
 ) {
+    if *mode != Mode::Playing {
+        return;
+    }
+
     if let Some(start) = mouse_state.left_state.is_being_dragged() {
         let (top_left, bottom_right) = sort_points(start, mouse_state.position);
         line_buffers.draw_rect(top_left, bottom_right, dpi_scaling.0);
@@ -535,37 +557,4 @@ pub fn render_abilities(
             );
         }
     }
-}
-
-#[legion::system]
-pub fn render_win_lose(
-    #[resource] playing_state: &PlayingState,
-    #[resource] line_buffers: &mut LineBuffers,
-    #[resource] text_buffer: &mut TextBuffer,
-    #[resource] screen_dimensions: &ScreenDimensions,
-    #[resource] dpi_scaling: &DpiScaling,
-) {
-    if *playing_state == PlayingState::InProgress {
-        return;
-    }
-
-    let screen_dims = screen_dimensions.as_vec();
-
-    line_buffers.draw_filled_rect(
-        screen_dims / 2.0,
-        screen_dims,
-        Vec4::new(0.0, 0.0, 0.0, 0.925),
-        // Don't need DPI if we're just rendering a fullscreen quad.
-        1.0,
-    );
-
-    text_buffer.render_text(
-        Vec2::new(0.5, 0.4) * screen_dims,
-        &format!("Scenario {:?}", playing_state),
-        Font::Title,
-        1.5,
-        dpi_scaling.0,
-        TextAlignment::Center,
-        Vec4::one(),
-    );
 }

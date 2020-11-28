@@ -1,6 +1,6 @@
 use super::{
     CheeseDropletPosition, CheeseDropletVelocity, CheeseGuyser, CheeseGuyserBuiltOn, Cooldown,
-    Position,
+    Explosion, Position,
 };
 use crate::renderer::{ModelBuffers, ModelInstance};
 use crate::resources::{DeltaTime, Gravity};
@@ -68,4 +68,25 @@ pub fn render_cheese_droplets(
         transform: translation * rotation,
         flat_colour: Vec4::one(),
     });
+}
+
+#[legion::system(for_each)]
+pub fn render_explosions(explosion: &Explosion, #[resource] model_buffers: &mut ModelBuffers) {
+    model_buffers.explosions.push(ModelInstance {
+        transform: explosion.translation_rotation * Mat4::from_scale(explosion.size),
+        flat_colour: Vec4::new(1.0, 1.0, 1.0, 1.0 / 3.0),
+    });
+}
+
+#[legion::system(for_each)]
+pub fn expand_explosions(
+    entity: &Entity,
+    explosion: &mut Explosion,
+    #[resource] delta_time: &DeltaTime,
+    buffer: &mut CommandBuffer,
+) {
+    explosion.size += delta_time.0;
+    if explosion.size > explosion.max_size {
+        //buffer.remove(*entity);
+    }
 }

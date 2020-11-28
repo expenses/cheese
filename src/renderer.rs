@@ -81,6 +81,8 @@ pub struct RenderContext {
     pub shadow_uniform_bind_group: Arc<wgpu::BindGroup>,
     pub shadow_uniform_bind_group_layout: wgpu::BindGroupLayout,
     shadow_uniform_buffer: wgpu::Buffer,
+
+    pub darken_pipeline: wgpu::RenderPipeline,
 }
 
 impl RenderContext {
@@ -129,7 +131,76 @@ impl RenderContext {
             )
             .await?;
 
-        // Create bind groups
+        // Create samplers
+
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            label: Some("Cheese sampler"),
+            ..Default::default()
+        });
+
+        let shadow_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            label: Some("Cheese shadow sampler"),
+            ..Default::default()
+        });
+
+        let framebuffer_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Cheese framebuffer sampler"),
+            ..Default::default()
+        });
+
+        // Create basic buffers
+
+        let window_size = window.inner_size();
+
+        let perspective_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Cheese perspective buffer"),
+            contents: bytemuck::bytes_of(&create_perspective_mat4(
+                window_size.width,
+                window_size.height,
+            )),
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        });
+
+        let view_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Cheese view buffer"),
+            contents: bytemuck::bytes_of(&Mat4::look_at(Vec3::one(), Vec3::zero(), Vec3::unit_y())),
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        });
+
+        let sun_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Cheese sun buffer"),
+            contents: &bytemuck::bytes_of(&SUN_DIRECTION),
+            usage: wgpu::BufferUsage::UNIFORM,
+        });
+
+        let screen_dimension_uniform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Cheese screen dimension uniform buffer"),
+                contents: &bytemuck::bytes_of(&ScreenDimensionUniform::new(
+                    window_size.width,
+                    window_size.height,
+                )),
+                usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            });
+
+        // Create the shadow attachment
+
+        let shadow_texture = create_texture(
+            &device,
+            "Cheese shadow texture",
+            settings.shadow_resolution,
+            settings.shadow_resolution,
+            DEPTH_FORMAT,
+            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        );
+
+        // Create the main bind group
 
         let main_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -187,71 +258,6 @@ impl RenderContext {
                 ],
             });
 
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            address_mode_u: wgpu::AddressMode::Repeat,
-            address_mode_v: wgpu::AddressMode::Repeat,
-            label: Some("Cheese sampler"),
-            ..Default::default()
-        });
-
-        let shadow_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            label: Some("Cheese shadow sampler"),
-            ..Default::default()
-        });
-
-        let framebuffer_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Cheese framebuffer sampler"),
-            ..Default::default()
-        });
-
-        let window_size = window.inner_size();
-
-        let perspective_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Cheese perspective buffer"),
-            contents: bytemuck::bytes_of(&create_perspective_mat4(
-                window_size.width,
-                window_size.height,
-            )),
-            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        });
-
-        let view = Mat4::look_at(Vec3::one(), Vec3::zero(), Vec3::unit_y());
-
-        let view_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Cheese view buffer"),
-            contents: bytemuck::bytes_of(&view),
-            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        });
-
-        let sun_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Cheese sun buffer"),
-            contents: &bytemuck::bytes_of(&SUN_DIRECTION),
-            usage: wgpu::BufferUsage::UNIFORM,
-        });
-
-        let screen_dimension_uniform_buffer =
-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Cheese screen dimension uniform buffer"),
-                contents: &bytemuck::bytes_of(&ScreenDimensionUniform::new(
-                    window_size.width,
-                    window_size.height,
-                )),
-                usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-            });
-
-        let shadow_texture = create_texture(
-            &device,
-            "Cheese shadow texture",
-            settings.shadow_resolution,
-            settings.shadow_resolution,
-            DEPTH_FORMAT,
-            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
-        );
-
         let main_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &main_bind_group_layout,
             entries: &[
@@ -295,25 +301,7 @@ impl RenderContext {
             label: Some("Cheese main bind group"),
         });
 
-        // Create the swap chain.
-
-        let swap_chain_desc = wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
-            format: DISPLAY_FORMAT,
-            width: window_size.width,
-            height: window_size.height,
-            present_mode: wgpu::PresentMode::Fifo,
-        };
-
-        let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
-        let depth_texture = create_texture(
-            &device,
-            "Cheese depth texture",
-            window_size.width,
-            window_size.height,
-            DEPTH_FORMAT,
-            wgpu::TextureUsage::RENDER_ATTACHMENT,
-        );
+        // Post-processing
 
         let framebuffer_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -337,6 +325,14 @@ impl RenderContext {
                     },
                 ],
             });
+
+        let (framebuffer, framebuffer_bind_group) = create_framebuffer(
+            &device,
+            &framebuffer_bind_group_layout,
+            &framebuffer_sampler,
+            window_size.width,
+            window_size.height,
+        );
 
         let post_processing_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -373,13 +369,7 @@ impl RenderContext {
             &fs_copy_to_swapchain_frame_module,
         );
 
-        let (framebuffer, framebuffer_bind_group) = create_framebuffer(
-            &device,
-            &framebuffer_bind_group_layout,
-            &framebuffer_sampler,
-            window_size.width,
-            window_size.height,
-        );
+        // Re-usable bind group layouts, buffers and shader modules
 
         let joint_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -536,7 +526,7 @@ impl RenderContext {
             &device,
             "Cheese bloom first pass bind group",
             &bloom_bind_group_layout,
-            &sampler,
+            &framebuffer_sampler,
             &bloombuffer,
             &bloom_blur_vert_buffer,
         );
@@ -544,7 +534,7 @@ impl RenderContext {
             &device,
             "Cheese bloom second pass bind group",
             &bloom_bind_group_layout,
-            &sampler,
+            &framebuffer_sampler,
             &bloombuffer_after_vertical,
             &bloom_blur_hori_buffer,
         );
@@ -583,6 +573,65 @@ impl RenderContext {
             alpha_to_coverage_enabled: false,
         });
 
+        // Darkening pipeline for menus on top of the game.
+
+        let fs_darken = wgpu::include_spirv!("../shaders/compiled/darken.frag.spv");
+        let fs_darken_module = device.create_shader_module(fs_darken);
+
+        let darken_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Cheese darken pipeline layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+
+        let darken_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Cheese darken pipeline"),
+            layout: Some(&darken_pipeline_layout),
+            vertex_stage: wgpu::ProgrammableStageDescriptor {
+                module: &vs_full_screen_tri_module,
+                entry_point: "main",
+            },
+            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+                module: &fs_darken_module,
+                entry_point: "main",
+            }),
+            rasterization_state: Some(wgpu::RasterizationStateDescriptor::default()),
+            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
+            color_states: &[colour_state_descriptor(true)],
+            depth_stencil_state: None,
+            vertex_state: wgpu::VertexStateDescriptor {
+                index_format: INDEX_FORMAT,
+                vertex_buffers: &[],
+            },
+            sample_count: 1,
+            sample_mask: !0,
+            alpha_to_coverage_enabled: false,
+        });
+
+        // Create the swap chain
+
+        let swap_chain_desc = wgpu::SwapChainDescriptor {
+            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+            format: DISPLAY_FORMAT,
+            width: window_size.width,
+            height: window_size.height,
+            present_mode: wgpu::PresentMode::Fifo,
+        };
+
+        let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
+
+        // Create the depth attachment
+
+        let depth_texture = create_texture(
+            &device,
+            "Cheese depth texture",
+            window_size.width,
+            window_size.height,
+            DEPTH_FORMAT,
+            wgpu::TextureUsage::RENDER_ATTACHMENT,
+        );
+
         Ok(Self {
             swap_chain,
             window,
@@ -619,6 +668,7 @@ impl RenderContext {
             bloom_second_pass_bind_group,
             bloom_bind_group_layout,
             bloom_blur_pipeline,
+            darken_pipeline,
         })
     }
 
@@ -674,7 +724,7 @@ impl RenderContext {
             &self.device,
             "Cheese bloom first pass bind group",
             &self.bloom_bind_group_layout,
-            &self.sampler,
+            &self.framebuffer_sampler,
             &self.bloombuffer,
             &self.bloom_blur_vert_buffer,
         );
@@ -682,7 +732,7 @@ impl RenderContext {
             &self.device,
             "Cheese bloom second pass bind group",
             &self.bloom_bind_group_layout,
-            &self.sampler,
+            &self.framebuffer_sampler,
             &self.bloombuffer_after_vertical,
             &self.bloom_blur_hori_buffer,
         );
