@@ -686,7 +686,7 @@ pub struct Explosion {
 }
 
 impl Explosion {
-    pub fn new(position: Vec2, rng: &mut SmallRng) -> Self {
+    pub fn new(position: Vec2, rng: &mut SmallRng, max_size: f32) -> Self {
         let facing = crate::titlescreen::uniform_sphere_distribution_from_coords(
             rng.gen_range(0.0, 1.0),
             rng.gen_range(0.0, 1.0),
@@ -700,8 +700,8 @@ impl Explosion {
 
         Self {
             translation_rotation: translation * rotation,
-            size: 0.0,
-            max_size: 10.0,
+            size: max_size / 4.0,
+            max_size,
         }
     }
 }

@@ -87,6 +87,8 @@ pub fn apply_bullets(
 #[read_component(Building)]
 pub fn handle_damaged(
     entity: &Entity,
+    position: &Position,
+    radius: &Radius,
     damaged: &DamagedThisTick,
     health: &mut Health,
     // None in the case of a building.
@@ -94,6 +96,7 @@ pub fn handle_damaged(
     map_handle: Option<&MapHandle>,
     buffer: &mut CommandBuffer,
     #[resource] map: &mut Map,
+    #[resource] rng: &mut SmallRng,
     world: &SubWorld,
 ) {
     health.0 = (health.0 - 2.0).max(0.0);
@@ -104,6 +107,8 @@ pub fn handle_damaged(
         if let Some(map_handle) = map_handle {
             map.remove(map_handle);
         }
+
+        buffer.push((Explosion::new(position.0, rng, radius.0),));
 
         return;
     }

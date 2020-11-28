@@ -85,8 +85,9 @@ pub fn expand_explosions(
     #[resource] delta_time: &DeltaTime,
     buffer: &mut CommandBuffer,
 ) {
-    explosion.size += delta_time.0;
+    let expand_speed = 3.0;
+    explosion.size += delta_time.0 * expand_speed;
     if explosion.size > explosion.max_size {
-        //buffer.remove(*entity);
+        buffer.remove(*entity);
     }
 }
