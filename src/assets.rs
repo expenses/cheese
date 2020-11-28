@@ -229,7 +229,7 @@ fn load_texture(
     device: &wgpu::Device,
     encoder: &mut wgpu::CommandEncoder,
 ) -> anyhow::Result<wgpu::BindGroup> {
-    let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png)?.into_rgba();
+    let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png)?.into_rgba8();
 
     let temp_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Cheese texture staging buffer"),

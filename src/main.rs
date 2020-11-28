@@ -19,7 +19,6 @@ use crate::resources::{
     DpiScaling, Gravity, Keypress, Keypresses, Mode, MouseState, Objectives, PlayerSide,
     RayCastLocation, RtsControls, ScreenDimensions, SelectedUnitsAbilities, Settings,
 };
-use futures::FutureExt;
 use legion::*;
 use rand::{rngs::SmallRng, SeedableRng};
 use ultraviolet::Vec2;
@@ -32,9 +31,13 @@ use winit::{
 fn main() -> anyhow::Result<()> {
     #[cfg(feature = "wasm")]
     {
-        console_log::init_with_level(log::Level::Info);
+        console_log::init_with_level(log::Level::Info)?;
         console_error_panic_hook::set_once();
-        wasm_bindgen_futures::spawn_local(run().map(drop));
+        wasm_bindgen_futures::spawn_local(async {
+            if let Err(error) = run().await {
+                log::error!("{}", error);
+            }
+        });
     }
     #[cfg(not(feature = "wasm"))]
     {
