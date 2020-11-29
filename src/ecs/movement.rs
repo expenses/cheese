@@ -270,7 +270,8 @@ pub fn move_bullets(
 fn move_towards(pos: &mut Vec2, facing: &mut f32, target: Vec2, speed: f32, delta_time: f32) {
     let direction = target - *pos;
     if direction.mag_sq() > 0.0 {
-        *facing = direction.y.atan2(direction.x);
+        let correct_facing = direction.y.atan2(direction.x);
+        *facing = interpolate_rotations(*facing, correct_facing, 1.0 / 3.0);
     }
 
     if direction.mag_sq() <= (speed * delta_time).powi(2) {
@@ -278,4 +279,11 @@ fn move_towards(pos: &mut Vec2, facing: &mut f32, target: Vec2, speed: f32, delt
     } else {
         *pos += direction.normalized() * speed * delta_time;
     }
+}
+
+// Works well enough.
+fn interpolate_rotations(a: f32, b: f32, factor: f32) -> f32 {
+    let cos = mix(a.cos(), b.cos(), factor);
+    let sin = mix(a.sin(), b.sin(), factor);
+    sin.atan2(cos)
 }

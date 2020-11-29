@@ -1,6 +1,6 @@
 use crate::assets::ModelAnimations;
 use crate::pathfinding::{Map, MapHandle};
-use crate::renderer::Button;
+use crate::renderer::Image;
 use crate::resources::{
     Camera, CameraControls, DeltaTime, MouseState, PlayerSide, RtsControls, ScreenDimensions,
 };
@@ -13,6 +13,7 @@ use std::collections::VecDeque;
 use ultraviolet::{Mat4, Vec2, Vec3};
 use winit::event::VirtualKeyCode;
 
+mod ai;
 mod animation;
 mod buildings;
 mod combat;
@@ -24,6 +25,7 @@ mod playing_menu;
 mod rendering;
 
 use crate::resources::DebugControls;
+use ai::follow_ai_build_orders_system;
 use animation::{progress_animations_system, progress_building_animations_system};
 use buildings::{
     build_buildings_system, free_up_cheese_guysers_system, generate_cheese_coins_system,
@@ -104,6 +106,7 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(avoidance_system())
         .add_system(add_attack_commands_system())
         .add_system(update_selected_units_abilities_system())
+        .add_system(follow_ai_build_orders_system())
         // Needed because a command could place a building using a command buffer, but the entity
         // reference wouldn't be valid until the commands in the buffer have been executed.
         .flush()
@@ -190,7 +193,7 @@ impl Ability {
 
     const RECRUIT_MOUSE_MARINE: Self = Self {
         ability_type: AbilityType::Recruit(Unit::MouseMarine),
-        hotkey: VirtualKeyCode::M,
+        hotkey: VirtualKeyCode::F,
     };
 
     const SET_RECRUITMENT_WAYPOINT: Self = Self {
@@ -198,13 +201,13 @@ impl Ability {
         hotkey: VirtualKeyCode::W,
     };
 
-    fn button(&self) -> Button {
+    fn image(&self) -> Image {
         match self.ability_type {
-            AbilityType::Build(Building::Armoury) => Button::BuildArmoury,
-            AbilityType::Build(Building::Pump) => Button::BuildPump,
-            AbilityType::Recruit(Unit::Engineer) => Button::RecruitEngineer,
-            AbilityType::Recruit(Unit::MouseMarine) => Button::RecruitMouseMarine,
-            AbilityType::SetRecruitmentWaypoint => Button::SetRecruitmentWaypoint,
+            AbilityType::Build(Building::Armoury) => Image::BuildArmoury,
+            AbilityType::Build(Building::Pump) => Image::BuildPump,
+            AbilityType::Recruit(Unit::Engineer) => Image::RecruitEngineer,
+            AbilityType::Recruit(Unit::MouseMarine) => Image::RecruitMouseMarine,
+            AbilityType::SetRecruitmentWaypoint => Image::SetRecruitmentWaypoint,
         }
     }
 }
@@ -231,6 +234,16 @@ pub enum Side {
     Green,
     Purple,
 }
+
+impl Side {
+    fn flip(&self) -> Self {
+        match self {
+            Self::Green => Self::Purple,
+            Self::Purple => Self::Green,
+        }
+    }
+}
+
 pub struct Selected;
 pub struct Selectable;
 
@@ -242,7 +255,7 @@ pub struct MovementDebugging {
     path_end: Vec2,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Command {
     MoveTo {
         target: Vec2,
@@ -269,6 +282,13 @@ pub enum Command {
 }
 
 impl Command {
+    fn new_build(target: Entity) -> Self {
+        Self::Build {
+            target,
+            state: ActionState::InRange,
+        }
+    }
+
     fn new_attack(target: Entity, explicit: bool) -> Self {
         Self::Attack {
             target,
@@ -313,7 +333,7 @@ impl Command {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ActionState {
     OutOfRange { path: Vec<Vec2> },
     InRange,
@@ -453,6 +473,7 @@ impl Building {
                     time: 0.0,
                     total_time: animations.pump.animations[0].total_time,
                 });
+                entry.add_component(Cooldown(0.0));
             }
             Building::Armoury => {
                 entry.add_component(Abilities(vec![
@@ -466,13 +487,63 @@ impl Building {
 
         Some(entity)
     }
+
+    pub fn add_to_world_to_construct(
+        self,
+        buffer: &mut CommandBuffer,
+        position: Vec2,
+        side: Side,
+        animations: &ModelAnimations,
+        map: &mut Map,
+    ) -> Option<Entity> {
+        let parts = self.parts(position, side, map)?;
+        let entity = buffer.push(parts);
+
+        match self {
+            Building::Pump => {
+                buffer.add_component(entity, animations.pump.skin.clone());
+                buffer.add_component(
+                    entity,
+                    AnimationState {
+                        animation: 0,
+                        time: 0.0,
+                        total_time: animations.pump.animations[0].total_time,
+                    },
+                );
+                buffer.add_component(entity, Cooldown(0.0));
+            }
+            Building::Armoury => {
+                buffer.add_component(
+                    entity,
+                    Abilities(vec![
+                        &Ability::RECRUIT_MOUSE_MARINE,
+                        &Ability::RECRUIT_ENGINEER,
+                        &Ability::SET_RECRUITMENT_WAYPOINT,
+                    ]),
+                );
+                buffer.add_component(entity, RecruitmentQueue::default());
+            }
+        }
+
+        Some(entity)
+    }
 }
 
 #[derive(Default)]
 pub struct RecruitmentQueue {
-    progress: f32,
+    percentage_progress: f32,
     pub queue: VecDeque<Unit>,
     waypoint: Vec2,
+}
+
+impl RecruitmentQueue {
+    fn length(&self) -> ordered_float::OrderedFloat<f32> {
+        ordered_float::OrderedFloat(if self.queue.is_empty() {
+            0.0
+        } else {
+            (self.queue.len() - 1) as f32 + (1.0 - self.percentage_progress)
+        })
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -681,12 +752,12 @@ fn nearest_point_within_building(
 
 pub struct Explosion {
     translation_rotation: Mat4,
-    size: f32,
+    progress: f32,
     max_size: f32,
 }
 
 impl Explosion {
-    pub fn new(position: Vec2, rng: &mut SmallRng) -> Self {
+    pub fn new(position: Vec2, rng: &mut SmallRng, max_size: f32) -> Self {
         let facing = crate::titlescreen::uniform_sphere_distribution_from_coords(
             rng.gen_range(0.0, 1.0),
             rng.gen_range(0.0, 1.0),
@@ -700,8 +771,28 @@ impl Explosion {
 
         Self {
             translation_rotation: translation * rotation,
-            size: 0.0,
-            max_size: 10.0,
+            progress: 0.0,
+            max_size,
         }
     }
+
+    fn duration(&self) -> f32 {
+        let min_size = self.max_size / 4.0;
+        self.max_size - min_size
+    }
+
+    fn size(&self) -> f32 {
+        let min_size = self.max_size / 4.0;
+        let easing = mix(self.progress, ease_out_quad(self.progress), 0.8);
+
+        min_size + easing * self.duration()
+    }
+}
+
+fn mix(a: f32, b: f32, factor: f32) -> f32 {
+    a * (1.0 - factor) + b * factor
+}
+
+fn ease_out_quad(x: f32) -> f32 {
+    1.0 - (1.0 - x) * (1.0 - x)
 }

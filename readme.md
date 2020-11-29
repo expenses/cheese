@@ -1,3 +1,20 @@
-A game for the [2020 github game off](https://itch.io/jam/game-off-2020)
+As we all know, the moon is made of cheese. Unfortunately, the cheese on the surface of the moon is a bit dry and tasteless, due to sitting out in a vacuum.  The really good cheese lies underground in vast cheese lakes. As the CEO of a hyper-capitalistic mice company, it's your job is control the flow of cheese at all costs!
 
-![A bunch of mice shooting another mouse](readme/helmets.png)
+Featuring:
+
+## A titlescreen! (Very Important!)
+
+![](readme/titlescreen.png)
+
+## Cute mice!
+
+![](readme/mice.png)
+
+## Combat!
+
+![](readme/combat.png)
+
+## Everything explodes!
+
+![](readme/explosions.png)
+

@@ -1,7 +1,8 @@
 - Units should not try to move to the same spot, but the path locations should be spread out.
-- AI
+- AI!!!!
 - Fill out HUD (medium)
 - Pyschic units
 - Helmets should increase opacity when in combat
 - Map crevasses
 - Stats on win/loss
+- Minimap?

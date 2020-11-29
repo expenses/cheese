@@ -221,7 +221,7 @@ impl MouseButtonState {
 pub struct PlayerSide(pub ecs::Side);
 pub struct DeltaTime(pub f32);
 pub struct CursorIcon(pub winit::window::CursorIcon);
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RayCastLocation {
     pub pos: Vec2,
     pub snapped_to_guyser: Option<Entity>,
@@ -305,3 +305,17 @@ impl Default for Settings {
         }
     }
 }
+
+pub struct TotalTime(pub f32);
+
+#[derive(Debug)]
+pub enum AiBuildOrderItem {
+    BuildPump(Entity),
+    BuildArmoury(Vec2),
+    RecruitMarine(u32),
+    AttackMove(Vec2),
+    SetWaypoint(Vec2),
+}
+
+#[derive(Default)]
+pub struct AiBuildOrders(pub Vec<(f32, AiBuildOrderItem)>);

@@ -166,15 +166,16 @@ pub struct LineBuffers {
     lyon_buffers: VertexBuffers<Vertex, u16>,
 }
 
-pub enum Button {
+pub enum Image {
     BuildPump,
     BuildArmoury,
     RecruitEngineer,
     RecruitMouseMarine,
     SetRecruitmentWaypoint,
+    CheeseCoins,
 }
 
-impl Button {
+impl Image {
     fn uv(&self) -> (Vec2, Vec2) {
         match self {
             Self::BuildPump => (Vec2::new(0.0, 0.0), Vec2::new(0.25, 0.5)),
@@ -182,6 +183,7 @@ impl Button {
             Self::RecruitEngineer => (Vec2::new(0.0, 0.5), Vec2::new(0.25, 0.5)),
             Self::RecruitMouseMarine => (Vec2::new(0.25, 0.5), Vec2::new(0.25, 0.5)),
             Self::SetRecruitmentWaypoint => (Vec2::new(0.5, 0.0), Vec2::new(0.25, 0.5)),
+            Self::CheeseCoins => (Vec2::new(0.75, 0.5), Vec2::new(0.125, 0.25)),
         }
     }
 }
@@ -225,18 +227,18 @@ impl LineBuffers {
         self.buffer();
     }
 
-    pub fn draw_button(
+    pub fn draw_image(
         &mut self,
         center: Vec2,
         mut dimensions: Vec2,
-        button: Button,
+        image: Image,
         greyscale: bool,
         dpi_scaling: f32,
     ) {
         dimensions *= dpi_scaling;
         let top_left = center - dimensions / 2.0;
 
-        let (uv_top_left, uv_dimensions) = button.uv();
+        let (uv_top_left, uv_dimensions) = image.uv();
 
         let num_vertices = self.vertices.len_waiting();
 

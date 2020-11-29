@@ -95,9 +95,9 @@ pub fn progress_recruitment_queue(
 
     if let Some(unit) = recruitment_queue.queue.front().cloned() {
         let recruitment_time = unit.stats().recruitment_time;
-        recruitment_queue.progress += delta_time.0;
-        if recruitment_queue.progress > recruitment_time {
-            recruitment_queue.progress -= recruitment_time;
+        recruitment_queue.percentage_progress += delta_time.0 / recruitment_time;
+        if recruitment_queue.percentage_progress > 1.0 {
+            recruitment_queue.percentage_progress -= 1.0;
             recruitment_queue.queue.pop_front();
 
             let start_point = nearest_point_within_building(
@@ -124,7 +124,7 @@ pub fn progress_recruitment_queue(
     } else {
         // If a unit just finished off the queue and there are no more units in the queue,
         // we don't want to keep the carry-over progress from the last unit around.
-        recruitment_queue.progress = 0.0;
+        recruitment_queue.percentage_progress = 0.0;
     }
 }
 

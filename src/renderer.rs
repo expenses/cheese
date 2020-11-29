@@ -14,7 +14,7 @@ mod shadow_pipeline;
 mod torus_pipeline;
 
 pub use lines_3d_pipeline::{Lines3dBuffer, Lines3dPipeline};
-pub use lines_pipeline::{Button, LineBuffers, LinesPipeline};
+pub use lines_pipeline::{Image, LineBuffers, LinesPipeline};
 pub use model_pipelines::{ModelBuffers, ModelInstance, ModelPipelines, TitlescreenBuffer};
 pub use shadow_pipeline::ShadowPipeline;
 pub use torus_pipeline::{TorusBuffer, TorusInstance, TorusPipeline};

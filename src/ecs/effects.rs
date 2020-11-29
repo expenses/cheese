@@ -73,7 +73,7 @@ pub fn render_cheese_droplets(
 #[legion::system(for_each)]
 pub fn render_explosions(explosion: &Explosion, #[resource] model_buffers: &mut ModelBuffers) {
     model_buffers.explosions.push(ModelInstance {
-        transform: explosion.translation_rotation * Mat4::from_scale(explosion.size),
+        transform: explosion.translation_rotation * Mat4::from_scale(explosion.size()),
         flat_colour: Vec4::new(1.0, 1.0, 1.0, 1.0 / 3.0),
     });
 }
@@ -85,8 +85,9 @@ pub fn expand_explosions(
     #[resource] delta_time: &DeltaTime,
     buffer: &mut CommandBuffer,
 ) {
-    explosion.size += delta_time.0;
-    if explosion.size > explosion.max_size {
-        //buffer.remove(*entity);
+    explosion.progress += 3.0 * delta_time.0 / explosion.duration();
+
+    if explosion.progress > 1.0 {
+        buffer.remove(*entity);
     }
 }

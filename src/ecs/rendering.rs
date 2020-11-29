@@ -1,7 +1,7 @@
 use super::*;
 use crate::animation::Skin;
 use crate::renderer::{
-    Font, LineBuffers, ModelBuffers, ModelInstance, TextAlignment, TextBuffer, TorusBuffer,
+    Font, Image, LineBuffers, ModelBuffers, ModelInstance, TextAlignment, TextBuffer, TorusBuffer,
     TorusInstance,
 };
 use crate::resources::{
@@ -221,14 +221,16 @@ pub fn render_ui(
     #[resource] player_side: &PlayerSide,
     #[resource] objectives: &Objectives,
     #[resource] mode: &Mode,
+    #[resource] screen_dimensions: &ScreenDimensions,
+    #[resource] line_buffers: &mut LineBuffers,
     world: &SubWorld,
 ) {
+    let blue = Vec4::new(0.091, 0.118, 0.543, 1.0);
+
     if *mode != Mode::Playing {
         return;
     }
 
-    let coins = std::iter::once(format!("Cheese coins: {}\n", cheese_coins.0));
-    let mode = std::iter::once(format!("Mode: {:?}\n", rts_controls.mode));
     let objectives = std::iter::once(format!("Objectives:\n"))
         .chain(
             objectives
@@ -247,22 +249,40 @@ pub fn render_ui(
     let queue_infos = query
         .iter(world)
         .filter(|(_, side)| **side == player_side.0)
-        .map(|(queue, _)| format!("Queue progress: {}\n", queue.progress));
+        .map(|(queue, _)| format!("Queue progress: {}\n", queue.percentage_progress));
 
-    let text: String = objectives
-        .chain(coins)
-        .chain(mode)
-        .chain(queue_infos)
-        .collect();
+    let text: String = objectives.chain(queue_infos).collect();
+
+    let y_offset = 4.0;
 
     text_buffer.render_text(
-        Vec2::new(10.0, 10.0),
+        Vec2::new(10.0, y_offset),
         &text,
         Font::Ui,
         1.0,
         dpi_scaling.0,
         TextAlignment::Default,
-        Vec4::one(),
+        blue,
+    );
+
+    let dims = screen_dimensions.as_vec();
+
+    text_buffer.render_text(
+        Vec2::new(dims.x - 32.0, y_offset),
+        &format!("{}", cheese_coins.0),
+        Font::Ui,
+        1.0,
+        dpi_scaling.0,
+        TextAlignment::HorizontalRight,
+        blue,
+    );
+
+    line_buffers.draw_image(
+        Vec2::new(dims.x - 16.0, 16.0),
+        Vec2::new(32.0, 32.0),
+        Image::CheeseCoins,
+        false,
+        dpi_scaling.0,
     );
 }
 
@@ -517,10 +537,10 @@ pub fn render_abilities(
             AbilityType::SetRecruitmentWaypoint => true,
         };
 
-        line_buffers.draw_button(
+        line_buffers.draw_image(
             position(i),
             Vec2::new(ability_size, ability_size),
-            ability.button(),
+            ability.image(),
             !can_use,
             dpi_scaling.0,
         );
