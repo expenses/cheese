@@ -8,6 +8,7 @@ description = "A RTS about mice on the moon made for the 2020 Github Game Off"
 [package.metadata.bundle]
 name = "Cheese"
 identifier = "io.github.expenses.cheese"
+icon = ["bundle/logo.png"]
 
 [dependencies]
 anyhow = "1.0.34"
