@@ -3,8 +3,11 @@ name = "cheese"
 version = "0.1.0-alpha"
 authors = ["Ashley Ruglys <ashley.ruglys@gmail.com>"]
 edition = "2018"
+description = "A RTS about mice on the moon made for the 2020 Github Game Off"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[package.metadata.bundle]
+name = "Cheese"
+identifier = "io.github.expenses.cheese"
 
 [dependencies]
 anyhow = "1.0.34"
