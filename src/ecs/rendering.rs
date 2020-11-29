@@ -249,7 +249,7 @@ pub fn render_ui(
     let queue_infos = query
         .iter(world)
         .filter(|(_, side)| **side == player_side.0)
-        .map(|(queue, _)| format!("Queue progress: {}\n", queue.progress));
+        .map(|(queue, _)| format!("Queue progress: {}\n", queue.percentage_progress));
 
     let text: String = objectives.chain(queue_infos).collect();
 

@@ -2,7 +2,7 @@ use super::*;
 use crate::assets::ModelAnimations;
 use crate::resources::{
     CheeseCoins, CommandMode, ControlGroups, Keypress, Keypresses, LoseCondition, Mode, Objectives,
-    RayCastLocation, SelectedUnitsAbilities, WinCondition,
+    RayCastLocation, SelectedUnitsAbilities, TotalTime, WinCondition,
 };
 
 #[legion::system]
@@ -16,6 +16,7 @@ pub fn handle_keypresses(
     #[resource] player_side: &mut PlayerSide,
     #[resource] selected_units_abilities: &SelectedUnitsAbilities,
     #[resource] mode: &mut Mode,
+    #[resource] total_time: &TotalTime,
     world: &mut SubWorld,
 ) {
     for Keypress {
@@ -45,14 +46,15 @@ pub fn handle_keypresses(
                                 if unit.stats().cost <= cheese_coins.0 {
                                     cheese_coins.0 -= unit.stats().cost;
 
+                                    log::trace!(target: "command-recording", "{:?}: Recruiting {:?}", total_time.0, unit);
+
                                     let entity_with_shortest_recruitment_queue = casters
                                         .iter()
                                         .map(|caster| {
                                             let queue_len = <&RecruitmentQueue>::query()
                                                 .get(world, *caster)
                                                 .unwrap()
-                                                .queue
-                                                .len();
+                                                .length();
                                             (caster, queue_len)
                                         })
                                         .min_by_key(|(_, queue_len)| *queue_len)
@@ -216,6 +218,7 @@ pub fn handle_left_click(
     #[resource] map: &mut Map,
     #[resource] animations: &ModelAnimations,
     #[resource] cheese_coins: &mut CheeseCoins,
+    #[resource] total_time: &TotalTime,
     world: &mut SubWorld,
     commands: &mut CommandBuffer,
 ) {
@@ -225,7 +228,13 @@ pub fn handle_left_click(
 
     match rts_controls.mode {
         CommandMode::AttackMove => {
-            issue_command(ray_cast_location, rts_controls, player_side, world);
+            issue_command(
+                ray_cast_location,
+                rts_controls,
+                player_side,
+                world,
+                total_time.0,
+            );
         }
         CommandMode::Normal => {
             let position = ray_cast_location.pos;
@@ -271,10 +280,13 @@ pub fn handle_left_click(
                 world,
                 rts_controls,
                 cheese_coins,
+                total_time.0,
             );
         }
         CommandMode::SetRecruitmentWaypoint => {
             let position = ray_cast_location.pos;
+
+            log::trace!(target: "command-recording", "{:?}: Setting waypoint {:?}", total_time.0, position);
 
             <(&mut RecruitmentQueue, &Side)>::query()
                 .filter(component::<Selected>())
@@ -301,6 +313,7 @@ fn build_building_command(
     world: &mut SubWorld,
     rts_controls: &RtsControls,
     cheese_coins: &mut CheeseCoins,
+    total_time: f32,
 ) {
     if building.stats().cost > cheese_coins.0
         || (building == Building::Pump && ray_cast_location.snapped_to_guyser.is_none())
@@ -308,51 +321,14 @@ fn build_building_command(
         return;
     }
 
-    if let Some((pos, handle, building, radius, selectable, side, health, completeness)) =
-        building.parts(ray_cast_location.pos, player_side.0, map)
-    {
+    if let Some(building_entity) = building.add_to_world_to_construct(
+        commands,
+        ray_cast_location.pos,
+        player_side.0,
+        animations,
+        map,
+    ) {
         cheese_coins.0 -= building.stats().cost;
-
-        let building_entity = match building {
-            Building::Pump => {
-                let skin = animations.pump.skin.clone();
-                let animation_state = AnimationState {
-                    animation: 0,
-                    time: 0.0,
-                    total_time: animations.pump.animations[0].total_time,
-                };
-                commands.push((
-                    pos,
-                    handle,
-                    building,
-                    radius,
-                    selectable,
-                    side,
-                    health,
-                    skin,
-                    animation_state,
-                    completeness,
-                    Cooldown(0.0),
-                ))
-            }
-            Building::Armoury => commands.push((
-                pos,
-                handle,
-                building,
-                radius,
-                selectable,
-                side,
-                health,
-                completeness,
-                Abilities(vec![
-                    &Ability::RECRUIT_MOUSE_MARINE,
-                    &Ability::RECRUIT_ENGINEER,
-                    &Ability::SET_RECRUITMENT_WAYPOINT,
-                ]),
-                RecruitmentQueue::default(),
-                Cooldown(0.0),
-            )),
-        };
 
         if let Building::Pump = building {
             let guyser_entity = ray_cast_location.snapped_to_guyser.unwrap();
@@ -363,6 +339,8 @@ fn build_building_command(
                 },
             );
         }
+
+        log::trace!(target: "command-recording", "{:?}: Building {:?} at {:?}", total_time, building, ray_cast_location);
 
         let command = Command::Build {
             target: building_entity,
@@ -397,6 +375,7 @@ pub fn handle_right_click(
     #[resource] ray_cast_location: &RayCastLocation,
     #[resource] rts_controls: &mut RtsControls,
     #[resource] player_side: &PlayerSide,
+    #[resource] total_time: &TotalTime,
     world: &mut SubWorld,
 ) {
     if !mouse_state.right_state.was_clicked() {
@@ -410,7 +389,13 @@ pub fn handle_right_click(
         return;
     }
 
-    issue_command(ray_cast_location, rts_controls, player_side, world)
+    issue_command(
+        ray_cast_location,
+        rts_controls,
+        player_side,
+        world,
+        total_time.0,
+    )
 }
 
 fn issue_command(
@@ -418,6 +403,7 @@ fn issue_command(
     rts_controls: &RtsControls,
     player_side: &PlayerSide,
     world: &mut SubWorld,
+    total_time: f32,
 ) {
     let position = ray_cast_location.pos;
 
@@ -452,6 +438,8 @@ fn issue_command(
     };
 
     if let Some(command) = command {
+        log::trace!(target: "command-recording", "{:?}: Performing {:?}", total_time, command);
+
         if let Command::Build { .. } = command {
             <(&mut CommandQueue, &Side)>::query()
                 .filter(component::<Selected>() & component::<CanBuild>())

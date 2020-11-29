@@ -13,6 +13,7 @@ use std::collections::VecDeque;
 use ultraviolet::{Mat4, Vec2, Vec3};
 use winit::event::VirtualKeyCode;
 
+mod ai;
 mod animation;
 mod buildings;
 mod combat;
@@ -24,6 +25,7 @@ mod playing_menu;
 mod rendering;
 
 use crate::resources::DebugControls;
+use ai::follow_ai_build_orders_system;
 use animation::{progress_animations_system, progress_building_animations_system};
 use buildings::{
     build_buildings_system, free_up_cheese_guysers_system, generate_cheese_coins_system,
@@ -104,6 +106,7 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(avoidance_system())
         .add_system(add_attack_commands_system())
         .add_system(update_selected_units_abilities_system())
+        .add_system(follow_ai_build_orders_system())
         // Needed because a command could place a building using a command buffer, but the entity
         // reference wouldn't be valid until the commands in the buffer have been executed.
         .flush()
@@ -231,6 +234,16 @@ pub enum Side {
     Green,
     Purple,
 }
+
+impl Side {
+    fn flip(&self) -> Self {
+        match self {
+            Self::Green => Self::Purple,
+            Self::Purple => Self::Green,
+        }
+    }
+}
+
 pub struct Selected;
 pub struct Selectable;
 
@@ -242,7 +255,7 @@ pub struct MovementDebugging {
     path_end: Vec2,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Command {
     MoveTo {
         target: Vec2,
@@ -269,6 +282,13 @@ pub enum Command {
 }
 
 impl Command {
+    fn new_build(target: Entity) -> Self {
+        Self::Build {
+            target,
+            state: ActionState::InRange,
+        }
+    }
+
     fn new_attack(target: Entity, explicit: bool) -> Self {
         Self::Attack {
             target,
@@ -313,7 +333,7 @@ impl Command {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ActionState {
     OutOfRange { path: Vec<Vec2> },
     InRange,
@@ -453,6 +473,7 @@ impl Building {
                     time: 0.0,
                     total_time: animations.pump.animations[0].total_time,
                 });
+                entry.add_component(Cooldown(0.0));
             }
             Building::Armoury => {
                 entry.add_component(Abilities(vec![
@@ -466,13 +487,63 @@ impl Building {
 
         Some(entity)
     }
+
+    pub fn add_to_world_to_construct(
+        self,
+        buffer: &mut CommandBuffer,
+        position: Vec2,
+        side: Side,
+        animations: &ModelAnimations,
+        map: &mut Map,
+    ) -> Option<Entity> {
+        let parts = self.parts(position, side, map)?;
+        let entity = buffer.push(parts);
+
+        match self {
+            Building::Pump => {
+                buffer.add_component(entity, animations.pump.skin.clone());
+                buffer.add_component(
+                    entity,
+                    AnimationState {
+                        animation: 0,
+                        time: 0.0,
+                        total_time: animations.pump.animations[0].total_time,
+                    },
+                );
+                buffer.add_component(entity, Cooldown(0.0));
+            }
+            Building::Armoury => {
+                buffer.add_component(
+                    entity,
+                    Abilities(vec![
+                        &Ability::RECRUIT_MOUSE_MARINE,
+                        &Ability::RECRUIT_ENGINEER,
+                        &Ability::SET_RECRUITMENT_WAYPOINT,
+                    ]),
+                );
+                buffer.add_component(entity, RecruitmentQueue::default());
+            }
+        }
+
+        Some(entity)
+    }
 }
 
 #[derive(Default)]
 pub struct RecruitmentQueue {
-    progress: f32,
+    percentage_progress: f32,
     pub queue: VecDeque<Unit>,
     waypoint: Vec2,
+}
+
+impl RecruitmentQueue {
+    fn length(&self) -> ordered_float::OrderedFloat<f32> {
+        ordered_float::OrderedFloat(if self.queue.is_empty() {
+            0.0
+        } else {
+            (self.queue.len() - 1) as f32 + (1.0 - self.percentage_progress)
+        })
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
