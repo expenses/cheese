@@ -36,11 +36,7 @@ pub fn handle_keypresses(
                                 rts_controls.mode = CommandMode::SetRecruitmentWaypoint;
                             }
                             AbilityType::Build(building) => {
-                                //if building.stats().cost <= cheese_coins.0 {
                                 rts_controls.mode = CommandMode::Construct { building };
-                                //} else {
-                                // Todo: play sound: meep merp (like from dota).
-                                //}
                             }
                             AbilityType::Recruit(unit) => {
                                 if unit.stats().cost <= cheese_coins.0 {
@@ -235,6 +231,10 @@ pub fn handle_left_click(
                 world,
                 total_time.0,
             );
+
+            if !rts_controls.shift_held {
+                rts_controls.mode = CommandMode::Normal;
+            }
         }
         CommandMode::Normal => {
             let position = ray_cast_location.pos;
@@ -268,9 +268,13 @@ pub fn handle_left_click(
                     }
                 }
             }
+
+            if !rts_controls.shift_held {
+                rts_controls.mode = CommandMode::Normal;
+            }
         }
         CommandMode::Construct { building } => {
-            build_building_command(
+            let built = build_building_command(
                 building,
                 ray_cast_location,
                 player_side,
@@ -282,6 +286,10 @@ pub fn handle_left_click(
                 cheese_coins,
                 total_time.0,
             );
+
+            if built && !rts_controls.shift_held {
+                rts_controls.mode = CommandMode::Normal;
+            }
         }
         CommandMode::SetRecruitmentWaypoint => {
             let position = ray_cast_location.pos;
@@ -294,12 +302,10 @@ pub fn handle_left_click(
                 .filter(|(_, side)| **side == player_side.0)
                 .for_each(|(queue, _)| {
                     queue.waypoint = position;
-                })
-        }
-    }
+                });
 
-    if !rts_controls.shift_held {
-        rts_controls.mode = CommandMode::Normal;
+            rts_controls.mode = CommandMode::Normal;
+        }
     }
 }
 
@@ -314,11 +320,11 @@ fn build_building_command(
     rts_controls: &RtsControls,
     cheese_coins: &mut CheeseCoins,
     total_time: f32,
-) {
+) -> bool {
     if building.stats().cost > cheese_coins.0
         || (building == Building::Pump && ray_cast_location.snapped_to_guyser.is_none())
     {
-        return;
+        return false;
     }
 
     if let Some(building_entity) = building.add_to_world_to_construct(
@@ -360,6 +366,10 @@ fn build_building_command(
 
                 commands.0.push_back(command.clone());
             });
+
+        true
+    } else {
+        false
     }
 }
 

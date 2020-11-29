@@ -383,8 +383,6 @@ async fn run() -> anyhow::Result<()> {
 
                     if settings.bloom {
                         // First bloom pass
-                        // todo: setting to disable bloom
-
                         let mut render_pass =
                             encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -414,7 +412,6 @@ async fn run() -> anyhow::Result<()> {
                         drop(render_pass);
 
                         // Second bloom pass and composit onto framebuffer
-
                         let mut render_pass =
                             encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
