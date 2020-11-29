@@ -1,4 +1,6 @@
 #![allow(clippy::float_cmp)]
+// Needed to stop a console window from appearing on windows.
+#![windows_subsystem = "windows"]
 
 mod animation;
 mod assets;

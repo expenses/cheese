@@ -88,6 +88,7 @@ pub struct RenderContext {
 impl RenderContext {
     pub async fn new(event_loop: &EventLoop<()>, settings: &Settings) -> anyhow::Result<Self> {
         let window = WindowBuilder::new()
+            .with_inner_size(winit::dpi::LogicalSize::new(1280, 720))
             .with_title("Cheese (working title)")
             .build(event_loop)?;
 
@@ -117,7 +118,7 @@ impl RenderContext {
                 compatible_surface: Some(&surface),
             })
             .await
-            .ok_or_else(|| anyhow::anyhow!("request_adapter failed"))?;
+            .ok_or_else(|| anyhow::anyhow!("'request_adapter' failed. If you get this on linux, try installing the vulkan drivers for your gpu."))?;
 
         let (device, queue) = adapter
             .request_device(
