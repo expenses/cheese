@@ -181,6 +181,9 @@ async fn run() -> anyhow::Result<()> {
                     let mut objectives = resources.get_mut::<Objectives>().unwrap();
                     let mut camera = resources.get_mut::<Camera>().unwrap();
                     let mut cheese_coins = resources.get_mut::<CheeseCoins>().unwrap();
+
+                    world.clear();
+
                     match scenario {
                         1 => {
                             scenarios::one(
@@ -195,6 +198,17 @@ async fn run() -> anyhow::Result<()> {
                         }
                         2 => {
                             scenarios::two(
+                                &mut world,
+                                &animations,
+                                &mut map,
+                                &mut rng,
+                                &mut objectives,
+                                &mut camera,
+                                &mut cheese_coins,
+                            );
+                        }
+                        3 => {
+                            scenarios::three(
                                 &mut world,
                                 &animations,
                                 &mut map,

@@ -17,8 +17,6 @@ pub fn one(
     camera: &mut Camera,
     cheese_coins: &mut CheeseCoins,
 ) {
-    world.clear();
-
     let mut command_buffer = legion::systems::CommandBuffer::new(&world);
 
     let unit_spawn_point = Vec2::new(-36.0, 0.0);
@@ -183,8 +181,6 @@ pub fn two(
 ) {
     let engineer_pos = Vec2::new(-52.69, -53.42);
 
-    world.clear();
-
     let mut command_buffer = legion::systems::CommandBuffer::new(&world);
 
     ecs::Unit::Engineer.add_to_world(
@@ -243,5 +239,65 @@ pub fn two(
         ],
         lose_conditions: vec![LoseCondition::LetAllUnitsDie],
     };
+    *cheese_coins = CheeseCoins(100);
+}
+
+pub fn three(
+    mut world: &mut World,
+    animations: &ModelAnimations,
+    map: &mut Map,
+    rng: &mut rand::rngs::SmallRng,
+    objectives: &mut Objectives,
+    camera: &mut Camera,
+    cheese_coins: &mut CheeseCoins,
+) {
+    let start = Vec2::new(-57.57, -59.81);
+
+    let mut command_buffer = legion::systems::CommandBuffer::new(&world);
+
+    ecs::Unit::Engineer.add_to_world(
+        &mut command_buffer,
+        Some(animations),
+        start,
+        ecs::Facing(0.0),
+        ecs::Side::Green,
+        None,
+    );
+
+    ecs::Unit::Engineer.add_to_world(
+        &mut command_buffer,
+        Some(animations),
+        -start,
+        ecs::Facing(0.0),
+        ecs::Side::Purple,
+        None,
+    );
+
+    command_buffer.flush(world);
+
+    let base_guysers = [
+        Vec2::new(-72.23, -78.57),
+        Vec2::new(-74.96, -63.91),
+        Vec2::new(-46.65, -78.57),
+        Vec2::new(-56.55, -33.89),
+        Vec2::new(-25.85, -60.5),
+    ];
+
+    spawn_guyser(&mut world, Vec2::zero());
+    for guyser in &base_guysers {
+        spawn_guyser(&mut world, *guyser);
+        spawn_guyser(&mut world, -*guyser);
+    }
+
+    *objectives = Objectives {
+        win_conditions: vec![WinCondition::DestroyAll],
+        lose_conditions: vec![LoseCondition::LetAllUnitsDie],
+    };
+
+    *camera = Camera {
+        looking_at: start,
+        distance: 30.0,
+    };
+
     *cheese_coins = CheeseCoins(100);
 }
