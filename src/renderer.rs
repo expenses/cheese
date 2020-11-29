@@ -93,7 +93,10 @@ impl RenderContext {
                 compatible_surface: Some(&surface),
             })
             .await
-            .ok_or_else(|| anyhow::anyhow!("'request_adapter' failed. If you get this on linux, try installing the vulkan drivers for your gpu."))?;
+            .ok_or_else(|| anyhow::anyhow!(
+                "'request_adapter' failed. If you get this on linux, try installing the vulkan drivers for your gpu. \
+                You can check that they're working properly by running `vulkaninfo` or `vkcube`."
+            ))?;
 
         let (device, queue) = adapter
             .request_device(
