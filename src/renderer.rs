@@ -80,6 +80,7 @@ pub struct RenderContext {
 impl RenderContext {
     pub async fn new(event_loop: &EventLoop<()>, settings: &Settings) -> anyhow::Result<Self> {
         let window = WindowBuilder::new()
+            .with_inner_size(winit::dpi::LogicalSize::new(1280, 720))
             .with_title("Cheese (working title)")
             .build(event_loop)?;
 
