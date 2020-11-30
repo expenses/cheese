@@ -31,6 +31,10 @@ pub fn set_movement_paths(
 
     let mut pop_front = false;
 
+    // Todo: if a unit has an implicit attack command on a building and it gets destroyed, the
+    // underlying attack move doesnt have its path updated. The solution is maybe to use a dirty
+    // flag for this.
+
     match command_queue.0.front_mut() {
         Some(&mut Command::MoveTo {
             target,

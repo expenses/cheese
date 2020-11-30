@@ -2,9 +2,13 @@
 - Pyschic units
 - Helmets should increase opacity when in combat
 - Map crevasses
-- Stats on win/loss
 - Minimap?
 - Work on improving pathfinding a little bit if possible
-- UI for recruitment queues.
 - Improve shadows (shadow mapping is hard tbh)
-- Don't allow building on top of units.
+
+- Don't allow building on top of units. ( important )
+- UI for recruitment queues. ( important )
+- Properly handle errors (esp. in ai) instead of panicking. ( important )
+- Make avoidance look better (medium )
+- Attack move movement fixes.
+- Fix issue where two units bump off each other when trying to get to the same point in avoidance.

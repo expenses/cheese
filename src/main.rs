@@ -18,8 +18,9 @@ use crate::renderer::{
 };
 use crate::resources::{
     AiBuildOrders, Camera, CameraControls, CheeseCoins, ControlGroups, CursorIcon, DebugControls,
-    DeltaTime, DpiScaling, Gravity, Keypress, Keypresses, Mode, MouseState, Objectives, PlayerSide,
-    RayCastLocation, RtsControls, ScreenDimensions, SelectedUnitsAbilities, Settings, TotalTime,
+    DeltaTime, DpiScaling, GameStats, Gravity, Keypress, Keypresses, Mode, MouseState, Objectives,
+    PlayerSide, RayCastLocation, RtsControls, ScreenDimensions, SelectedUnitsAbilities, Settings,
+    TotalTime,
 };
 use legion::*;
 use rand::{rngs::SmallRng, SeedableRng};
@@ -83,6 +84,7 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(Keypresses::default());
     resources.insert(TotalTime(0.0));
     resources.insert(AiBuildOrders::default());
+    resources.insert(GameStats::default());
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
     // and the other can take up 2 pixels. So I guess the best solution is to just round the value
@@ -187,6 +189,7 @@ async fn run() -> anyhow::Result<()> {
                     let mut cheese_coins = resources.get_mut::<CheeseCoins>().unwrap();
                     let mut ai_build_orders = resources.get_mut::<AiBuildOrders>().unwrap();
                     resources.get_mut::<TotalTime>().unwrap().0 = 0.0;
+                    *resources.get_mut::<GameStats>().unwrap() = GameStats::default();
 
                     world.clear();
 

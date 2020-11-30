@@ -1,6 +1,6 @@
 use crate::renderer::{Font, LineBuffers, TextAlignment, TextBuffer};
 use crate::resources::{
-    CursorIcon, DpiScaling, Keypress, Keypresses, Mode, MouseState, ScreenDimensions,
+    CursorIcon, DpiScaling, GameStats, Keypress, Keypresses, Mode, MouseState, ScreenDimensions,
 };
 use crate::titlescreen::{point_in_area, selected_colour, text_selection_area, TEXT_COLOUR};
 use ultraviolet::Vec2;
@@ -70,6 +70,7 @@ pub fn render_playing_menu(
     #[resource] dpi_scaling: &DpiScaling,
     #[resource] mouse_state: &MouseState,
     #[resource] cursor_icon: &mut CursorIcon,
+    #[resource] stats: &GameStats,
 ) {
     let text = match mode {
         Mode::ScenarioWon => "Scenario Won",
@@ -113,6 +114,33 @@ pub fn render_playing_menu(
                     TEXT_COLOUR
                 },
             );
+        }
+    }
+
+    if matches!(mode, Mode::ScenarioWon | Mode::ScenarioLost) {
+        let items = [
+            format!("Units recruited: {}", stats.units_recruited),
+            format!("Units lost: {}", stats.units_lost),
+            format!("Buildings built: {}", stats.buildings_built),
+            format!("Enemy units killed: {}", stats.enemy_units_killed),
+            format!(
+                "Enemy buildings destoyed: {}",
+                stats.enemy_buildings_destroyed
+            ),
+        ];
+        let mut y = 0.7;
+
+        for text in &items {
+            text_buffer.render_text(
+                Vec2::new(0.5, y) * screen_dims,
+                text,
+                Font::Ui,
+                1.0,
+                dpi_scaling.0,
+                TextAlignment::Center,
+                TEXT_COLOUR,
+            );
+            y += 0.05;
         }
     }
 }

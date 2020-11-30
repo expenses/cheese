@@ -1,8 +1,8 @@
 use super::*;
 use crate::assets::ModelAnimations;
 use crate::resources::{
-    CheeseCoins, CommandMode, ControlGroups, Keypress, Keypresses, LoseCondition, Mode, Objectives,
-    RayCastLocation, SelectedUnitsAbilities, TotalTime, WinCondition,
+    CheeseCoins, CommandMode, ControlGroups, GameStats, Keypress, Keypresses, LoseCondition, Mode,
+    Objectives, RayCastLocation, SelectedUnitsAbilities, TotalTime, WinCondition,
 };
 
 #[legion::system]
@@ -13,10 +13,11 @@ pub fn handle_keypresses(
     #[resource] rts_controls: &mut RtsControls,
     #[resource] debug_controls: &mut DebugControls,
     #[resource] cheese_coins: &mut CheeseCoins,
-    #[resource] player_side: &mut PlayerSide,
+    //#[resource] player_side: &mut PlayerSide,
     #[resource] selected_units_abilities: &SelectedUnitsAbilities,
     #[resource] mode: &mut Mode,
     #[resource] total_time: &TotalTime,
+    #[resource] game_stats: &mut GameStats,
     world: &mut SubWorld,
 ) {
     for Keypress {
@@ -55,6 +56,8 @@ pub fn handle_keypresses(
                                     if let Some(entity) = entity_with_shortest_recruitment_queue {
                                         cheese_coins.0 -= unit.stats().cost;
                                         log::trace!(target: "command-recording", "{:?}: Recruiting {:?}", total_time.0, unit);
+
+                                        game_stats.units_recruited += 1;
 
                                         <&mut RecruitmentQueue>::query()
                                             .get_mut(world, entity)

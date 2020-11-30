@@ -4,13 +4,14 @@ use super::{
     RecruitmentQueue, Side,
 };
 use crate::assets::ModelAnimations;
-use crate::resources::{CheeseCoins, DeltaTime, PlayerSide};
+use crate::resources::{CheeseCoins, DeltaTime, GameStats, PlayerSide};
 use legion::{component, systems::CommandBuffer, world::SubWorld, Entity, EntityStore, IntoQuery};
 
 #[legion::system(for_each)]
 #[filter(component::<Position>())]
 #[read_component(Position)]
 #[read_component(Building)]
+#[read_component(Side)]
 #[write_component(Health)]
 #[write_component(BuildingCompleteness)]
 pub fn build_buildings(
@@ -18,6 +19,8 @@ pub fn build_buildings(
     command_queue: &mut CommandQueue,
     facing: &mut Facing,
     #[resource] delta_time: &DeltaTime,
+    #[resource] player_side: &PlayerSide,
+    #[resource] stats: &mut GameStats,
     world: &mut SubWorld,
     buffer: &mut CommandBuffer,
 ) {
@@ -35,10 +38,15 @@ pub fn build_buildings(
         state: ActionState::InRange,
     }) = command_queue.0.front()
     {
-        let (building_pos, building, mut health, mut completeness) =
-            <(&Position, &Building, &mut Health, &mut BuildingCompleteness)>::query()
-                .get_mut(world, *target)
-                .expect("We've cancelled actions on dead entities");
+        let (building_pos, building, side, mut health, mut completeness) = <(
+            &Position,
+            &Building,
+            &Side,
+            &mut Health,
+            &mut BuildingCompleteness,
+        )>::query()
+        .get_mut(world, *target)
+        .expect("We've cancelled actions on dead entities");
 
         let max = building.stats().max_health;
 
@@ -54,6 +62,9 @@ pub fn build_buildings(
 
         if completeness.0 == max {
             buffer.add_component(*target, FullyBuilt);
+            if *side == player_side.0 {
+                stats.buildings_built += 1;
+            }
         }
     }
 

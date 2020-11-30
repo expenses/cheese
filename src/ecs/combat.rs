@@ -1,5 +1,5 @@
 use super::*;
-use crate::resources::DeltaTime;
+use crate::resources::{DeltaTime, GameStats, PlayerSide};
 
 #[legion::system(for_each)]
 #[read_component(Position)]
@@ -90,11 +90,14 @@ pub fn handle_damaged(
     position: &Position,
     radius: &Radius,
     damaged: &DamagedThisTick,
+    side: &Side,
     health: &mut Health,
     // None in the case of a building.
     commands: Option<&mut CommandQueue>,
     map_handle: Option<&MapHandle>,
     buffer: &mut CommandBuffer,
+    #[resource] player_side: &PlayerSide,
+    #[resource] stats: &mut GameStats,
     #[resource] map: &mut Map,
     #[resource] rng: &mut SmallRng,
     world: &SubWorld,
@@ -106,6 +109,14 @@ pub fn handle_damaged(
 
         if let Some(map_handle) = map_handle {
             map.remove(map_handle);
+        }
+
+        if *side == player_side.0 {
+            stats.units_lost += 1;
+        } else if map_handle.is_some() {
+            stats.enemy_buildings_destroyed += 1;
+        } else {
+            stats.enemy_units_killed += 1;
         }
 
         buffer.push((Explosion::new(position.0, rng, radius.0),));
