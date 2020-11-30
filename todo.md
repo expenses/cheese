@@ -6,6 +6,5 @@
 - Minimap?
 - Work on improving pathfinding a little bit if possible
 - UI for recruitment queues.
-- Improve shadows
-- Don't recruit to unbuilt queues
-- Complete tag
+- Improve shadows (shadow mapping is hard tbh)
+- Don't allow building on top of units.

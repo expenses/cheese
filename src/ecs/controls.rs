@@ -40,28 +40,28 @@ pub fn handle_keypresses(
                             }
                             AbilityType::Recruit(unit) => {
                                 if unit.stats().cost <= cheese_coins.0 {
-                                    cheese_coins.0 -= unit.stats().cost;
-
-                                    log::trace!(target: "command-recording", "{:?}: Recruiting {:?}", total_time.0, unit);
-
                                     let entity_with_shortest_recruitment_queue = casters
                                         .iter()
-                                        .map(|caster| {
-                                            let queue_len = <&RecruitmentQueue>::query()
+                                        .filter_map(|caster| {
+                                            <&RecruitmentQueue>::query()
+                                                .filter(component::<FullyBuilt>())
                                                 .get(world, *caster)
-                                                .unwrap()
-                                                .length();
-                                            (caster, queue_len)
+                                                .ok()
+                                                .map(|queue| (caster, queue.length()))
                                         })
                                         .min_by_key(|(_, queue_len)| *queue_len)
-                                        .map(|(entity, _)| *entity)
-                                        .unwrap();
+                                        .map(|(entity, _)| *entity);
 
-                                    <&mut RecruitmentQueue>::query()
-                                        .get_mut(world, entity_with_shortest_recruitment_queue)
-                                        .unwrap()
-                                        .queue
-                                        .push_back(unit);
+                                    if let Some(entity) = entity_with_shortest_recruitment_queue {
+                                        cheese_coins.0 -= unit.stats().cost;
+                                        log::trace!(target: "command-recording", "{:?}: Recruiting {:?}", total_time.0, unit);
+
+                                        <&mut RecruitmentQueue>::query()
+                                            .get_mut(world, entity)
+                                            .unwrap()
+                                            .queue
+                                            .push_back(unit);
+                                    }
                                 }
                             }
                         }
@@ -621,7 +621,6 @@ fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {
 #[legion::system]
 #[read_component(Side)]
 #[read_component(Building)]
-#[read_component(BuildingCompleteness)]
 pub fn update_playing_state(
     #[resource] objectives: &Objectives,
     #[resource] player_side: &PlayerSide,
@@ -639,12 +638,11 @@ pub fn update_playing_state(
                 all_destroyed
             }
             WinCondition::BuildN(num, building) => {
-                let num_buildings = <(&Side, &Building, &BuildingCompleteness)>::query()
+                let num_buildings = <(&Side, &Building)>::query()
+                    .filter(component::<FullyBuilt>())
                     .iter(world)
-                    .filter(|(side, building_type, completeness)| {
-                        **side == player_side.0
-                            && building == *building_type
-                            && completeness.0 == building.stats().max_health
+                    .filter(|(side, building_type)| {
+                        **side == player_side.0 && building == *building_type
                     })
                     .count();
                 num_buildings as u8 >= *num

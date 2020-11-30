@@ -1,9 +1,8 @@
-use super::{
-    AnimationState, Building, BuildingCompleteness, Command, CommandQueue, MouseAnimation,
-};
+use super::{AnimationState, Building, Command, CommandQueue, FullyBuilt, MouseAnimation};
 use crate::animation::Skin;
 use crate::assets::ModelAnimations;
 use crate::resources::DeltaTime;
+use legion::component;
 
 #[legion::system(for_each)]
 pub fn progress_animations(
@@ -45,18 +44,14 @@ pub fn progress_animations(
 }
 
 #[legion::system(for_each)]
+#[filter(component::<FullyBuilt>())]
 pub fn progress_building_animations(
     building: &Building,
-    completeness: &BuildingCompleteness,
     skin: &mut Skin,
     animation_state: &mut AnimationState,
     #[resource] animations: &ModelAnimations,
     #[resource] delta_time: &DeltaTime,
 ) {
-    if completeness.0 != building.stats().max_health {
-        return;
-    }
-
     animation_state.time += delta_time.0;
     animation_state.time %= animation_state.total_time;
 

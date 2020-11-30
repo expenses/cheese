@@ -1,6 +1,6 @@
 use super::{
     nearest_point_within_building, ActionState, Building, BuildingCompleteness,
-    CheeseGuyserBuiltOn, Command, CommandQueue, Cooldown, Facing, Health, Position,
+    CheeseGuyserBuiltOn, Command, CommandQueue, Cooldown, Facing, FullyBuilt, Health, Position,
     RecruitmentQueue, Side,
 };
 use crate::assets::ModelAnimations;
@@ -19,6 +19,7 @@ pub fn build_buildings(
     facing: &mut Facing,
     #[resource] delta_time: &DeltaTime,
     world: &mut SubWorld,
+    buffer: &mut CommandBuffer,
 ) {
     let mut pop_front = false;
     let health_increase_per_sec = 60.0;
@@ -50,6 +51,10 @@ pub fn build_buildings(
         if health.0 == max {
             pop_front = true;
         }
+
+        if completeness.0 == max {
+            buffer.add_component(*target, FullyBuilt);
+        }
     }
 
     if pop_front {
@@ -58,19 +63,15 @@ pub fn build_buildings(
 }
 
 #[legion::system(for_each)]
+#[filter(component::<FullyBuilt>())]
 pub fn generate_cheese_coins(
     building: &Building,
-    completeness: &BuildingCompleteness,
     side: &Side,
     cooldown: &mut Cooldown,
     #[resource] player_side: &PlayerSide,
     #[resource] cheese_coins: &mut CheeseCoins,
 ) {
-    if cooldown.0 == 0.0
-        && building == &Building::Pump
-        && completeness.0 == building.stats().max_health
-        && side == &player_side.0
-    {
+    if cooldown.0 == 0.0 && building == &Building::Pump && side == &player_side.0 {
         // Reminder: no delta time stuff needed here because that's done in the cooldown code.
         cheese_coins.0 += 2;
         cooldown.0 = 0.5;
@@ -78,21 +79,16 @@ pub fn generate_cheese_coins(
 }
 
 #[legion::system(for_each)]
+#[filter(component::<FullyBuilt>())]
 pub fn progress_recruitment_queue(
     building_position: &Position,
     building: &Building,
     recruitment_queue: &mut RecruitmentQueue,
-    completeness: &BuildingCompleteness,
     side: &Side,
     #[resource] animations: &ModelAnimations,
     #[resource] delta_time: &DeltaTime,
     buffer: &mut CommandBuffer,
 ) {
-    // Todo: a `Complete` tag would be nice.
-    if completeness.0 != building.stats().max_health {
-        return;
-    }
-
     if let Some(unit) = recruitment_queue.queue.front().cloned() {
         let recruitment_time = unit.stats().recruitment_time;
         recruitment_queue.percentage_progress += delta_time.0 / recruitment_time;

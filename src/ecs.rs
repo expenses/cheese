@@ -464,6 +464,8 @@ impl Building {
 
         let mut entry = world.entry(entity).unwrap();
 
+        entry.add_component(FullyBuilt);
+
         match self {
             Building::Pump => {
                 entry.add_component(animations.pump.skin.clone());
@@ -720,6 +722,7 @@ fn vec2_to_ncollide_point(point: Vec2) -> ncollide2d::math::Point<f32> {
 pub struct CheeseDropletPosition(Vec3);
 pub struct CheeseDropletVelocity(Vec3);
 pub struct CanBuild;
+pub struct FullyBuilt;
 
 fn nearest_point_within_building(
     unit_pos: Vec2,

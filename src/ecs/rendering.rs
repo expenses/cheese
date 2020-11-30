@@ -214,7 +214,6 @@ fn wgpu_to_screen(wgpu: Vec2, width: f32, height: f32) -> Vec2 {
 #[read_component(RecruitmentQueue)]
 #[read_component(Side)]
 pub fn render_ui(
-    #[resource] rts_controls: &RtsControls,
     #[resource] dpi_scaling: &DpiScaling,
     #[resource] cheese_coins: &CheeseCoins,
     #[resource] text_buffer: &mut TextBuffer,
