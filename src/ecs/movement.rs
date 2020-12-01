@@ -17,7 +17,7 @@ pub fn reset_map_updated(#[resource] map: &mut Map) {
 pub fn set_movement_paths(
     entity: &Entity,
     radius: &Radius,
-    firing_range: &FiringRange,
+    firing_range: Option<&FiringRange>,
     command_queue: &mut CommandQueue,
     mut movement_debugging: Option<&mut MovementDebugging>,
     world: &SubWorld,
@@ -75,6 +75,10 @@ pub fn set_movement_paths(
             ref mut first_out_of_range,
             ..
         }) => {
+            let firing_range = firing_range.expect(
+                "It shouldn't be possible to issue attack commands to units that can't attack",
+            );
+
             let (target_pos, building) = <(&Position, Option<&Building>)>::query()
                 .get(world, target)
                 .expect("We've cancelled actions on dead entities");

@@ -30,27 +30,34 @@ pub fn follow_ai_build_orders(
                 AiBuildOrderItem::BuildPump(guyser_entity) => {
                     let position = <&Position>::query().get(world, *guyser_entity).unwrap();
 
-                    let pump_entity = Building::Pump
-                        .add_to_world_to_construct(
-                            commands,
-                            position.0,
-                            player_side.0.flip(),
-                            animations,
-                            map,
-                        )
-                        .unwrap();
+                    let unit_under_building =
+                        unit_under_building(position.0, Building::Pump.stats().dimensions, world);
 
-                    commands
-                        .add_component(*guyser_entity, CheeseGuyserBuiltOn { pump: pump_entity });
+                    if !unit_under_building {
+                        let pump_entity = Building::Pump
+                            .add_to_world_to_construct(
+                                commands,
+                                position.0,
+                                player_side.0.flip(),
+                                animations,
+                                map,
+                            )
+                            .unwrap();
 
-                    <(&mut CommandQueue, &Side)>::query()
-                        .filter(component::<CanBuild>())
-                        .iter_mut(world)
-                        .filter(|(_, side)| **side != player_side.0)
-                        .for_each(|(commands, _)| {
-                            commands.0.clear();
-                            commands.0.push_back(Command::new_build(pump_entity));
-                        });
+                        commands.add_component(
+                            *guyser_entity,
+                            CheeseGuyserBuiltOn { pump: pump_entity },
+                        );
+
+                        <(&mut CommandQueue, &Side)>::query()
+                            .filter(component::<CanBuild>())
+                            .iter_mut(world)
+                            .filter(|(_, side)| **side != player_side.0)
+                            .for_each(|(commands, _)| {
+                                commands.0.clear();
+                                commands.0.push_back(Command::new_build(pump_entity));
+                            });
+                    }
                 }
                 AiBuildOrderItem::BuildArmoury(position) => {
                     let armoury_entity = Building::Armoury

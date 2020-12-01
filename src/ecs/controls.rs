@@ -326,6 +326,7 @@ fn build_building_command(
 ) -> bool {
     if building.stats().cost > cheese_coins.0
         || (building == Building::Pump && ray_cast_location.snapped_to_guyser.is_none())
+        || unit_under_building(ray_cast_location.pos, building.stats().dimensions, world)
     {
         return false;
     }
@@ -456,6 +457,18 @@ fn issue_command(
         if let Command::Build { .. } = command {
             <(&mut CommandQueue, &Side)>::query()
                 .filter(component::<Selected>() & component::<CanBuild>())
+                .iter_mut(world)
+                .filter(|(_, side)| **side == player_side.0)
+                .for_each(|(commands, _)| {
+                    if !rts_controls.shift_held {
+                        commands.0.clear();
+                    }
+
+                    commands.0.push_back(command.clone());
+                });
+        } else if let Command::Attack { .. } = command {
+            <(&mut CommandQueue, &Side)>::query()
+                .filter(component::<Selected>() & component::<CanAttack>())
                 .iter_mut(world)
                 .filter(|(_, side)| **side == player_side.0)
                 .for_each(|(commands, _)| {

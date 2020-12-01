@@ -28,6 +28,7 @@ pub fn one(
         &mut command_buffer,
         animations,
         10,
+        ecs::Unit::MouseMarine,
         unit_spawn_point,
         2.0,
         0.0,
@@ -38,6 +39,7 @@ pub fn one(
         &mut command_buffer,
         animations,
         5,
+        ecs::Unit::MouseMarine,
         Vec2::new(40.0, 6.7),
         1.0,
         180.0,
@@ -155,6 +157,7 @@ fn spawn_units_in_circle(
     buffer: &mut CommandBuffer,
     animations: &ModelAnimations,
     num: u32,
+    unit: ecs::Unit,
     center: Vec2,
     radius: f32,
     facing: f32,
@@ -162,7 +165,7 @@ fn spawn_units_in_circle(
 ) {
     for i in 0..num {
         let rads = (i as f32 / num as f32 * 360.0).to_radians();
-        ecs::Unit::MouseMarine.add_to_world(
+        unit.add_to_world(
             buffer,
             Some(animations),
             center + Vec2::new(rads.sin() * radius, rads.cos() * radius),
@@ -205,6 +208,7 @@ pub fn two(
         &mut command_buffer,
         animations,
         5,
+        ecs::Unit::MouseMarine,
         enemy_pos + Vec2::new(-3.0, 0.0),
         1.0,
         direction.y.atan2(direction.x).to_degrees(),
@@ -215,6 +219,7 @@ pub fn two(
         &mut command_buffer,
         animations,
         5,
+        ecs::Unit::MouseMarine,
         enemy_pos + Vec2::new(3.0, 0.0),
         1.0,
         direction.y.atan2(direction.x).to_degrees(),

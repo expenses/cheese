@@ -94,6 +94,7 @@ pub fn handle_damaged(
     health: &mut Health,
     // None in the case of a building.
     commands: Option<&mut CommandQueue>,
+    can_attack: Option<&CanAttack>,
     map_handle: Option<&MapHandle>,
     buffer: &mut CommandBuffer,
     #[resource] player_side: &PlayerSide,
@@ -126,7 +127,9 @@ pub fn handle_damaged(
 
     // If the unit is idle and got attacked, go attack back!
     if let Some(commands) = commands {
-        if commands.0.is_empty() || is_attacking_building(&commands, world) {
+        if can_attack.is_some()
+            && (commands.0.is_empty() || is_attacking_building(&commands, world))
+        {
             commands.0.push_front(Command::new_attack(damaged.0, false));
         }
     }
@@ -150,7 +153,7 @@ fn is_attacking_building(commands: &CommandQueue, world: &SubWorld) -> bool {
 }
 
 #[legion::system(for_each)]
-#[filter(component::<Position>() & component::<Side>() & component::<FiringRange>())]
+#[filter(component::<Position>() & component::<Side>() & component::<FiringRange>() & component::<CanAttack>())]
 #[read_component(Entity)]
 #[read_component(Position)]
 #[read_component(Side)]

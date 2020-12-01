@@ -21,11 +21,13 @@ fn mix(colour_a: Vec3, colour_b: Vec3, factor: f32) -> Vec3 {
 }
 
 #[legion::system]
+#[read_component(Position)]
 pub fn render_building_plan(
     #[resource] ray_cast_location: &RayCastLocation,
     #[resource] rts_controls: &RtsControls,
     #[resource] cheese_coins: &CheeseCoins,
     #[resource] model_buffers: &mut ModelBuffers,
+    world: &SubWorld,
 ) {
     let allowed = Vec4::new(0.0, 1.0, 0.0, 0.25);
     let not_allowed = Vec4::new(1.0, 0.25, 0.0, 1.0 / 2.5);
@@ -34,7 +36,9 @@ pub fn render_building_plan(
     if let CommandMode::Construct { building } = rts_controls.mode {
         let colour = if building.stats().cost > cheese_coins.0 {
             cant_afford
-        } else if building == Building::Pump && ray_cast_location.snapped_to_guyser.is_none() {
+        } else if (building == Building::Pump && ray_cast_location.snapped_to_guyser.is_none())
+            || unit_under_building(ray_cast_location.pos, building.stats().dimensions, world)
+        {
             not_allowed
         } else {
             allowed
