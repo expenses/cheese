@@ -482,7 +482,7 @@ impl Building {
                     &Ability::RECRUIT_ENGINEER,
                     &Ability::SET_RECRUITMENT_WAYPOINT,
                 ]));
-                entry.add_component(RecruitmentQueue::default());
+                entry.add_component(RecruitmentQueue::new(position, self.stats().dimensions));
             }
         }
 
@@ -522,7 +522,7 @@ impl Building {
                         &Ability::SET_RECRUITMENT_WAYPOINT,
                     ]),
                 );
-                buffer.add_component(entity, RecruitmentQueue::default());
+                buffer.add_component(entity, RecruitmentQueue::new(position, self.stats().dimensions));
             }
         }
 
@@ -530,7 +530,6 @@ impl Building {
     }
 }
 
-#[derive(Default)]
 pub struct RecruitmentQueue {
     percentage_progress: f32,
     pub queue: VecDeque<Unit>,
@@ -538,6 +537,14 @@ pub struct RecruitmentQueue {
 }
 
 impl RecruitmentQueue {
+    fn new(building_position: Vec2, building_dims: Vec2) -> Self {
+        Self {
+            percentage_progress: 0.0,
+            queue: VecDeque::new(),
+            waypoint: building_position + Vec2::new(0.0, building_dims.y / 2.0 + 2.0)
+        }
+    }
+
     fn length(&self) -> ordered_float::OrderedFloat<f32> {
         ordered_float::OrderedFloat(if self.queue.is_empty() {
             0.0
