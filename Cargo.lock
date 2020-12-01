@@ -226,7 +226,7 @@ dependencies = [
 
 [[package]]
 name = "cheese"
-version = "0.1.0-alpha"
+version = "0.1.0-beta"
 dependencies = [
  "anyhow",
  "arrayvec",
