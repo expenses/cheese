@@ -231,6 +231,7 @@ pub fn render_ui(
     world: &SubWorld,
 ) {
     let blue = Vec4::new(0.091, 0.118, 0.543, 1.0);
+    let dpi = dpi_scaling.0;
 
     if *mode != Mode::Playing {
         return;
@@ -255,7 +256,7 @@ pub fn render_ui(
     let y_offset = 4.0;
 
     text_buffer.render_text(
-        Vec2::new(10.0, y_offset),
+        Vec2::new(10.0, y_offset) * dpi,
         &text,
         Font::Ui,
         1.0,
@@ -267,7 +268,7 @@ pub fn render_ui(
     let dims = screen_dimensions.as_vec();
 
     text_buffer.render_text(
-        Vec2::new(dims.x - 32.0, y_offset),
+        Vec2::new(dims.x - 32.0 * dpi, y_offset * dpi),
         &format!("{}", cheese_coins.0),
         Font::Ui,
         1.0,
@@ -277,7 +278,7 @@ pub fn render_ui(
     );
 
     line_buffers.draw_image(
-        Vec2::new(dims.x - 16.0, 16.0),
+        Vec2::new(dims.x - 16.0 * dpi, 16.0 * dpi),
         Vec2::new(32.0, 32.0),
         Image::CheeseCoins,
         false,
@@ -311,10 +312,10 @@ pub fn render_ui(
         .take(max_queues_we_can_fit_on_a_1080p_monitor)
         .enumerate()
         .for_each(|(i, (queue, building, built))| {
-            let y = 64.0 + i as f32 * (32.0 + 4.0);
+            let y = (64.0 * dpi) + i as f32 * (32.0 + 4.0) * dpi;
 
             let bar_width = 256.0;
-            let bar_offset = bar_width + 8.0;
+            let bar_offset = bar_width * dpi + 8.0;
             let bar_inner = bar_width - 2.0;
 
             line_buffers.draw_filled_rect(
@@ -328,7 +329,7 @@ pub fn render_ui(
 
             line_buffers.draw_filled_rect(
                 Vec2::new(
-                    dims.x - bar_offset / 2.0 + (progress_in_px - bar_inner) / 2.0,
+                    dims.x - bar_offset / 2.0 + (progress_in_px - bar_inner) / 2.0 * dpi,
                     y,
                 ),
                 Vec2::new(progress_in_px, 22.0),
@@ -353,14 +354,14 @@ pub fn render_ui(
             );
 
             line_buffers.draw_filled_rect(
-                Vec2::new(dims.x - bar_offset - 16.0, y),
+                Vec2::new(dims.x - bar_offset - 16.0 * dpi, y),
                 Vec2::new(34.0, 34.0),
                 blue,
                 dpi_scaling.0,
             );
 
             line_buffers.draw_image(
-                Vec2::new(dims.x - bar_offset - 16.0, y),
+                Vec2::new(dims.x - bar_offset - 16.0 * dpi, y),
                 Vec2::new(32.0, 32.0),
                 building.stats().image,
                 !built,
