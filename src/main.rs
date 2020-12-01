@@ -87,10 +87,10 @@ async fn run() -> anyhow::Result<()> {
     resources.insert(GameStats::default());
     // Dpi scale factors are wierd. One of my laptops has it set at 1.33 and the other has it at 2.0.
     // Scaling things like selection boxes by 1.33 looks bad because one side can take up 1 pixel
-    // and the other can take up 2 pixels. So I guess the best solution is to just round the value
-    // idk.
+    // and the other can take up 2 pixels. So I guess the best solution is to just floor the value
+    // (a ui that's too small is generally better than one thats too big).
     resources.insert(DpiScaling(
-        render_context.window.scale_factor().round() as f32
+        render_context.window.scale_factor().floor() as f32
     ));
     resources.insert(animations);
     resources.insert(pathfinding::Map::new());
