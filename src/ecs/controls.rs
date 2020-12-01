@@ -663,7 +663,8 @@ pub fn update_playing_state(
                     .count();
                 num_buildings as u8 >= *num
             }
-        });
+        })
+        && !objectives.win_conditions.is_empty();
 
     if won {
         *mode = Mode::ScenarioWon;

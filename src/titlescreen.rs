@@ -22,7 +22,8 @@ const SCENARIOS_MENU: &'static [(&'static str, Vec2)] = &[
     ("Training 1: Attacking", Vec2::new(0.3, 3.5 / 6.0)),
     ("Training 2: Base Building", Vec2::new(0.3, 4.0 / 6.0)),
     ("Skirmish", Vec2::new(0.3, 4.5 / 6.0)),
-    ("Back", Vec2::new(0.3, 5.0 / 6.0)),
+    ("Sandbox", Vec2::new(0.3, 5.0 / 6.0)),
+    ("Back", Vec2::new(0.3, 5.5 / 6.0)),
 ];
 
 pub const TEXT_COLOUR: Vec4 = Vec4::new(0.867, 0.675, 0.086, 1.0);
@@ -170,6 +171,9 @@ fn handle_clicks(
                 }
                 "Skirmish" => {
                     *mode = Mode::StartScenario(3);
+                }
+                "Sandbox" => {
+                    *mode = Mode::StartScenario(255);
                 }
                 "Back" => {
                     *menu = Menu::Main;

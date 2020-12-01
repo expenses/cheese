@@ -230,6 +230,16 @@ async fn run() -> anyhow::Result<()> {
                                 &mut ai_build_orders,
                             );
                         }
+                        255 => scenarios::sandbox(
+                            &mut world,
+                            &animations,
+                            &mut map,
+                            &mut rng,
+                            &mut objectives,
+                            &mut camera,
+                            &mut cheese_coins,
+                            &mut ai_build_orders,
+                        ),
                         _ => {}
                     }
                     // Gotta change both the Mode in resources and the local copy.

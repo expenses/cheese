@@ -422,3 +422,82 @@ pub fn three(
 149.3153: MoveTo { target: Vec2 { x: -78.44591, y: -80.18292 }, attack_move: true, path: [] }
 150.26266: MoveTo { target: Vec2 { x: -46.487736, y: -79.067795 }, attack_move: true, path: [] }
 */
+
+pub fn sandbox(
+    world: &mut World,
+    animations: &ModelAnimations,
+    map: &mut Map,
+    rng: &mut rand::rngs::SmallRng,
+    objectives: &mut Objectives,
+    camera: &mut Camera,
+    cheese_coins: &mut CheeseCoins,
+    ai_build_orders: &mut AiBuildOrders,
+) {
+    let mut command_buffer = legion::systems::CommandBuffer::new(&world);
+
+    ecs::Unit::Engineer.add_to_world(
+        &mut command_buffer,
+        Some(animations),
+        Vec2::new(0.0, -90.0),
+        ecs::Facing(0.0),
+        ecs::Side::Green,
+        None,
+    );
+
+    spawn_units_in_circle(
+        &mut command_buffer,
+        animations,
+        25,
+        ecs::Unit::MouseMarine,
+        Vec2::new(0.0, 90.0),
+        1.0,
+        0.0,
+        ecs::Side::Purple,
+    );
+
+    spawn_units_in_circle(
+        &mut command_buffer,
+        animations,
+        25,
+        ecs::Unit::MouseMarine,
+        Vec2::new(0.0, 90.0),
+        2.0,
+        0.0,
+        ecs::Side::Purple,
+    );
+
+    spawn_units_in_circle(
+        &mut command_buffer,
+        animations,
+        25,
+        ecs::Unit::MouseMarine,
+        Vec2::new(0.0, 90.0),
+        3.0,
+        0.0,
+        ecs::Side::Purple,
+    );
+
+    spawn_units_in_circle(
+        &mut command_buffer,
+        animations,
+        25,
+        ecs::Unit::MouseMarine,
+        Vec2::new(0.0, 90.0),
+        4.0,
+        0.0,
+        ecs::Side::Purple,
+    );
+
+    command_buffer.flush(world);
+
+    *objectives = Objectives {
+        win_conditions: vec![],
+        lose_conditions: vec![],
+    };
+    *camera = Camera {
+        looking_at: Vec2::new(0.0, -90.0),
+        distance: 50.0,
+    };
+    *cheese_coins = CheeseCoins(10_000_000);
+    *ai_build_orders = AiBuildOrders::default();
+}
