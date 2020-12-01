@@ -81,7 +81,7 @@ impl RenderContext {
     pub async fn new(event_loop: &EventLoop<()>, settings: &Settings) -> anyhow::Result<Self> {
         let window = WindowBuilder::new()
             .with_inner_size(winit::dpi::LogicalSize::new(1280, 720))
-            .with_title("Cheese (working title)")
+            .with_title("Cheese")
             .build(event_loop)?;
 
         let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);

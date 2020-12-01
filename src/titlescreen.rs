@@ -10,7 +10,7 @@ pub fn camera_view() -> Mat4 {
     Mat4::look_at(Vec3::zero(), Vec3::unit_z(), Vec3::unit_y())
 }
 
-const TITLE_POSITION: Vec2 = Vec2::new(0.3, 1.0 / 6.0);
+const TITLE_POSITION: Vec2 = Vec2::new(0.3, 1.0 / 4.0);
 const MOON_POSITION: Vec3 = Vec3::new(-1.5, 0.0, 3.0);
 
 const MAIN_MENU: &'static [(&'static str, Vec2)] = &[
@@ -89,9 +89,9 @@ fn render_text(
 
     text_buffer.render_text(
         TITLE_POSITION * screen_dimensions,
-        "Cheese (working title :^))",
+        "Cheese",
         Font::Title,
-        1.5,
+        3.0,
         dpi_scaling.0,
         TextAlignment::Center,
         TEXT_COLOUR,
