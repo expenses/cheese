@@ -28,16 +28,16 @@ pathfinding = "2.0.4"
 spade = "1.8.2"
 rand = { version = "0.7.3", default-features = false, features = ["small_rng"] }
 ultraviolet = { version = "0.7.5", features = ["bytemuck"] }
-wgpu = "=0.6.0"
-wgpu_glyph = "0.10.0"
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs", branch = "gecko" }
+wgpu_glyph = { git = "https://github.com/expenses/wgpu_glyph", branch = "update-to-wgpu-gecko" }
 winit = "0.23.0"
 ncollide2d = "0.26.1"
 derive_more = "0.99.11"
-web-sys = { version = "0.3.45", optional = true }
-wasm-bindgen-futures = { version = "0.4.18", optional = true }
+wasm-bindgen-futures = { version = "*", optional = true }
 console_log = "0.2.0"
 console_error_panic_hook = { version = "0.1.6", optional = true }
 futures = "0.3.8"
+web-sys =  { version = "0.3.45", optional = true }
 
 [features]
 default = ["multithreading"]
@@ -48,8 +48,7 @@ wasm = ["web-sys", "winit/web-sys", "wasm-bindgen-futures", "rand/wasm-bindgen",
 native = []
 
 [patch.crates-io]
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs" }
-web-sys = { git = "https://github.com/rustwasm/wasm-bindgen" }
-wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen" }
-js-sys = { git = "https://github.com/rustwasm/wasm-bindgen" }
-wgpu_glyph = { git = "https://github.com/expenses/wgpu_glyph", branch = "update-to-wgpu-0.6-master" }
+wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "316c5a70fdc4a052fb65ef82bf02d52107b5671b" }
+wasm-bindgen-futures = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "316c5a70fdc4a052fb65ef82bf02d52107b5671b" }
+web-sys = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "316c5a70fdc4a052fb65ef82bf02d52107b5671b" }
+js-sys = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "316c5a70fdc4a052fb65ef82bf02d52107b5671b" }

@@ -1394,7 +1394,7 @@ dependencies = [
 [[package]]
 name = "js-sys"
 version = "0.3.45"
-source = "git+https://github.com/rustwasm/wasm-bindgen#83cc988cbfa9ced7be419a3429cbd99c74b1fec1"
+source = "git+https://github.com/rustwasm/wasm-bindgen?rev=316c5a70fdc4a052fb65ef82bf02d52107b5671b#316c5a70fdc4a052fb65ef82bf02d52107b5671b"
 dependencies = [
  "wasm-bindgen",
 ]
@@ -3098,7 +3098,7 @@ checksum = "cccddf32554fecc6acb585f82a32a72e28b48f8c4c1883ddfeeeaa96f7d8e519"
 [[package]]
 name = "wasm-bindgen"
 version = "0.2.68"
-source = "git+https://github.com/rustwasm/wasm-bindgen#83cc988cbfa9ced7be419a3429cbd99c74b1fec1"
+source = "git+https://github.com/rustwasm/wasm-bindgen?rev=316c5a70fdc4a052fb65ef82bf02d52107b5671b#316c5a70fdc4a052fb65ef82bf02d52107b5671b"
 dependencies = [
  "cfg-if 1.0.0",
  "wasm-bindgen-macro",
@@ -3107,7 +3107,7 @@ dependencies = [
 [[package]]
 name = "wasm-bindgen-backend"
 version = "0.2.68"
-source = "git+https://github.com/rustwasm/wasm-bindgen#83cc988cbfa9ced7be419a3429cbd99c74b1fec1"
+source = "git+https://github.com/rustwasm/wasm-bindgen?rev=316c5a70fdc4a052fb65ef82bf02d52107b5671b#316c5a70fdc4a052fb65ef82bf02d52107b5671b"
 dependencies = [
  "bumpalo",
  "lazy_static",
@@ -3121,10 +3121,9 @@ dependencies = [
 [[package]]
 name = "wasm-bindgen-futures"
 version = "0.4.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7866cab0aa01de1edf8b5d7936938a7e397ee50ce24119aef3e1eaa3b6171da"
+source = "git+https://github.com/rustwasm/wasm-bindgen?rev=316c5a70fdc4a052fb65ef82bf02d52107b5671b#316c5a70fdc4a052fb65ef82bf02d52107b5671b"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "js-sys",
  "wasm-bindgen",
  "web-sys",
@@ -3133,7 +3132,7 @@ dependencies = [
 [[package]]
 name = "wasm-bindgen-macro"
 version = "0.2.68"
-source = "git+https://github.com/rustwasm/wasm-bindgen#83cc988cbfa9ced7be419a3429cbd99c74b1fec1"
+source = "git+https://github.com/rustwasm/wasm-bindgen?rev=316c5a70fdc4a052fb65ef82bf02d52107b5671b#316c5a70fdc4a052fb65ef82bf02d52107b5671b"
 dependencies = [
  "quote 1.0.7",
  "wasm-bindgen-macro-support",
@@ -3142,7 +3141,7 @@ dependencies = [
 [[package]]
 name = "wasm-bindgen-macro-support"
 version = "0.2.68"
-source = "git+https://github.com/rustwasm/wasm-bindgen#83cc988cbfa9ced7be419a3429cbd99c74b1fec1"
+source = "git+https://github.com/rustwasm/wasm-bindgen?rev=316c5a70fdc4a052fb65ef82bf02d52107b5671b#316c5a70fdc4a052fb65ef82bf02d52107b5671b"
 dependencies = [
  "proc-macro2 1.0.24",
  "quote 1.0.7",
@@ -3154,7 +3153,7 @@ dependencies = [
 [[package]]
 name = "wasm-bindgen-shared"
 version = "0.2.68"
-source = "git+https://github.com/rustwasm/wasm-bindgen#83cc988cbfa9ced7be419a3429cbd99c74b1fec1"
+source = "git+https://github.com/rustwasm/wasm-bindgen?rev=316c5a70fdc4a052fb65ef82bf02d52107b5671b#316c5a70fdc4a052fb65ef82bf02d52107b5671b"
 
 [[package]]
 name = "wayland-client"
@@ -3301,7 +3300,7 @@ dependencies = [
 [[package]]
 name = "web-sys"
 version = "0.3.45"
-source = "git+https://github.com/rustwasm/wasm-bindgen#83cc988cbfa9ced7be419a3429cbd99c74b1fec1"
+source = "git+https://github.com/rustwasm/wasm-bindgen?rev=316c5a70fdc4a052fb65ef82bf02d52107b5671b#316c5a70fdc4a052fb65ef82bf02d52107b5671b"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -3310,7 +3309,7 @@ dependencies = [
 [[package]]
 name = "wgpu"
 version = "0.6.0"
-source = "git+https://github.com/gfx-rs/wgpu-rs#e59ea495a66ce9606c3a2bbfc2efe8c0c05d413c"
+source = "git+https://github.com/gfx-rs/wgpu-rs?branch=gecko#e59ea495a66ce9606c3a2bbfc2efe8c0c05d413c"
 dependencies = [
  "arrayvec",
  "futures",
@@ -3369,7 +3368,7 @@ dependencies = [
 [[package]]
 name = "wgpu_glyph"
 version = "0.10.0"
-source = "git+https://github.com/expenses/wgpu_glyph?branch=update-to-wgpu-0.6-master#953915e2599219318c85b06d0c6368ff2d335c5f"
+source = "git+https://github.com/expenses/wgpu_glyph?branch=update-to-wgpu-gecko#cafb8cbb54965527023d43ad96f818a60552e7ee"
 dependencies = [
  "glyph_brush",
  "log",
