@@ -203,8 +203,7 @@ impl Ability {
 
     fn image(&self) -> Image {
         match self.ability_type {
-            AbilityType::Build(Building::Armoury) => Image::BuildArmoury,
-            AbilityType::Build(Building::Pump) => Image::BuildPump,
+            AbilityType::Build(building) => building.stats().image,
             AbilityType::Recruit(Unit::Engineer) => Image::RecruitEngineer,
             AbilityType::Recruit(Unit::MouseMarine) => Image::RecruitMouseMarine,
             AbilityType::SetRecruitmentWaypoint => Image::SetRecruitmentWaypoint,
@@ -266,7 +265,6 @@ pub enum Command {
     Attack {
         target: Entity,
         // Was the unit explicitly commanded to attack, or was this caused by attack moving or agro?
-        // todo: attack moves need to give up when an enemy goes out of range.
         explicit: bool,
         // Is the unit out of range for the first time? If so, go within range no matter what.
         // If it's not an explicit attack and we're not out of range for the first time, then it's
@@ -383,6 +381,7 @@ pub struct BuildingStats {
     pub dimensions: Vec2,
     pub max_health: f32,
     pub cost: u32,
+    pub image: Image,
 }
 
 impl Building {
@@ -404,12 +403,14 @@ impl Building {
                 dimensions: Vec2::new(6.0, 10.0),
                 max_health: 500.0,
                 cost: 200,
+                image: Image::BuildArmoury,
             },
             Self::Pump => BuildingStats {
                 radius: 3.0,
                 dimensions: Vec2::new(4.0, 4.0),
                 max_health: 200.0,
                 cost: 50,
+                image: Image::BuildPump,
             },
         }
     }
@@ -434,6 +435,7 @@ impl Building {
             dimensions,
             max_health: _,
             cost: _,
+            image: _,
         } = self.stats();
 
         let handle = map.insert(position, dimensions)?;
@@ -465,6 +467,8 @@ impl Building {
 
         let mut entry = world.entry(entity).unwrap();
 
+        entry.add_component(FullyBuilt);
+
         match self {
             Building::Pump => {
                 entry.add_component(animations.pump.skin.clone());
@@ -481,7 +485,7 @@ impl Building {
                     &Ability::RECRUIT_ENGINEER,
                     &Ability::SET_RECRUITMENT_WAYPOINT,
                 ]));
-                entry.add_component(RecruitmentQueue::default());
+                entry.add_component(RecruitmentQueue::new(position, self.stats().dimensions));
             }
         }
 
@@ -521,7 +525,10 @@ impl Building {
                         &Ability::SET_RECRUITMENT_WAYPOINT,
                     ]),
                 );
-                buffer.add_component(entity, RecruitmentQueue::default());
+                buffer.add_component(
+                    entity,
+                    RecruitmentQueue::new(position, self.stats().dimensions),
+                );
             }
         }
 
@@ -529,7 +536,6 @@ impl Building {
     }
 }
 
-#[derive(Default)]
 pub struct RecruitmentQueue {
     percentage_progress: f32,
     pub queue: VecDeque<Unit>,
@@ -537,6 +543,14 @@ pub struct RecruitmentQueue {
 }
 
 impl RecruitmentQueue {
+    fn new(building_position: Vec2, building_dims: Vec2) -> Self {
+        Self {
+            percentage_progress: 0.0,
+            queue: VecDeque::new(),
+            waypoint: building_position + Vec2::new(0.0, building_dims.y / 2.0 + 2.0),
+        }
+    }
+
     fn length(&self) -> ordered_float::OrderedFloat<f32> {
         ordered_float::OrderedFloat(if self.queue.is_empty() {
             0.0
@@ -556,7 +570,8 @@ pub struct UnitStats {
     pub max_health: f32,
     pub move_speed: f32,
     pub radius: f32,
-    pub firing_range: f32,
+    // None if the unit can't attack
+    pub firing_range: Option<f32>,
     pub health_bar_height: f32,
     pub cost: u32,
     pub recruitment_time: f32,
@@ -574,7 +589,7 @@ impl Unit {
         match self {
             Self::MouseMarine => UnitStats {
                 max_health: 50.0,
-                firing_range: 10.0,
+                firing_range: Some(10.0),
                 move_speed: 6.0,
                 radius: 1.0,
                 health_bar_height: 3.0,
@@ -583,7 +598,7 @@ impl Unit {
             },
             Self::Engineer => UnitStats {
                 max_health: 40.0,
-                firing_range: 1.0,
+                firing_range: None,
                 move_speed: 6.0,
                 radius: 1.0,
                 health_bar_height: 3.0,
@@ -629,19 +644,26 @@ impl Unit {
             Selectable,
             Health(max_health),
             Cooldown(0.0),
-            FiringRange(firing_range),
             MoveSpeed(move_speed),
             Radius(radius),
             // Uncomment to debug movement.
             // MovementDebugging::default(),
         ));
 
-        if let Unit::Engineer = self {
-            buffer.add_component(entity, CanBuild);
-            buffer.add_component(
-                entity,
-                Abilities(vec![&Ability::BUILD_PUMP, &Ability::BUILD_ARMOURY]),
-            );
+        match self {
+            Unit::Engineer => {
+                buffer.add_component(entity, CanBuild);
+                buffer.add_component(
+                    entity,
+                    Abilities(vec![&Ability::BUILD_PUMP, &Ability::BUILD_ARMOURY]),
+                );
+            }
+            Unit::MouseMarine => {}
+        }
+
+        if let Some(firing_range) = firing_range {
+            buffer.add_component(entity, FiringRange(firing_range));
+            buffer.add_component(entity, CanAttack);
         }
 
         if let Some(animations) = animations {
@@ -721,6 +743,8 @@ fn vec2_to_ncollide_point(point: Vec2) -> ncollide2d::math::Point<f32> {
 pub struct CheeseDropletPosition(Vec3);
 pub struct CheeseDropletVelocity(Vec3);
 pub struct CanBuild;
+pub struct CanAttack;
+pub struct FullyBuilt;
 
 fn nearest_point_within_building(
     unit_pos: Vec2,
@@ -795,4 +819,19 @@ fn mix(a: f32, b: f32, factor: f32) -> f32 {
 
 fn ease_out_quad(x: f32) -> f32 {
     1.0 - (1.0 - x) * (1.0 - x)
+}
+
+fn unit_under_building(building_position: Vec2, building_dims: Vec2, world: &SubWorld) -> bool {
+    let top_left = building_position - building_dims / 2.0;
+    let (top, left) = (top_left.y, top_left.x);
+    let bottom_right = building_position + building_dims / 2.0;
+    let (bottom, right) = (bottom_right.y, bottom_right.x);
+
+    <&Position>::query()
+        .filter(component::<Unit>())
+        .iter(world)
+        .any(|pos| {
+            let pos = pos.0;
+            pos.x > left && pos.x < right && pos.y > top && pos.y < bottom
+        })
 }

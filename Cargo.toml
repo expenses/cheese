@@ -1,6 +1,6 @@
 [package]
 name = "cheese"
-version = "0.1.0-alpha"
+version = "0.1.0-beta"
 authors = ["Ashley Ruglys <ashley.ruglys@gmail.com>"]
 edition = "2018"
 description = "A RTS about mice on the moon made for the 2020 Github Game Off"

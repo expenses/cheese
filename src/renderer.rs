@@ -89,7 +89,7 @@ impl RenderContext {
     pub async fn new(event_loop: &EventLoop<()>, settings: &Settings) -> anyhow::Result<Self> {
         let window = WindowBuilder::new()
             .with_inner_size(winit::dpi::LogicalSize::new(1280, 720))
-            .with_title("Cheese (working title)")
+            .with_title("Cheese")
             .build(event_loop)?;
 
         log::info!("Window scale factor: {}", window.scale_factor());
@@ -1126,6 +1126,7 @@ pub enum TextAlignment {
     Default,
     Center,
     HorizontalRight,
+    CenterLeft,
 }
 
 impl TextBuffer {
@@ -1162,6 +1163,9 @@ impl TextBuffer {
                 .v_align(wgpu_glyph::VerticalAlign::Center),
             TextAlignment::HorizontalRight => {
                 wgpu_glyph::Layout::default().h_align(wgpu_glyph::HorizontalAlign::Right)
+            }
+            TextAlignment::CenterLeft => {
+                wgpu_glyph::Layout::default().v_align(wgpu_glyph::VerticalAlign::Center)
             }
         };
 

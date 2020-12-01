@@ -1,8 +1,8 @@
 use super::*;
 use crate::assets::ModelAnimations;
 use crate::resources::{
-    CheeseCoins, CommandMode, ControlGroups, Keypress, Keypresses, LoseCondition, Mode, Objectives,
-    RayCastLocation, SelectedUnitsAbilities, TotalTime, WinCondition,
+    CheeseCoins, CommandMode, ControlGroups, GameStats, Keypress, Keypresses, LoseCondition, Mode,
+    Objectives, RayCastLocation, SelectedUnitsAbilities, TotalTime, WinCondition,
 };
 
 #[legion::system]
@@ -13,10 +13,11 @@ pub fn handle_keypresses(
     #[resource] rts_controls: &mut RtsControls,
     #[resource] debug_controls: &mut DebugControls,
     #[resource] cheese_coins: &mut CheeseCoins,
-    #[resource] player_side: &mut PlayerSide,
+    //#[resource] player_side: &mut PlayerSide,
     #[resource] selected_units_abilities: &SelectedUnitsAbilities,
     #[resource] mode: &mut Mode,
     #[resource] total_time: &TotalTime,
+    #[resource] game_stats: &mut GameStats,
     world: &mut SubWorld,
 ) {
     for Keypress {
@@ -36,36 +37,34 @@ pub fn handle_keypresses(
                                 rts_controls.mode = CommandMode::SetRecruitmentWaypoint;
                             }
                             AbilityType::Build(building) => {
-                                //if building.stats().cost <= cheese_coins.0 {
                                 rts_controls.mode = CommandMode::Construct { building };
-                                //} else {
-                                // Todo: play sound: meep merp (like from dota).
-                                //}
                             }
                             AbilityType::Recruit(unit) => {
                                 if unit.stats().cost <= cheese_coins.0 {
-                                    cheese_coins.0 -= unit.stats().cost;
-
-                                    log::trace!(target: "command-recording", "{:?}: Recruiting {:?}", total_time.0, unit);
-
                                     let entity_with_shortest_recruitment_queue = casters
                                         .iter()
-                                        .map(|caster| {
-                                            let queue_len = <&RecruitmentQueue>::query()
+                                        .filter_map(|caster| {
+                                            <&RecruitmentQueue>::query()
+                                                .filter(component::<FullyBuilt>())
                                                 .get(world, *caster)
-                                                .unwrap()
-                                                .length();
-                                            (caster, queue_len)
+                                                .ok()
+                                                .map(|queue| (caster, queue.length()))
                                         })
                                         .min_by_key(|(_, queue_len)| *queue_len)
-                                        .map(|(entity, _)| *entity)
-                                        .unwrap();
+                                        .map(|(entity, _)| *entity);
 
-                                    <&mut RecruitmentQueue>::query()
-                                        .get_mut(world, entity_with_shortest_recruitment_queue)
-                                        .unwrap()
-                                        .queue
-                                        .push_back(unit);
+                                    if let Some(entity) = entity_with_shortest_recruitment_queue {
+                                        cheese_coins.0 -= unit.stats().cost;
+                                        log::trace!(target: "command-recording", "{:?}: Recruiting {:?}", total_time.0, unit);
+
+                                        game_stats.units_recruited += 1;
+
+                                        <&mut RecruitmentQueue>::query()
+                                            .get_mut(world, entity)
+                                            .unwrap()
+                                            .queue
+                                            .push_back(unit);
+                                    }
                                 }
                             }
                         }
@@ -235,6 +234,10 @@ pub fn handle_left_click(
                 world,
                 total_time.0,
             );
+
+            if !rts_controls.shift_held {
+                rts_controls.mode = CommandMode::Normal;
+            }
         }
         CommandMode::Normal => {
             let position = ray_cast_location.pos;
@@ -268,9 +271,13 @@ pub fn handle_left_click(
                     }
                 }
             }
+
+            if !rts_controls.shift_held {
+                rts_controls.mode = CommandMode::Normal;
+            }
         }
         CommandMode::Construct { building } => {
-            build_building_command(
+            let built = build_building_command(
                 building,
                 ray_cast_location,
                 player_side,
@@ -282,6 +289,10 @@ pub fn handle_left_click(
                 cheese_coins,
                 total_time.0,
             );
+
+            if built && !rts_controls.shift_held {
+                rts_controls.mode = CommandMode::Normal;
+            }
         }
         CommandMode::SetRecruitmentWaypoint => {
             let position = ray_cast_location.pos;
@@ -294,12 +305,10 @@ pub fn handle_left_click(
                 .filter(|(_, side)| **side == player_side.0)
                 .for_each(|(queue, _)| {
                     queue.waypoint = position;
-                })
-        }
-    }
+                });
 
-    if !rts_controls.shift_held {
-        rts_controls.mode = CommandMode::Normal;
+            rts_controls.mode = CommandMode::Normal;
+        }
     }
 }
 
@@ -314,11 +323,12 @@ fn build_building_command(
     rts_controls: &RtsControls,
     cheese_coins: &mut CheeseCoins,
     total_time: f32,
-) {
+) -> bool {
     if building.stats().cost > cheese_coins.0
         || (building == Building::Pump && ray_cast_location.snapped_to_guyser.is_none())
+        || unit_under_building(ray_cast_location.pos, building.stats().dimensions, world)
     {
-        return;
+        return false;
     }
 
     if let Some(building_entity) = building.add_to_world_to_construct(
@@ -360,6 +370,10 @@ fn build_building_command(
 
                 commands.0.push_back(command.clone());
             });
+
+        true
+    } else {
+        false
     }
 }
 
@@ -443,6 +457,18 @@ fn issue_command(
         if let Command::Build { .. } = command {
             <(&mut CommandQueue, &Side)>::query()
                 .filter(component::<Selected>() & component::<CanBuild>())
+                .iter_mut(world)
+                .filter(|(_, side)| **side == player_side.0)
+                .for_each(|(commands, _)| {
+                    if !rts_controls.shift_held {
+                        commands.0.clear();
+                    }
+
+                    commands.0.push_back(command.clone());
+                });
+        } else if let Command::Attack { .. } = command {
+            <(&mut CommandQueue, &Side)>::query()
+                .filter(component::<Selected>() & component::<CanAttack>())
                 .iter_mut(world)
                 .filter(|(_, side)| **side == player_side.0)
                 .for_each(|(commands, _)| {
@@ -611,7 +637,6 @@ fn deselect_all(world: &SubWorld, commands: &mut CommandBuffer) {
 #[legion::system]
 #[read_component(Side)]
 #[read_component(Building)]
-#[read_component(BuildingCompleteness)]
 pub fn update_playing_state(
     #[resource] objectives: &Objectives,
     #[resource] player_side: &PlayerSide,
@@ -629,17 +654,17 @@ pub fn update_playing_state(
                 all_destroyed
             }
             WinCondition::BuildN(num, building) => {
-                let num_buildings = <(&Side, &Building, &BuildingCompleteness)>::query()
+                let num_buildings = <(&Side, &Building)>::query()
+                    .filter(component::<FullyBuilt>())
                     .iter(world)
-                    .filter(|(side, building_type, completeness)| {
-                        **side == player_side.0
-                            && building == *building_type
-                            && completeness.0 == building.stats().max_health
+                    .filter(|(side, building_type)| {
+                        **side == player_side.0 && building == *building_type
                     })
                     .count();
                 num_buildings as u8 >= *num
             }
-        });
+        })
+        && !objectives.win_conditions.is_empty();
 
     if won {
         *mode = Mode::ScenarioWon;

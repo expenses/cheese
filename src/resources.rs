@@ -319,3 +319,12 @@ pub enum AiBuildOrderItem {
 
 #[derive(Default)]
 pub struct AiBuildOrders(pub Vec<(f32, AiBuildOrderItem)>);
+
+#[derive(Default)]
+pub struct GameStats {
+    pub units_recruited: u32,
+    pub units_lost: u32,
+    pub buildings_built: u32,
+    pub enemy_buildings_destroyed: u32,
+    pub enemy_units_killed: u32,
+}

@@ -26,51 +26,67 @@ pub fn follow_ai_build_orders(
         if *time <= total_time.0 {
             log::debug!(target: "ai", "Following build order: {:?}", item);
 
+            let engineer_exists = <&Side>::query()
+                .filter(component::<CanBuild>())
+                .iter(world)
+                .filter(|side| **side != player_side.0)
+                .count()
+                > 0;
+
             match item {
                 AiBuildOrderItem::BuildPump(guyser_entity) => {
                     let position = <&Position>::query().get(world, *guyser_entity).unwrap();
 
-                    let pump_entity = Building::Pump
-                        .add_to_world_to_construct(
-                            commands,
-                            position.0,
-                            player_side.0.flip(),
-                            animations,
-                            map,
-                        )
-                        .unwrap();
+                    let unit_under_building =
+                        unit_under_building(position.0, Building::Pump.stats().dimensions, world);
 
-                    commands
-                        .add_component(*guyser_entity, CheeseGuyserBuiltOn { pump: pump_entity });
+                    if !unit_under_building && engineer_exists {
+                        let pump_entity = Building::Pump
+                            .add_to_world_to_construct(
+                                commands,
+                                position.0,
+                                player_side.0.flip(),
+                                animations,
+                                map,
+                            )
+                            .unwrap();
 
-                    <(&mut CommandQueue, &Side)>::query()
-                        .filter(component::<CanBuild>())
-                        .iter_mut(world)
-                        .filter(|(_, side)| **side != player_side.0)
-                        .for_each(|(commands, _)| {
-                            commands.0.clear();
-                            commands.0.push_back(Command::new_build(pump_entity));
-                        });
+                        commands.add_component(
+                            *guyser_entity,
+                            CheeseGuyserBuiltOn { pump: pump_entity },
+                        );
+
+                        <(&mut CommandQueue, &Side)>::query()
+                            .filter(component::<CanBuild>())
+                            .iter_mut(world)
+                            .filter(|(_, side)| **side != player_side.0)
+                            .for_each(|(commands, _)| {
+                                commands.0.clear();
+                                commands.0.push_back(Command::new_build(pump_entity));
+                            });
+                    }
                 }
                 AiBuildOrderItem::BuildArmoury(position) => {
-                    let armoury_entity = Building::Armoury
-                        .add_to_world_to_construct(
-                            commands,
-                            *position,
-                            player_side.0.flip(),
-                            animations,
-                            map,
-                        )
-                        .unwrap();
+                    if engineer_exists {
+                        let armoury_entity = Building::Armoury
+                            .add_to_world_to_construct(
+                                commands,
+                                *position,
+                                player_side.0.flip(),
+                                animations,
+                                map,
+                            )
+                            .unwrap();
 
-                    <(&mut CommandQueue, &Side)>::query()
-                        .filter(component::<CanBuild>())
-                        .iter_mut(world)
-                        .filter(|(_, side)| **side != player_side.0)
-                        .for_each(|(commands, _)| {
-                            commands.0.clear();
-                            commands.0.push_back(Command::new_build(armoury_entity));
-                        });
+                        <(&mut CommandQueue, &Side)>::query()
+                            .filter(component::<CanBuild>())
+                            .iter_mut(world)
+                            .filter(|(_, side)| **side != player_side.0)
+                            .for_each(|(commands, _)| {
+                                commands.0.clear();
+                                commands.0.push_back(Command::new_build(armoury_entity));
+                            });
+                    }
                 }
                 AiBuildOrderItem::RecruitMarine(times) => {
                     for _ in 0..*times {

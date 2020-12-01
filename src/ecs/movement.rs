@@ -17,7 +17,7 @@ pub fn reset_map_updated(#[resource] map: &mut Map) {
 pub fn set_movement_paths(
     entity: &Entity,
     radius: &Radius,
-    firing_range: &FiringRange,
+    firing_range: Option<&FiringRange>,
     command_queue: &mut CommandQueue,
     mut movement_debugging: Option<&mut MovementDebugging>,
     world: &SubWorld,
@@ -30,6 +30,10 @@ pub fn set_movement_paths(
         .expect("We've applied a filter to this system for Position");
 
     let mut pop_front = false;
+
+    // Todo: if a unit has an implicit attack command on a building and it gets destroyed, the
+    // underlying attack move doesnt have its path updated. The solution is maybe to use a dirty
+    // flag for this.
 
     match command_queue.0.front_mut() {
         Some(&mut Command::MoveTo {
@@ -71,6 +75,10 @@ pub fn set_movement_paths(
             ref mut first_out_of_range,
             ..
         }) => {
+            let firing_range = firing_range.expect(
+                "It shouldn't be possible to issue attack commands to units that can't attack",
+            );
+
             let (target_pos, building) = <(&Position, Option<&Building>)>::query()
                 .get(world, target)
                 .expect("We've cancelled actions on dead entities");

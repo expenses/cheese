@@ -1,8 +1,12 @@
 - Units should not try to move to the same spot, but the path locations should be spread out.
-- AI!!!!
-- Fill out HUD (medium)
 - Pyschic units
 - Helmets should increase opacity when in combat
 - Map crevasses
-- Stats on win/loss
 - Minimap?
+- Work on improving pathfinding a little bit if possible
+- Improve shadows (shadow mapping is hard tbh)
+
+- Make avoidance look better ( medium ) ( it's a bug, not a feature :P )
+- Attack move movement fixes.
+- Fix issue where two units bump off each other when trying to get to the same point in avoidance.
+- Fix issue where units just skip contructing a building.

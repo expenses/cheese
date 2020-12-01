@@ -1,5 +1,5 @@
 use super::*;
-use crate::resources::DeltaTime;
+use crate::resources::{DeltaTime, GameStats, PlayerSide};
 
 #[legion::system(for_each)]
 #[read_component(Position)]
@@ -90,11 +90,15 @@ pub fn handle_damaged(
     position: &Position,
     radius: &Radius,
     damaged: &DamagedThisTick,
+    side: &Side,
     health: &mut Health,
     // None in the case of a building.
     commands: Option<&mut CommandQueue>,
+    can_attack: Option<&CanAttack>,
     map_handle: Option<&MapHandle>,
     buffer: &mut CommandBuffer,
+    #[resource] player_side: &PlayerSide,
+    #[resource] stats: &mut GameStats,
     #[resource] map: &mut Map,
     #[resource] rng: &mut SmallRng,
     world: &SubWorld,
@@ -108,6 +112,14 @@ pub fn handle_damaged(
             map.remove(map_handle);
         }
 
+        if *side == player_side.0 {
+            stats.units_lost += 1;
+        } else if map_handle.is_some() {
+            stats.enemy_buildings_destroyed += 1;
+        } else {
+            stats.enemy_units_killed += 1;
+        }
+
         buffer.push((Explosion::new(position.0, rng, radius.0),));
 
         return;
@@ -115,7 +127,9 @@ pub fn handle_damaged(
 
     // If the unit is idle and got attacked, go attack back!
     if let Some(commands) = commands {
-        if commands.0.is_empty() || is_attacking_building(&commands, world) {
+        if can_attack.is_some()
+            && (commands.0.is_empty() || is_attacking_building(&commands, world))
+        {
             commands.0.push_front(Command::new_attack(damaged.0, false));
         }
     }
@@ -139,7 +153,7 @@ fn is_attacking_building(commands: &CommandQueue, world: &SubWorld) -> bool {
 }
 
 #[legion::system(for_each)]
-#[filter(component::<Position>() & component::<Side>() & component::<FiringRange>())]
+#[filter(component::<Position>() & component::<Side>() & component::<FiringRange>() & component::<CanAttack>())]
 #[read_component(Entity)]
 #[read_component(Position)]
 #[read_component(Side)]

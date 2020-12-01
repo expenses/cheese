@@ -10,7 +10,7 @@ pub fn camera_view() -> Mat4 {
     Mat4::look_at(Vec3::zero(), Vec3::unit_z(), Vec3::unit_y())
 }
 
-const TITLE_POSITION: Vec2 = Vec2::new(0.3, 1.0 / 6.0);
+const TITLE_POSITION: Vec2 = Vec2::new(0.3, 1.0 / 4.0);
 const MOON_POSITION: Vec3 = Vec3::new(-1.5, 0.0, 3.0);
 
 const MAIN_MENU: &'static [(&'static str, Vec2)] = &[
@@ -24,7 +24,8 @@ const SCENARIOS_MENU: &'static [(&'static str, Vec2)] = &[
     ("Training 1: Attacking", Vec2::new(0.3, 3.5 / 6.0)),
     ("Training 2: Base Building", Vec2::new(0.3, 4.0 / 6.0)),
     ("Skirmish", Vec2::new(0.3, 4.5 / 6.0)),
-    ("Back", Vec2::new(0.3, 5.0 / 6.0)),
+    ("Sandbox", Vec2::new(0.3, 5.0 / 6.0)),
+    ("Back", Vec2::new(0.3, 5.5 / 6.0)),
 ];
 
 pub const TEXT_COLOUR: Vec4 = Vec4::new(0.867, 0.675, 0.086, 1.0);
@@ -91,9 +92,9 @@ fn render_text(
 
     text_buffer.render_text(
         TITLE_POSITION * screen_dimensions,
-        "Cheese (working title :^))",
+        "Cheese",
         Font::Title,
-        1.5,
+        3.0,
         dpi_scaling.0,
         TextAlignment::Center,
         TEXT_COLOUR,
@@ -172,6 +173,9 @@ fn handle_clicks(
                 }
                 "Skirmish" => {
                     *mode = Mode::StartScenario(3);
+                }
+                "Sandbox" => {
+                    *mode = Mode::StartScenario(255);
                 }
                 "Back" => {
                     *menu = Menu::Main;
