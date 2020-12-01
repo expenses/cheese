@@ -7,3 +7,4 @@ animation/*.png
 animation/*.blend
 perf.data*
 wasm/pkg
+linux_build
