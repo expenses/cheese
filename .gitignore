@@ -2,7 +2,5 @@
 *.code-workspace
 fonts
 target
-animation/*.gltf
-animation/*.png
-animation/*.blend
 perf.data*
+linux_build
