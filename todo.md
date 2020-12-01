@@ -6,7 +6,7 @@
 - Work on improving pathfinding a little bit if possible
 - Improve shadows (shadow mapping is hard tbh)
 
-- UI for recruitment queues. ( important )
-- Make avoidance look better (medium )
+- Make avoidance look better ( medium ) ( it's a bug, not a feature :P )
 - Attack move movement fixes.
 - Fix issue where two units bump off each other when trying to get to the same point in avoidance.
+- Fix issue where units just skip contructing a building.

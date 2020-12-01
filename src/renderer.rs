@@ -1051,6 +1051,7 @@ pub enum TextAlignment {
     Default,
     Center,
     HorizontalRight,
+    CenterLeft,
 }
 
 impl TextBuffer {
@@ -1087,6 +1088,9 @@ impl TextBuffer {
                 .v_align(wgpu_glyph::VerticalAlign::Center),
             TextAlignment::HorizontalRight => {
                 wgpu_glyph::Layout::default().h_align(wgpu_glyph::HorizontalAlign::Right)
+            }
+            TextAlignment::CenterLeft => {
+                wgpu_glyph::Layout::default().v_align(wgpu_glyph::VerticalAlign::Center)
             }
         };
 

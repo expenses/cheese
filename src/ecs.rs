@@ -203,8 +203,7 @@ impl Ability {
 
     fn image(&self) -> Image {
         match self.ability_type {
-            AbilityType::Build(Building::Armoury) => Image::BuildArmoury,
-            AbilityType::Build(Building::Pump) => Image::BuildPump,
+            AbilityType::Build(building) => building.stats().image,
             AbilityType::Recruit(Unit::Engineer) => Image::RecruitEngineer,
             AbilityType::Recruit(Unit::MouseMarine) => Image::RecruitMouseMarine,
             AbilityType::SetRecruitmentWaypoint => Image::SetRecruitmentWaypoint,
@@ -382,6 +381,7 @@ pub struct BuildingStats {
     pub dimensions: Vec2,
     pub max_health: f32,
     pub cost: u32,
+    pub image: Image,
 }
 
 impl Building {
@@ -403,12 +403,14 @@ impl Building {
                 dimensions: Vec2::new(6.0, 10.0),
                 max_health: 500.0,
                 cost: 200,
+                image: Image::BuildArmoury,
             },
             Self::Pump => BuildingStats {
                 radius: 3.0,
                 dimensions: Vec2::new(4.0, 4.0),
                 max_health: 200.0,
                 cost: 50,
+                image: Image::BuildPump,
             },
         }
     }
@@ -433,6 +435,7 @@ impl Building {
             dimensions,
             max_health: _,
             cost: _,
+            image: _,
         } = self.stats();
 
         let handle = map.insert(position, dimensions)?;
@@ -522,7 +525,10 @@ impl Building {
                         &Ability::SET_RECRUITMENT_WAYPOINT,
                     ]),
                 );
-                buffer.add_component(entity, RecruitmentQueue::new(position, self.stats().dimensions));
+                buffer.add_component(
+                    entity,
+                    RecruitmentQueue::new(position, self.stats().dimensions),
+                );
             }
         }
 
@@ -541,7 +547,7 @@ impl RecruitmentQueue {
         Self {
             percentage_progress: 0.0,
             queue: VecDeque::new(),
-            waypoint: building_position + Vec2::new(0.0, building_dims.y / 2.0 + 2.0)
+            waypoint: building_position + Vec2::new(0.0, building_dims.y / 2.0 + 2.0),
         }
     }
 

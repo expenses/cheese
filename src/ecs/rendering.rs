@@ -217,6 +217,8 @@ fn wgpu_to_screen(wgpu: Vec2, width: f32, height: f32) -> Vec2 {
 #[legion::system]
 #[read_component(RecruitmentQueue)]
 #[read_component(Side)]
+#[read_component(Building)]
+#[read_component(FullyBuilt)]
 pub fn render_ui(
     #[resource] dpi_scaling: &DpiScaling,
     #[resource] cheese_coins: &CheeseCoins,
@@ -248,13 +250,7 @@ pub fn render_ui(
                 .map(|cond| format!("{}\n", cond)),
         );
 
-    let mut query = <(&RecruitmentQueue, &Side)>::query();
-    let queue_infos = query
-        .iter(world)
-        .filter(|(_, side)| **side == player_side.0)
-        .map(|(queue, _)| format!("Queue progress: {}\n", queue.percentage_progress));
-
-    let text: String = objectives.chain(queue_infos).collect();
+    let text: String = objectives.collect();
 
     let y_offset = 4.0;
 
@@ -287,6 +283,90 @@ pub fn render_ui(
         false,
         dpi_scaling.0,
     );
+
+    // Recruitment queue rendering
+
+    let max_queues_we_can_fit_on_a_1080p_monitor = 28;
+
+    let mut queues: Vec<_> = <(&RecruitmentQueue, &Side, &Building, Option<&FullyBuilt>)>::query()
+        .iter(world)
+        .filter(|(_, side, ..)| **side == player_side.0)
+        .map(|(queue, _, building, built)| (queue, building, built.is_some()))
+        .collect();
+
+    queues.sort_unstable_by(
+        |&(queue_a, building_a, built_a), &(queue_b, building_b, built_b)| match building_a
+            .cmp(building_b)
+        {
+            std::cmp::Ordering::Equal => match built_a.cmp(&built_b) {
+                std::cmp::Ordering::Equal => queue_a.length().cmp(&queue_b.length()).reverse(),
+                unequal => unequal.reverse(),
+            },
+            unequal => unequal,
+        },
+    );
+
+    queues
+        .iter()
+        .take(max_queues_we_can_fit_on_a_1080p_monitor)
+        .enumerate()
+        .for_each(|(i, (queue, building, built))| {
+            let y = 64.0 + i as f32 * (32.0 + 4.0);
+
+            let bar_width = 256.0;
+            let bar_offset = bar_width + 8.0;
+            let bar_inner = bar_width - 2.0;
+
+            line_buffers.draw_filled_rect(
+                Vec2::new(dims.x - bar_offset / 2.0, y),
+                Vec2::new(bar_width, 24.0),
+                blue,
+                dpi_scaling.0,
+            );
+
+            let progress_in_px = queue.percentage_progress * bar_inner;
+
+            line_buffers.draw_filled_rect(
+                Vec2::new(
+                    dims.x - bar_offset / 2.0 + (progress_in_px - bar_inner) / 2.0,
+                    y,
+                ),
+                Vec2::new(progress_in_px, 22.0),
+                Vec4::one(),
+                dpi_scaling.0,
+            );
+
+            let text_colour = if queue.percentage_progress < 0.05 {
+                Vec4::one()
+            } else {
+                blue
+            };
+
+            text_buffer.render_text(
+                Vec2::new(dims.x - bar_offset + 8.0, y),
+                &format!("{}", queue.queue.len()),
+                Font::Ui,
+                0.75,
+                dpi_scaling.0,
+                TextAlignment::CenterLeft,
+                text_colour,
+            );
+
+            line_buffers.draw_filled_rect(
+                Vec2::new(dims.x - bar_offset - 16.0, y),
+                Vec2::new(34.0, 34.0),
+                blue,
+                dpi_scaling.0,
+            );
+
+            line_buffers.draw_image(
+                Vec2::new(dims.x - bar_offset - 16.0, y),
+                Vec2::new(32.0, 32.0),
+                building.stats().image,
+                !built,
+                dpi_scaling.0,
+            );
+        });
 }
 
 #[legion::system(for_each)]
