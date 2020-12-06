@@ -153,53 +153,124 @@ fn is_attacking_building(commands: &CommandQueue, world: &SubWorld) -> bool {
 }
 
 #[legion::system(for_each)]
-#[filter(component::<Position>() & component::<Side>() & component::<FiringRange>() & component::<CanAttack>())]
+#[filter(component::<Position>() & component::<Side>() & component::<CanAttack>())]
 #[read_component(Entity)]
 #[read_component(Position)]
 #[read_component(Side)]
-#[read_component(FiringRange)]
 #[read_component(Building)]
-pub fn add_attack_commands(entity: &Entity, commands: &mut CommandQueue, world: &SubWorld) {
-    let (position, side, firing_range) = <(&Position, &Side, &FiringRange)>::query()
+pub fn agro_units(
+    entity: &Entity,
+    commands: &mut CommandQueue,
+    world: &SubWorld,
+    command_buffer: &mut CommandBuffer,
+) {
+    // Todo: find a clean way to getting units to re-target when an enemy unit is in range and we're
+    // currently attacking a building.
+
+    let is_available_to_attack =
+        matches!(commands.0.front(), None | Some(&Command::MoveTo { attack_move: true, .. }));
+
+    if !is_available_to_attack {
+        return;
+    }
+
+    let (position, side) = <(&Position, &Side)>::query()
         .get(world, *entity)
         .expect("We've applied a filter for these components");
 
-    let agro_multiplier = 1.5;
+    let agro_range: f32 = 15.0;
 
-    // Todo: find a clean way to getting units to re-target when an enemy unit is in range and we're
-    // currently attacking a building.
-    if matches!(commands.0.front(), None | Some(&Command::MoveTo { attack_move: true, .. })) {
-        let target = <(Entity, &Position, Option<&Building>, &Side)>::query()
-            .iter(world)
-            .filter(|(.., entity_side)| *entity_side != side)
-            .filter(|(_, entity_position, ..)| {
-                (position.0 - entity_position.0).mag_sq()
-                    <= (firing_range.0 * agro_multiplier).powi(2)
-            })
-            .map(|(entity, entity_position, entity_building, _)| {
-                let distance_sq = (position.0 - entity_position.0).mag_sq();
-                (
-                    entity,
-                    ordered_float::OrderedFloat(distance_sq),
-                    entity_building.is_some(),
-                )
-            })
-            .min_by(|&(_, a_pos, a_is_building), &(_, b_pos, b_is_building)| {
-                if a_is_building == b_is_building {
-                    a_pos.cmp(&b_pos)
-                // If only a is a building, then it a has less priority
-                } else if a_is_building {
-                    std::cmp::Ordering::Greater
-                // If only b is a building then it a has higher priority
-                } else {
-                    std::cmp::Ordering::Less
-                }
-            })
-            .map(|(entity, ..)| entity);
+    if let Some(target) = find_best_target(position.0, *side, Some(agro_range), world) {
+        commands.0.push_front(Command::new_attack(target, false));
+        command_buffer.add_component(*entity, Agroed::ThisTick(target));
+    }
+}
 
-        if let Some(target) = target {
-            commands.0.push_front(Command::new_attack(*target, false))
-        }
+fn find_best_target(
+    position: Vec2,
+    side: Side,
+    in_range: Option<f32>,
+    world: &SubWorld,
+) -> Option<Entity> {
+    <(Entity, &Position, Option<&Building>, &Side)>::query()
+        .iter(world)
+        .filter(|(.., entity_side)| **entity_side != side)
+        .filter(|(_, entity_position, ..)| {
+            in_range
+                .map(|range| (position - entity_position.0).mag_sq() <= range.powi(2))
+                .unwrap_or(true)
+        })
+        .map(|(entity, entity_position, entity_building, _)| {
+            let distance_sq = (position - entity_position.0).mag_sq();
+            (
+                *entity,
+                ordered_float::OrderedFloat(distance_sq),
+                entity_building.is_some(),
+            )
+        })
+        .min_by(|&(_, a_pos, a_is_building), &(_, b_pos, b_is_building)| {
+            if a_is_building == b_is_building {
+                a_pos.cmp(&b_pos)
+            // If only a is a building, then it a has less priority
+            } else if a_is_building {
+                std::cmp::Ordering::Greater
+            // If only b is a building then it a has higher priority
+            } else {
+                std::cmp::Ordering::Less
+            }
+        })
+        .map(|(entity, ..)| entity)
+}
+
+#[legion::system(for_each)]
+#[filter(component::<Position>() & component::<Side>() & component::<CanAttack>())]
+#[read_component(Entity)]
+#[read_component(Position)]
+#[read_component(Side)]
+#[read_component(Building)]
+#[read_component(Agroed)]
+pub fn propagate_agro(
+    entity: &Entity,
+    commands: &mut CommandQueue,
+    world: &SubWorld,
+    command_buffer: &mut CommandBuffer,
+) {
+    let is_available_to_attack =
+        matches!(commands.0.front(), None | Some(&Command::MoveTo { attack_move: true, .. }));
+
+    if !is_available_to_attack {
+        return;
+    }
+
+    let (position, side) = <(&Position, &Side)>::query()
+        .get(world, *entity)
+        .expect("We've applied a filter for these components");
+
+    let agro_propagation_distance: f32 = 5.0;
+
+    let agro_entity = <(&Position, &Side, &Agroed)>::query()
+        .iter(world)
+        .filter(|(unit_pos, unit_side, _)| {
+            *unit_side == side
+                && (unit_pos.0 - position.0).mag_sq() <= agro_propagation_distance.powi(2)
+        })
+        .next()
+        .map(|(.., agroed)| match agroed {
+            Agroed::ThisTick(entity) => *entity,
+            Agroed::LastTick(entity) => *entity,
+        });
+
+    if let Some(target) = agro_entity {
+        commands.0.push_front(Command::new_attack(target, false));
+        command_buffer.add_component(*entity, Agroed::ThisTick(target));
+    }
+}
+
+#[legion::system(for_each)]
+pub fn update_argoed_this_tick(entity: &Entity, agroed: &mut Agroed, buffer: &mut CommandBuffer) {
+    match *agroed {
+        Agroed::ThisTick(entity) => *agroed = Agroed::LastTick(entity),
+        Agroed::LastTick(_) => buffer.remove_component::<Agroed>(*entity),
     }
 }
 

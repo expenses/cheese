@@ -204,6 +204,7 @@ async fn run() -> anyhow::Result<()> {
                     let mut ai_build_orders = resources.get_mut::<AiBuildOrders>().unwrap();
                     resources.get_mut::<TotalTime>().unwrap().0 = 0.0;
                     *resources.get_mut::<GameStats>().unwrap() = GameStats::default();
+                    *map = pathfinding::Map::new();
 
                     world.clear();
 

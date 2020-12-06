@@ -78,7 +78,9 @@ pub fn handle_keypresses(
                 VirtualKeyCode::Down => camera_controls.down = pressed,
                 VirtualKeyCode::Left => camera_controls.left = pressed,
                 VirtualKeyCode::Right => camera_controls.right = pressed,
-                VirtualKeyCode::LShift => rts_controls.shift_held = pressed,
+                VirtualKeyCode::LShift | VirtualKeyCode::RShift => {
+                    rts_controls.shift_held = pressed
+                }
                 VirtualKeyCode::LControl => rts_controls.control_held = pressed,
                 VirtualKeyCode::S if pressed => rts_controls.stop_pressed = true,
                 VirtualKeyCode::A if pressed => rts_controls.mode = CommandMode::AttackMove,

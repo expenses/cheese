@@ -1,6 +1,6 @@
 [package]
 name = "cheese"
-version = "0.1.0-beta"
+version = "0.1.1"
 authors = ["Ashley Ruglys <ashley.ruglys@gmail.com>"]
 edition = "2018"
 description = "A RTS about mice on the moon made for the 2020 Github Game Off"
@@ -47,3 +47,6 @@ multithreading = ["legion/parallel"]
 wasm = ["web-sys", "winit/web-sys", "wasm-bindgen-futures", "rand/wasm-bindgen", "console_error_panic_hook"]
 native = []
 
+# Compile all dependencies in release mode
+[profile.dev.package."*"]
+opt-level = 3
