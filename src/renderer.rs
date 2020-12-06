@@ -262,7 +262,7 @@ impl RenderContext {
                         binding: 5,
                         visibility: wgpu::ShaderStage::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
                             multisampled: false,
                             view_dimension: wgpu::TextureViewDimension::D2,
                         },
