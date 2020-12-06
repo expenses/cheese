@@ -32,8 +32,9 @@ use buildings::{
     progress_recruitment_queue_system,
 };
 use combat::{
-    add_attack_commands_system, apply_bullets_system, firing_system, handle_damaged_system,
-    reduce_cooldowns_system, stop_actions_on_dead_entities_system,
+    agro_units_system, apply_bullets_system, firing_system, handle_damaged_system,
+    propagate_agro_system, reduce_cooldowns_system, stop_actions_on_dead_entities_system,
+    update_argoed_this_tick_system,
 };
 use controls::{
     cast_ray_system, control_camera_system, handle_control_groups_system,
@@ -89,6 +90,12 @@ fn cleanup_controls(
 
 pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
     builder
+        // Agro propagation and updating
+        .add_system(update_argoed_this_tick_system())
+        .flush()
+        .add_system(propagate_agro_system())
+        .flush()
+        //
         .add_system(handle_keypresses_system())
         .add_system(generate_cheese_coins_system())
         .add_system(progress_recruitment_queue_system())
@@ -104,7 +111,7 @@ pub fn add_gameplay_systems(builder: &mut legion::systems::Builder) {
         .add_system(handle_drag_selection_system())
         .add_system(handle_control_groups_system())
         .add_system(avoidance_system())
-        .add_system(add_attack_commands_system())
+        .add_system(agro_units_system())
         .add_system(update_selected_units_abilities_system())
         .add_system(follow_ai_build_orders_system())
         // Needed because a command could place a building using a command buffer, but the entity
@@ -745,6 +752,11 @@ pub struct CheeseDropletVelocity(Vec3);
 pub struct CanBuild;
 pub struct CanAttack;
 pub struct FullyBuilt;
+#[derive(Copy, Clone)]
+pub enum Agroed {
+    ThisTick(Entity),
+    LastTick(Entity),
+}
 
 fn nearest_point_within_building(
     unit_pos: Vec2,

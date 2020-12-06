@@ -1,6 +1,6 @@
 [package]
 name = "cheese"
-version = "0.1.0-beta"
+version = "0.1.1"
 authors = ["Ashley Ruglys <ashley.ruglys@gmail.com>"]
 edition = "2018"
 description = "A RTS about mice on the moon made for the 2020 Github Game Off"
@@ -40,3 +40,7 @@ default = ["multithreading"]
 # I want to be able to toggle this because wasm is (currently) only single threaded so being able to
 # test it with a single thread is useful in case I make a web version.
 multithreading = ["legion/parallel"]
+
+# Compile all dependencies in release mode
+[profile.dev.package."*"]
+opt-level = 3
